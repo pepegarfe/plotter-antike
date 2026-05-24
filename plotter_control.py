@@ -23,9 +23,14 @@ def _resource(filename):
 
 
 def _config_path():
-    """Ruta persistente para la config: AppData cuando es exe, dir del script si no."""
+    """Ruta persistente para la config: AppData/Library cuando es exe, dir del script si no."""
     if getattr(sys, 'frozen', False):
-        d = Path(os.environ.get('APPDATA', str(Path.home()))) / 'Antike' / 'PlotterController'
+        if sys.platform == 'darwin':
+            d = Path.home() / 'Library' / 'Application Support' / 'Antike' / 'PlotterController'
+        elif sys.platform == 'win32':
+            d = Path(os.environ.get('APPDATA', str(Path.home()))) / 'Antike' / 'PlotterController'
+        else:  # Linux y otros
+            d = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'antike' / 'plotter-controller'
         d.mkdir(parents=True, exist_ok=True)
         return d / 'plotter_config.json'
     return Path(__file__).parent / 'plotter_config.json'
