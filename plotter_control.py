@@ -1885,28 +1885,6 @@ class PlotterApp:
         h_sb.bind('<Return>', self._apply_size_h)
         _sublbl(row, "mm").pack(side=tk.LEFT)
 
-        # ── Escala ──
-        f = _sec("ESCALA")
-        row = tk.Frame(f, bg='#f4f4f4')
-        row.pack(fill=tk.X, pady=1)
-        sc_sb = ttk.Spinbox(row, from_=1, to=9999, increment=10,
-                             textvariable=self.var_scale, width=6,
-                             command=self._apply_scale)
-        sc_sb.pack(side=tk.LEFT)
-        sc_sb.bind('<Return>', self._apply_scale)
-        _sublbl(row, "%").pack(side=tk.LEFT, padx=(2, 6))
-        ttk.Button(row, text="−", width=2,
-                   command=lambda: self._nudge_scale(-1)).pack(side=tk.LEFT)
-        ttk.Button(row, text="+", width=2,
-                   command=lambda: self._nudge_scale(+1)).pack(side=tk.LEFT, padx=(2, 0))
-
-        row = tk.Frame(f, bg='#f4f4f4')
-        row.pack(fill=tk.X, pady=(3, 1))
-        _sublbl(row, "paso").pack(side=tk.LEFT)
-        ttk.Combobox(row, textvariable=self.var_scale_step, width=4,
-                     values=["1", "5", "10", "25", "50"]).pack(side=tk.LEFT, padx=(4, 2))
-        _sublbl(row, "%").pack(side=tk.LEFT)
-
         # ── Rotación ──
         f = _sec("ROTACIÓN")
         row = tk.Frame(f, bg='#f4f4f4')
@@ -1928,6 +1906,17 @@ class PlotterApp:
         ttk.Combobox(row, textvariable=self.var_rot_step, width=4,
                      values=["1", "5", "15", "30", "45", "90"]).pack(side=tk.LEFT, padx=(4, 2))
         _sublbl(row, "°").pack(side=tk.LEFT)
+
+        # ── Espejo ──
+        f = _sec("ESPEJO")
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=(2, 2))
+        ttk.Button(row, text="↔ Horizontal",
+                   command=lambda: self._apply_mirror('h')).pack(side=tk.LEFT, fill=tk.X,
+                                                                  expand=True, padx=(0, 2))
+        ttk.Button(row, text="↕ Vertical",
+                   command=lambda: self._apply_mirror('v')).pack(side=tk.LEFT, fill=tk.X,
+                                                                  expand=True)
 
         # ── Capas panel ───────────────────────────────────────────────────────
         layers_outer = tk.Frame(layers_tab, bg='#f4f4f4')
@@ -2630,6 +2619,49 @@ class PlotterApp:
             self._apply_rotation()
         except (tk.TclError, ValueError):
             pass
+
+    def _apply_mirror(self, axis):
+        """Flip selected path(s) around the group bounding-box center.
+
+        Bakes effective transform + flip into the raw pts so scale/rotation/offset
+        reset to identity — the visual position in the workspace is preserved.
+        axis: 'h' = left↔right (negate X), 'v' = top↔bottom (negate Y).
+        """
+        if not self.current_styled:
+            return
+        self._push_undo()
+        eff = self._effective_styled()
+
+        if self._sel_idx >= 0:
+            indices = [self._sel_idx]
+        elif self._sel_set:
+            indices = sorted(self._sel_set)
+        else:
+            indices = list(range(len(self.current_styled)))
+
+        all_pts = [pt for i in indices for pt in eff[i]['pts']]
+        if not all_pts:
+            return
+
+        if axis == 'h':
+            center = (min(p[0] for p in all_pts) + max(p[0] for p in all_pts)) / 2
+            for i in indices:
+                self.current_styled[i]['pts'] = [(2*center - x, y) for x, y in eff[i]['pts']]
+                self.current_styled[i]['_pinched'] = None
+                self.path_offsets[i]   = [0.0, 0.0]
+                self.path_scales[i]    = 1.0
+                self.path_rotations[i] = 0.0
+        else:
+            center = (min(p[1] for p in all_pts) + max(p[1] for p in all_pts)) / 2
+            for i in indices:
+                self.current_styled[i]['pts'] = [(x, 2*center - y) for x, y in eff[i]['pts']]
+                self.current_styled[i]['_pinched'] = None
+                self.path_offsets[i]   = [0.0, 0.0]
+                self.path_scales[i]    = 1.0
+                self.path_rotations[i] = 0.0
+
+        self._refresh_preview()
+        self._update_pos_display()
 
     def _orig_size(self, idx):
         """Return (w_mm, h_mm) of path(s) at scale=1, no rotation/offset."""
