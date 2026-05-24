@@ -1950,8 +1950,11 @@ class PlotterApp:
                 scrollregion=self._layers_canvas.bbox('all')))
         self._layers_canvas.bind('<Configure>',
             lambda e: self._layers_canvas.itemconfig(_lwin, width=e.width))
-        self._layers_canvas.bind('<MouseWheel>',
-            lambda e: self._layers_canvas.yview_scroll(-1 if e.delta > 0 else 1, 'units'))
+        def _layers_scroll(e):
+            self._layers_canvas.yview_scroll(-1 if e.delta > 0 else 1, 'units')
+        self._layers_scroll = _layers_scroll
+        self._layers_canvas.bind('<MouseWheel>', _layers_scroll)
+        self._layers_inner.bind('<MouseWheel>', _layers_scroll)
 
         # ── Plotter tab ───────────────────────────────────────────────────────
         plotter_tab = ttk.Frame(nb)
@@ -2067,6 +2070,7 @@ class PlotterApp:
 
             for w in (item, thumb, lbl):
                 w.bind('<Button-1>', _click)
+                w.bind('<MouseWheel>', self._layers_scroll)
 
         self._layers_inner.update_idletasks()
         self._layers_canvas.configure(scrollregion=self._layers_canvas.bbox('all'))
