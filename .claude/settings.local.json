@@ -5,7 +5,11 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\('plotter_control.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK - sin errores de sintaxis'\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('plotter_control.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('plotter_control.py','r',encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(start pythonw *)",
+      "Bash(git push *)"
     ]
   }
 }

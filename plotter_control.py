@@ -1470,7 +1470,7 @@ class DesignCanvas(_BaseCanvas):
                     if is_sel:
                         outline, ow = '#ff6600', 2.5
                     elif is_group:
-                        outline, ow = '#2266ee', 2.0
+                        outline, ow = '#ff6600', 2.0
                     else:
                         outline, ow = (_rgb_hex(stroke) if stroke else ''), 1
                     self.canvas.create_polygon(coords, fill=_rgb_hex(fill),
@@ -1489,7 +1489,7 @@ class DesignCanvas(_BaseCanvas):
                     if is_sel:
                         clr, ow = '#ff6600', 2.5
                     elif is_group:
-                        clr, ow = '#2266ee', 2.0
+                        clr, ow = '#ff6600', 2.0
                     else:
                         clr, ow = _rgb_hex(stroke), 1.5
                     self.canvas.create_line(pcoords, fill=clr, width=ow,
@@ -1547,8 +1547,9 @@ class PlotterApp:
         self.var_overcut      = tk.DoubleVar(value=1.0)
         self.var_corner_angle = tk.DoubleVar(value=0.0)
         self.var_step      = tk.DoubleVar(value=10.0)
-        self.var_status    = tk.StringVar(value="Desconectado")
-        self.var_file      = tk.StringVar(value="Ningún archivo cargado")
+        self.var_status        = tk.StringVar(value="Desconectado")
+        self.var_design_status = tk.StringVar(value="Sin diseño")
+        self.var_file          = tk.StringVar(value="Ningún archivo cargado")
         self.var_progress  = tk.DoubleVar(value=0)
         self.var_work_w    = tk.DoubleVar(value=300.0)
         self.var_work_h    = tk.DoubleVar(value=200.0)
@@ -1723,147 +1724,56 @@ class PlotterApp:
         ttk.Label(ca_row, text="(0 = desactivado)", foreground='gray').pack(side=tk.LEFT)
 
     def _build_right(self, parent):
-        nb = ttk.Notebook(parent)
+        self.nb = nb = ttk.Notebook(parent)
         nb.pack(fill=tk.BOTH, expand=True)
 
         # ── Vista Previa tab ─────────────────────────────────────────────────
         preview_tab = ttk.Frame(nb)
         nb.add(preview_tab, text="  Vista Previa  ")
 
-        # ── Toolbar 1: Archivo + Objeto + Acciones ────────────────────────────
-        tb1 = ttk.Frame(preview_tab, padding=(4, 4, 4, 2))
-        tb1.pack(fill=tk.X)
+        # ── Toolbar: Acciones + Vista ─────────────────────────────────────────
+        tb = ttk.Frame(preview_tab, padding=(4, 4, 4, 3))
+        tb.pack(fill=tk.X)
 
-        ttk.Label(tb1, text="Objeto:").pack(side=tk.LEFT)
-        self.cb_obj = ttk.Combobox(tb1, textvariable=self.var_obj_sel, state='readonly', width=14)
-        self.cb_obj['values'] = ["Todos"]
-        self.cb_obj.pack(side=tk.LEFT, padx=(2, 0))
-        self.cb_obj.bind('<<ComboboxSelected>>', self._on_obj_select)
-        ttk.Separator(tb1, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=7, pady=2)
-
-        ttk.Button(tb1, text="Test 10×10 mm", command=self._cut_test).pack(side=tk.LEFT, padx=2)
-        self.btn_send = ttk.Button(tb1, text="Enviar Diseño ▶", command=self._send_design)
+        ttk.Button(tb, text="Test 10×10 mm", command=self._cut_test).pack(side=tk.LEFT, padx=2)
+        self.btn_send = ttk.Button(tb, text="Enviar Diseño ▶", command=self._send_design)
         self.btn_send.pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb1, text="Cancelar", command=self._cancel).pack(side=tk.LEFT, padx=2)
+        ttk.Button(tb, text="Cancelar", command=self._cancel).pack(side=tk.LEFT, padx=2)
 
-        # ── Toolbar 2: Posición ───────────────────────────────────────────────
-        tb2 = ttk.Frame(preview_tab, padding=(4, 2, 4, 2))
-        tb2.pack(fill=tk.X)
+        ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
 
-        ttk.Label(tb2, text="X (mm):").pack(side=tk.LEFT)
-        sb_px = ttk.Spinbox(tb2, from_=-9999, to=9999, increment=0.5,
-                             textvariable=self.var_pos_x, width=7,
-                             command=self._apply_obj_position)
-        sb_px.pack(side=tk.LEFT, padx=(2, 0))
-        sb_px.bind('<Return>', self._apply_obj_position)
-        ttk.Button(tb2, text="<", width=2,
-                   command=lambda: self._nudge_pos('x', -1)).pack(side=tk.LEFT)
-        ttk.Button(tb2, text=">", width=2,
-                   command=lambda: self._nudge_pos('x', +1)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(tb, text="Ajustar", command=self._fit_view).pack(side=tk.LEFT, padx=2)
+        ttk.Button(tb, text="+", width=2, command=lambda: self._zoom(1.25)).pack(side=tk.LEFT, padx=1)
+        ttk.Button(tb, text="−", width=2, command=lambda: self._zoom(0.8)).pack(side=tk.LEFT, padx=(1, 4))
 
-        ttk.Label(tb2, text="Y (mm):").pack(side=tk.LEFT)
-        sb_py = ttk.Spinbox(tb2, from_=-9999, to=9999, increment=0.5,
-                             textvariable=self.var_pos_y, width=7,
-                             command=self._apply_obj_position)
-        sb_py.pack(side=tk.LEFT, padx=(2, 0))
-        sb_py.bind('<Return>', self._apply_obj_position)
-        ttk.Button(tb2, text="v", width=2,
-                   command=lambda: self._nudge_pos('y', -1)).pack(side=tk.LEFT)
-        ttk.Button(tb2, text="^", width=2,
-                   command=lambda: self._nudge_pos('y', +1)).pack(side=tk.LEFT, padx=(0, 4))
-
-        ttk.Label(tb2, text="Paso:").pack(side=tk.LEFT)
-        ttk.Combobox(tb2, textvariable=self.var_pos_step, width=5,
-                     values=["0.1", "0.5", "1", "5", "10", "50"]).pack(side=tk.LEFT, padx=(2, 10))
-
-        ttk.Button(tb2, text="Centrar en área",
-                   command=self._center_design).pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb2, text="Resetear todo",
-                   command=self._reset_positions).pack(side=tk.LEFT, padx=2)
-
-        # ── Toolbar 3: Tamaño + Escala + Rotación + Vista ─────────────────────
-        tb3 = ttk.Frame(preview_tab, padding=(4, 2, 4, 3))
-        tb3.pack(fill=tk.X)
-
-        # Tamaño
-        ttk.Label(tb3, text="W:").pack(side=tk.LEFT)
-        w_sb = ttk.Spinbox(tb3, from_=0.01, to=99999, increment=1.0,
-                            textvariable=self.var_size_w, width=7,
-                            command=self._apply_size_w)
-        w_sb.pack(side=tk.LEFT, padx=(2, 0))
-        w_sb.bind('<Return>', self._apply_size_w)
-        ttk.Label(tb3, text="mm").pack(side=tk.LEFT, padx=(2, 6))
-
-        ttk.Label(tb3, text="H:").pack(side=tk.LEFT)
-        h_sb = ttk.Spinbox(tb3, from_=0.01, to=99999, increment=1.0,
-                            textvariable=self.var_size_h, width=7,
-                            command=self._apply_size_h)
-        h_sb.pack(side=tk.LEFT, padx=(2, 0))
-        h_sb.bind('<Return>', self._apply_size_h)
-        ttk.Label(tb3, text="mm").pack(side=tk.LEFT, padx=(2, 0))
-
-        ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
-
-        # Escala
-        ttk.Label(tb3, text="Escala:").pack(side=tk.LEFT)
-        sc_sb = ttk.Spinbox(tb3, from_=1, to=9999, increment=10,
-                             textvariable=self.var_scale, width=7,
-                             command=self._apply_scale)
-        sc_sb.pack(side=tk.LEFT, padx=(2, 0))
-        sc_sb.bind('<Return>', self._apply_scale)
-        ttk.Label(tb3, text="%").pack(side=tk.LEFT, padx=(2, 0))
-        ttk.Button(tb3, text="-", width=2,
-                   command=lambda: self._nudge_scale(-1)).pack(side=tk.LEFT, padx=(4, 0))
-        ttk.Button(tb3, text="+", width=2,
-                   command=lambda: self._nudge_scale(+1)).pack(side=tk.LEFT, padx=(0, 2))
-        ttk.Combobox(tb3, textvariable=self.var_scale_step, width=4,
-                     values=["1", "5", "10", "25", "50"]).pack(side=tk.LEFT, padx=(1, 0))
-        ttk.Label(tb3, text="%").pack(side=tk.LEFT, padx=(1, 0))
-
-        ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
-
-        # Rotación
-        ttk.Label(tb3, text="Rot:").pack(side=tk.LEFT)
-        rot_sb = ttk.Spinbox(tb3, from_=0, to=359.9, increment=45,
-                              textvariable=self.var_rotate, width=7,
-                              command=self._apply_rotation)
-        rot_sb.pack(side=tk.LEFT, padx=(2, 0))
-        rot_sb.bind('<Return>', self._apply_rotation)
-        ttk.Label(tb3, text="°").pack(side=tk.LEFT, padx=(2, 0))
-        ttk.Button(tb3, text="<<", width=3,
-                   command=lambda: self._nudge_rotate(-1)).pack(side=tk.LEFT, padx=(4, 0))
-        ttk.Button(tb3, text=">>", width=3,
-                   command=lambda: self._nudge_rotate(+1)).pack(side=tk.LEFT, padx=(0, 2))
-        ttk.Combobox(tb3, textvariable=self.var_rot_step, width=4,
-                     values=["1", "5", "15", "30", "45", "90"]).pack(side=tk.LEFT, padx=(1, 0))
-        ttk.Label(tb3, text="°").pack(side=tk.LEFT, padx=(1, 0))
-
-        ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
-
-        # Vista
-        ttk.Button(tb3, text="Ajustar", command=self._fit_view).pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb3, text="+", width=2, command=lambda: self._zoom(1.25)).pack(side=tk.LEFT, padx=1)
-        ttk.Button(tb3, text="−", width=2, command=lambda: self._zoom(0.8)).pack(side=tk.LEFT, padx=(1, 4))
         self._var_pan_mode = tk.BooleanVar(value=False)
         self._btn_pan = tk.Checkbutton(
-            tb3, text=" ↔ Mover ", variable=self._var_pan_mode,
+            tb, text=" ↔ Mover ", variable=self._var_pan_mode,
             indicatoron=False, command=self._on_pan_mode_toggle,
             relief=tk.RAISED, bd=2, padx=3)
         self._btn_pan.pack(side=tk.LEFT, padx=2)
+
         self._var_cut_overlay = tk.BooleanVar(value=False)
         self._btn_cut = tk.Checkbutton(
-            tb3, text=" ✂ Vectores ", variable=self._var_cut_overlay,
+            tb, text=" ✂ Vectores ", variable=self._var_cut_overlay,
             indicatoron=False, command=self._toggle_cut_overlay,
             relief=tk.RAISED, bd=2, padx=3)
         self._btn_cut.pack(side=tk.LEFT, padx=2)
 
-        self.lbl_info = ttk.Label(tb3, text="", foreground='#666')
+        self.lbl_info = ttk.Label(tb, text="", foreground='#666')
         self.lbl_info.pack(side=tk.RIGHT, padx=8)
 
         ttk.Separator(preview_tab).pack(fill=tk.X)
 
-        # Canvas a pantalla completa
-        self.design_canvas = DesignCanvas(preview_tab)
+        # ── Área principal: canvas + sidebar ─────────────────────────────────
+        content = ttk.Frame(preview_tab)
+        content.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas
+        canvas_wrap = ttk.Frame(content)
+        canvas_wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.design_canvas = DesignCanvas(canvas_wrap)
         self.design_canvas._sel_set_cb = self._on_canvas_sel_rect
         self.design_canvas.canvas.config(takefocus=True)
         self.design_canvas.canvas.bind('<ButtonPress-1>',
@@ -1873,6 +1783,143 @@ class PlotterApp:
         self.design_canvas.canvas.bind('<Right>', lambda e: self._arrow_nudge('x', +1))
         self.design_canvas.canvas.bind('<Up>',    lambda e: self._arrow_nudge('y', +1))
         self.design_canvas.canvas.bind('<Down>',  lambda e: self._arrow_nudge('y', -1))
+
+        # ── Sidebar derecha ───────────────────────────────────────────────────
+        sb_sep = ttk.Separator(content, orient=tk.VERTICAL)
+        sb_sep.pack(side=tk.LEFT, fill=tk.Y)
+
+        self._sidebar = tk.Frame(content, bg='#f4f4f4', width=164)
+        self._sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        self._sidebar.pack_propagate(False)
+
+        def _sec(title):
+            tk.Label(self._sidebar, text=title, bg='#f4f4f4',
+                     fg='#999999', font=('', 8)).pack(anchor=tk.W, padx=10, pady=(10, 1))
+            ttk.Separator(self._sidebar).pack(fill=tk.X, padx=6)
+            f = tk.Frame(self._sidebar, bg='#f4f4f4')
+            f.pack(fill=tk.X, padx=8, pady=(4, 2))
+            return f
+
+        def _lbl(parent, text):
+            return tk.Label(parent, text=text, bg='#f4f4f4', fg='#444444', font=('', 9))
+
+        def _sublbl(parent, text):
+            return tk.Label(parent, text=text, bg='#f4f4f4', fg='#aaaaaa', font=('', 8))
+
+        # ── Objeto ──
+        f = _sec("OBJETO")
+        self.cb_obj = ttk.Combobox(f, textvariable=self.var_obj_sel, state='readonly', width=16)
+        self.cb_obj['values'] = ["Todos"]
+        self.cb_obj.pack(fill=tk.X, pady=(0, 2))
+        self.cb_obj.bind('<<ComboboxSelected>>', self._on_obj_select)
+
+        # ── Posición ──
+        f = _sec("POSICIÓN")
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=1)
+        _lbl(row, "X").pack(side=tk.LEFT)
+        sb_px = ttk.Spinbox(row, from_=-9999, to=9999, increment=0.5,
+                             textvariable=self.var_pos_x, width=6,
+                             command=self._apply_obj_position)
+        sb_px.pack(side=tk.LEFT, padx=(4, 2))
+        sb_px.bind('<Return>', self._apply_obj_position)
+        ttk.Button(row, text="<", width=2,
+                   command=lambda: self._nudge_pos('x', -1)).pack(side=tk.LEFT)
+        ttk.Button(row, text=">", width=2,
+                   command=lambda: self._nudge_pos('x', +1)).pack(side=tk.LEFT, padx=(1, 0))
+
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=1)
+        _lbl(row, "Y").pack(side=tk.LEFT)
+        sb_py = ttk.Spinbox(row, from_=-9999, to=9999, increment=0.5,
+                             textvariable=self.var_pos_y, width=6,
+                             command=self._apply_obj_position)
+        sb_py.pack(side=tk.LEFT, padx=(4, 2))
+        sb_py.bind('<Return>', self._apply_obj_position)
+        ttk.Button(row, text="v", width=2,
+                   command=lambda: self._nudge_pos('y', -1)).pack(side=tk.LEFT)
+        ttk.Button(row, text="^", width=2,
+                   command=lambda: self._nudge_pos('y', +1)).pack(side=tk.LEFT, padx=(1, 0))
+
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=(3, 1))
+        _sublbl(row, "paso").pack(side=tk.LEFT)
+        ttk.Combobox(row, textvariable=self.var_pos_step, width=4,
+                     values=["0.1", "0.5", "1", "5", "10", "50"]).pack(side=tk.LEFT, padx=(4, 2))
+        _sublbl(row, "mm").pack(side=tk.LEFT)
+
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=(4, 2))
+        ttk.Button(row, text="Centrar",
+                   command=self._center_design).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        ttk.Button(row, text="Resetear",
+                   command=self._reset_positions).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # ── Tamaño ──
+        f = _sec("TAMAÑO")
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=1)
+        _lbl(row, "W").pack(side=tk.LEFT)
+        w_sb = ttk.Spinbox(row, from_=0.01, to=99999, increment=1.0,
+                            textvariable=self.var_size_w, width=6,
+                            command=self._apply_size_w)
+        w_sb.pack(side=tk.LEFT, padx=(4, 2))
+        w_sb.bind('<Return>', self._apply_size_w)
+        _sublbl(row, "mm").pack(side=tk.LEFT)
+
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=1)
+        _lbl(row, "H").pack(side=tk.LEFT)
+        h_sb = ttk.Spinbox(row, from_=0.01, to=99999, increment=1.0,
+                            textvariable=self.var_size_h, width=6,
+                            command=self._apply_size_h)
+        h_sb.pack(side=tk.LEFT, padx=(4, 2))
+        h_sb.bind('<Return>', self._apply_size_h)
+        _sublbl(row, "mm").pack(side=tk.LEFT)
+
+        # ── Escala ──
+        f = _sec("ESCALA")
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=1)
+        sc_sb = ttk.Spinbox(row, from_=1, to=9999, increment=10,
+                             textvariable=self.var_scale, width=6,
+                             command=self._apply_scale)
+        sc_sb.pack(side=tk.LEFT)
+        sc_sb.bind('<Return>', self._apply_scale)
+        _sublbl(row, "%").pack(side=tk.LEFT, padx=(2, 6))
+        ttk.Button(row, text="−", width=2,
+                   command=lambda: self._nudge_scale(-1)).pack(side=tk.LEFT)
+        ttk.Button(row, text="+", width=2,
+                   command=lambda: self._nudge_scale(+1)).pack(side=tk.LEFT, padx=(2, 0))
+
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=(3, 1))
+        _sublbl(row, "paso").pack(side=tk.LEFT)
+        ttk.Combobox(row, textvariable=self.var_scale_step, width=4,
+                     values=["1", "5", "10", "25", "50"]).pack(side=tk.LEFT, padx=(4, 2))
+        _sublbl(row, "%").pack(side=tk.LEFT)
+
+        # ── Rotación ──
+        f = _sec("ROTACIÓN")
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=1)
+        rot_sb = ttk.Spinbox(row, from_=0, to=359.9, increment=45,
+                              textvariable=self.var_rotate, width=6,
+                              command=self._apply_rotation)
+        rot_sb.pack(side=tk.LEFT)
+        rot_sb.bind('<Return>', self._apply_rotation)
+        _sublbl(row, "°").pack(side=tk.LEFT, padx=(2, 6))
+        ttk.Button(row, text="<<", width=3,
+                   command=lambda: self._nudge_rotate(-1)).pack(side=tk.LEFT)
+        ttk.Button(row, text=">>", width=3,
+                   command=lambda: self._nudge_rotate(+1)).pack(side=tk.LEFT, padx=(2, 0))
+
+        row = tk.Frame(f, bg='#f4f4f4')
+        row.pack(fill=tk.X, pady=(3, 1))
+        _sublbl(row, "paso").pack(side=tk.LEFT)
+        ttk.Combobox(row, textvariable=self.var_rot_step, width=4,
+                     values=["1", "5", "15", "30", "45", "90"]).pack(side=tk.LEFT, padx=(4, 2))
+        _sublbl(row, "°").pack(side=tk.LEFT)
 
         # ── Plotter tab ───────────────────────────────────────────────────────
         plotter_tab = ttk.Frame(nb)
@@ -1895,13 +1942,33 @@ class PlotterApp:
     def _build_statusbar(self):
         sb = ttk.Frame(self.root, relief=tk.SUNKEN, padding=(4, 2))
         sb.pack(side=tk.BOTTOM, fill=tk.X)
-        self.sb_led = tk.Canvas(sb, width=14, height=14, highlightthickness=0)
-        self.sb_led.pack(side=tk.LEFT, padx=(2, 4))
-        self._set_sb_led(False)
-        ttk.Label(sb, textvariable=self.var_status).pack(side=tk.LEFT)
+
+        # Izquierda: estado del diseño
+        ttk.Label(sb, textvariable=self.var_design_status,
+                  foreground='#444').pack(side=tk.LEFT, padx=(2, 0))
+
+        # Derecha: barra de progreso + estado del plotter (clic → tab Plotter)
         self.progressbar = ttk.Progressbar(sb, variable=self.var_progress,
                                            maximum=100, length=220, mode='determinate')
         self.progressbar.pack(side=tk.RIGHT, padx=4)
+
+        plotter_btn = tk.Frame(sb, cursor='hand2')
+        plotter_btn.pack(side=tk.RIGHT, padx=(0, 8))
+
+        self.sb_led = tk.Canvas(plotter_btn, width=14, height=14, highlightthickness=0,
+                                cursor='hand2')
+        self.sb_led.pack(side=tk.LEFT, padx=(0, 4))
+        self._set_sb_led(False)
+
+        sb_status_lbl = ttk.Label(plotter_btn, textvariable=self.var_status,
+                                  cursor='hand2')
+        sb_status_lbl.pack(side=tk.LEFT)
+
+        def _open_plotter_tab(_event=None):
+            self.nb.select(1)
+
+        for w in (plotter_btn, self.sb_led, sb_status_lbl):
+            w.bind('<Button-1>', _open_plotter_tab)
 
     # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -2029,7 +2096,7 @@ class PlotterApp:
             total_pts = sum(len(d["pts"]) for d in paths)
             self.lbl_info.config(text=f"{len(paths)} paths | {total_pts} puntos")
             self._log(f"Cargado: {len(paths)} paths, {total_pts} puntos")
-            self.var_status.set(f"Diseno cargado: {Path(path).name}")
+            self.var_design_status.set(f"{Path(path).name}  ·  {len(paths)} paths | {total_pts} pts")
 
         except ImportError as e:
             messagebox.showerror("Librería faltante", str(e))
