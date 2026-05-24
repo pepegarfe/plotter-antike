@@ -2304,6 +2304,7 @@ class PlotterApp:
         self._clear_sel_set()
         self._sel_idx = idx
         self.var_obj_sel.set("Todos" if idx == -1 else f"Objeto {idx+1}")
+        self.design_canvas.set_selected(idx)
         self._update_pos_display()
         self._update_size_display()
         self._update_scale_display()
