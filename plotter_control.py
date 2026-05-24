@@ -1788,15 +1788,23 @@ class PlotterApp:
         sb_sep = ttk.Separator(content, orient=tk.VERTICAL)
         sb_sep.pack(side=tk.LEFT, fill=tk.Y)
 
-        self._sidebar = tk.Frame(content, bg='#f4f4f4', width=164)
+        self._sidebar = tk.Frame(content, bg='#f4f4f4', width=178)
         self._sidebar.pack(side=tk.LEFT, fill=tk.Y)
         self._sidebar.pack_propagate(False)
 
+        sb_nb = ttk.Notebook(self._sidebar)
+        sb_nb.pack(fill=tk.BOTH, expand=True)
+
+        props_tab  = tk.Frame(sb_nb, bg='#f4f4f4')
+        layers_tab = tk.Frame(sb_nb, bg='#f4f4f4')
+        sb_nb.add(props_tab,  text=" Props ")
+        sb_nb.add(layers_tab, text=" Capas ")
+
         def _sec(title):
-            tk.Label(self._sidebar, text=title, bg='#f4f4f4',
+            tk.Label(props_tab, text=title, bg='#f4f4f4',
                      fg='#999999', font=('', 8)).pack(anchor=tk.W, padx=10, pady=(10, 1))
-            ttk.Separator(self._sidebar).pack(fill=tk.X, padx=6)
-            f = tk.Frame(self._sidebar, bg='#f4f4f4')
+            ttk.Separator(props_tab).pack(fill=tk.X, padx=6)
+            f = tk.Frame(props_tab, bg='#f4f4f4')
             f.pack(fill=tk.X, padx=8, pady=(4, 2))
             return f
 
@@ -1921,6 +1929,30 @@ class PlotterApp:
                      values=["1", "5", "15", "30", "45", "90"]).pack(side=tk.LEFT, padx=(4, 2))
         _sublbl(row, "°").pack(side=tk.LEFT)
 
+        # ── Capas panel ───────────────────────────────────────────────────────
+        layers_outer = tk.Frame(layers_tab, bg='#f4f4f4')
+        layers_outer.pack(fill=tk.BOTH, expand=True)
+
+        layers_scroll = tk.Scrollbar(layers_outer, orient=tk.VERTICAL)
+        layers_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self._layers_canvas = tk.Canvas(layers_outer, bg='#f4f4f4',
+                                        yscrollcommand=layers_scroll.set,
+                                        highlightthickness=0)
+        self._layers_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        layers_scroll.config(command=self._layers_canvas.yview)
+
+        self._layers_inner = tk.Frame(self._layers_canvas, bg='#f4f4f4')
+        _lwin = self._layers_canvas.create_window((0, 0), window=self._layers_inner, anchor='nw')
+
+        self._layers_inner.bind('<Configure>',
+            lambda e: self._layers_canvas.configure(
+                scrollregion=self._layers_canvas.bbox('all')))
+        self._layers_canvas.bind('<Configure>',
+            lambda e: self._layers_canvas.itemconfig(_lwin, width=e.width))
+        self._layers_canvas.bind('<MouseWheel>',
+            lambda e: self._layers_canvas.yview_scroll(-1 if e.delta > 0 else 1, 'units'))
+
         # ── Plotter tab ───────────────────────────────────────────────────────
         plotter_tab = ttk.Frame(nb)
         nb.add(plotter_tab, text="  Plotter  ")
@@ -1971,6 +2003,73 @@ class PlotterApp:
             w.bind('<Button-1>', _open_plotter_tab)
 
     # ── Connection ─────────────────────────────────────────────────────────────
+
+    def _make_layer_thumb(self, parent, pts, fill, stroke, bg, size=28):
+        border = '#cc4400' if bg == '#ff6600' else '#cccccc'
+        c = tk.Canvas(parent, width=size, height=size, bg=bg,
+                      highlightthickness=1, highlightbackground=border,
+                      cursor='hand2')
+        if not pts or len(pts) < 2:
+            return c
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        pw = (max(xs) - min(xs)) or 1.0
+        ph = (max(ys) - min(ys)) or 1.0
+        pad = 3
+        avail = size - 2 * pad
+        s = avail / max(pw, ph)
+        ox = pad + (avail - pw * s) / 2 - min(xs) * s
+        # Y-inverted: canvas y = oy - pt[1]*s
+        oy = pad + (avail - ph * s) / 2 + max(ys) * s
+        coords = []
+        for pt in pts:
+            coords.append(pt[0] * s + ox)
+            coords.append(oy - pt[1] * s)
+        if fill is not None and len(coords) >= 6:
+            c.create_polygon(coords, fill=_rgb_hex(fill),
+                             outline=_rgb_hex(stroke) if stroke else _rgb_hex(fill),
+                             width=0.5)
+        elif stroke is not None and len(coords) >= 4:
+            c.create_line(coords, fill=_rgb_hex(stroke), width=1.0,
+                          smooth=True, joinstyle='round', capstyle='round')
+        return c
+
+    def _refresh_layers(self):
+        if not hasattr(self, '_layers_inner'):
+            return
+        for w in self._layers_inner.winfo_children():
+            w.destroy()
+        if not self.current_styled:
+            tk.Label(self._layers_inner, text="Sin trazados", bg='#f4f4f4',
+                     fg='#aaaaaa', font=('', 9)).pack(padx=8, pady=14)
+            self._layers_canvas.configure(scrollregion=self._layers_canvas.bbox('all'))
+            return
+        for i, d in enumerate(self.current_styled):
+            is_sel   = (self._sel_idx == i)
+            is_group = (i in self._sel_set)
+            active   = is_sel or is_group
+            bg = '#ff6600' if active else ('#f4f4f4' if i % 2 == 0 else '#ebebeb')
+            fg = '#ffffff' if active else '#333333'
+
+            item = tk.Frame(self._layers_inner, bg=bg, cursor='hand2')
+            item.pack(fill=tk.X)
+
+            thumb = self._make_layer_thumb(item, d['pts'], d.get('fill'), d.get('stroke'), bg)
+            thumb.pack(side=tk.LEFT, padx=(4, 3), pady=3)
+
+            lbl = tk.Label(item, text=f"Objeto {i+1}", bg=bg, fg=fg,
+                           font=('', 9), cursor='hand2', anchor='w')
+            lbl.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
+
+            def _click(_e, idx=i):
+                new_idx = -1 if self._sel_idx == idx else idx
+                self._on_canvas_select(new_idx)
+
+            for w in (item, thumb, lbl):
+                w.bind('<Button-1>', _click)
+
+        self._layers_inner.update_idletasks()
+        self._layers_canvas.configure(scrollregion=self._layers_canvas.bbox('all'))
 
     def _refresh_ports(self):
         ports = self.plotter.get_ports()
@@ -2097,6 +2196,7 @@ class PlotterApp:
             self.lbl_info.config(text=f"{len(paths)} paths | {total_pts} puntos")
             self._log(f"Cargado: {len(paths)} paths, {total_pts} puntos")
             self.var_design_status.set(f"{Path(path).name}  ·  {len(paths)} paths | {total_pts} pts")
+            self._refresh_layers()
 
         except ImportError as e:
             messagebox.showerror("Librería faltante", str(e))
@@ -2207,6 +2307,7 @@ class PlotterApp:
         self._update_pos_display()
         self._update_size_display()
         self._update_scale_display()
+        self._refresh_layers()
 
     def _update_pos_display(self):
         eff = self._effective_styled()
@@ -2760,6 +2861,7 @@ class PlotterApp:
                 self.var_obj_sel.set("Todos")
         self.design_canvas.redraw()
         self._update_pos_display()
+        self._refresh_layers()
 
     def _clear_sel_set(self):
         """Clear the rubber-band selection and remove 'Selección' from combobox."""
@@ -2814,6 +2916,7 @@ class PlotterApp:
         else:
             self.design_canvas.set_paths([], selected=-1)
             self.lbl_info.config(text="Sin diseño")
+        self._refresh_layers()
 
     # ── Preview helpers ────────────────────────────────────────────────────────
 
