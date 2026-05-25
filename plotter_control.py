@@ -1585,6 +1585,7 @@ class PlotterApp:
         self.log            = None
         self._log_buffer    = []   # mensajes previos a que se abra la ventana Log COM
         self._clipboard     = []   # trazados copiados con Ctrl+C
+        self._port_scan_busy = False  # evita solapar hilos de escaneo
 
         # Tkinter variables
         self.var_port      = tk.StringVar()
@@ -1614,9 +1615,7 @@ class PlotterApp:
         self._load_config()
         self._build_ui()
         self._update_work_area()
-        self._refresh_ports()
-        self.root.after(400, self._auto_connect)
-        self._schedule_port_refresh()
+        self._schedule_port_refresh()   # primer escaneo en hilo de fondo, no bloquea
         self.root.bind('<Control-o>', lambda _: self.open_file())
         self.root.bind('<Control-z>', lambda _: self._undo())
         self.root.bind('<Control-Z>', lambda _: self._redo())
@@ -2123,12 +2122,18 @@ class PlotterApp:
         ox = pad + (avail - pw * s) / 2 - min(xs) * s
         # Y-inverted: canvas y = oy - pt[1]*s
         oy = pad + (avail - ph * s) / 2 + max(ys) * s
+        draw_pts = _pinch_corners(pts) if stroke is not None else pts
         coords = []
-        for pt in pts:
+        for pt in draw_pts:
             coords.append(pt[0] * s + ox)
             coords.append(oy - pt[1] * s)
         if fill is not None and len(coords) >= 6:
-            c.create_polygon(coords, fill=_rgb_hex(fill),
+            # Para polígonos usamos los pts originales sin pinch
+            poly_coords = []
+            for pt in pts:
+                poly_coords.append(pt[0] * s + ox)
+                poly_coords.append(oy - pt[1] * s)
+            c.create_polygon(poly_coords, fill=_rgb_hex(fill),
                              outline=_rgb_hex(stroke) if stroke else _rgb_hex(fill),
                              width=0.5)
         elif stroke is not None and len(coords) >= 4:
@@ -2175,40 +2180,64 @@ class PlotterApp:
         self._layers_canvas.configure(scrollregion=self._layers_canvas.bbox('all'))
 
     def _refresh_ports(self):
-        ports = self.plotter.get_ports()
+        """Actualiza el combobox de puertos desde el hilo principal (llamar solo con root.after)."""
+        ports = getattr(self, '_last_ports', [])
         if hasattr(self, 'cb_port'):
             self.cb_port['values'] = ports
         if ports and not self.var_port.get():
             self.var_port.set(ports[0])
-        prev = getattr(self, '_last_ports', None)
-        if ports != prev:
-            self._last_ports = ports
-            self._log(f"Puertos detectados: {', '.join(ports) or 'ninguno'}")
 
     def _schedule_port_refresh(self):
-        if not self.plotter.connected:
-            self._refresh_ports()
-            self._auto_connect()
+        """Lanza un hilo de escaneo cada 3 s si no hay conexión activa."""
+        if not self.plotter.connected and not self._port_scan_busy:
+            self._port_scan_busy = True
+            threading.Thread(target=self._bg_port_scan, daemon=True).start()
         self.root.after(3000, self._schedule_port_refresh)
 
-    def _auto_connect(self):
-        """Conecta automáticamente al arrancar si el puerto guardado está disponible."""
-        port = self.var_port.get()
-        if not port or self.plotter.connected:
-            return
-        if port not in self.plotter.get_ports():
-            return
+    def _bg_port_scan(self):
+        """Escanea puertos y autoconecta en un hilo de fondo (no bloquea la UI)."""
         try:
-            baud = int(self.var_baud.get() or 9600)
-            self.plotter.connect(port, baud)
-            if hasattr(self, 'btn_connect'):
-                self.btn_connect.config(text="Desconectar")
-            self._set_led(True)
-            self.var_status.set(f"Conectado — {port} @ {baud}")
-            self._log(f"Autoconectado a {port} @ {baud} baudios")
-            self.plotter.send("IN;")
-        except Exception as e:
-            self._log(f"Autoconexión fallida en {port}: {e}")
+            ports = self.plotter.get_ports()
+        except Exception:
+            ports = []
+
+        prev = getattr(self, '_last_ports', None)
+        self._last_ports = ports
+
+        # Actualizar UI en el hilo principal
+        self.root.after(0, self._refresh_ports)
+        if ports != prev:
+            self.root.after(0, self._log,
+                            f"Puertos detectados: {', '.join(ports) or 'ninguno'}")
+
+        # Intentar autoconexión si procede
+        port = self.var_port.get()
+        if port and not self.plotter.connected and port in ports:
+            try:
+                baud = int(self.var_baud.get() or 9600)
+                self.plotter.connect(port, baud)
+                self.plotter.send("IN;")
+                self.root.after(0, self._on_auto_connected, port, baud)
+            except Exception as e:
+                self.root.after(0, self._log,
+                                f"Autoconexión fallida en {port}: {e}")
+
+        self._port_scan_busy = False
+
+    def _on_auto_connected(self, port, baud):
+        """Actualiza la UI tras una autoconexión exitosa (se llama desde root.after)."""
+        if hasattr(self, 'btn_connect'):
+            self.btn_connect.config(text="Desconectar")
+        self._set_led(True)
+        self.var_status.set(f"Conectado — {port} @ {baud}")
+        self._log(f"Autoconectado a {port} @ {baud} baudios")
+        self._save_config()
+
+    def _auto_connect(self):
+        """Compatibilidad: redirige al mecanismo de hilo de fondo."""
+        if not self._port_scan_busy and not self.plotter.connected:
+            self._port_scan_busy = True
+            threading.Thread(target=self._bg_port_scan, daemon=True).start()
 
     def _toggle_connection(self):
         if self.plotter.connected:
