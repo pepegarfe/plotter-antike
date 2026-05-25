@@ -485,7 +485,7 @@ class SVGParser:
         elif sweep and dtheta < 0:
             dtheta += 2 * math.pi
 
-        n = max(4, int(abs(dtheta) * max(rx, ry)))
+        n = max(32, int(abs(dtheta) * max(rx, ry) * 4))
         result = []
         for k in range(1, n + 1):
             th = theta1 + dtheta * k / n
@@ -577,7 +577,7 @@ class SVGParser:
                         x  += cx; y  += cy
                     _poly = (math.hypot(x1 - cx, y1 - cy) + math.hypot(x2 - x1, y2 - y1) +
                              math.hypot(x - x2, y - y2))
-                    _n = max(4, int(_poly))
+                    _n = max(16, int(_poly * 4))
                     for s in range(1, _n + 1):
                         tt = s / _n
                         bx = (1-tt)**3*cx + 3*(1-tt)**2*tt*x1 + 3*(1-tt)*tt**2*x2 + tt**3*x
@@ -598,7 +598,7 @@ class SVGParser:
                     y1 = 2 * cy - pcy if pcy is not None else cy
                     _poly = (math.hypot(x1 - cx, y1 - cy) + math.hypot(x2 - x1, y2 - y1) +
                              math.hypot(x - x2, y - y2))
-                    _n = max(4, int(_poly))
+                    _n = max(16, int(_poly * 4))
                     for s in range(1, _n + 1):
                         tt = s / _n
                         bx = (1-tt)**3*cx + 3*(1-tt)**2*tt*x1 + 3*(1-tt)*tt**2*x2 + tt**3*x
@@ -616,7 +616,7 @@ class SVGParser:
                         x1 += cx; y1 += cy
                         x  += cx; y  += cy
                     _poly = math.hypot(x1 - cx, y1 - cy) + math.hypot(x - x1, y - y1)
-                    _n = max(4, int(_poly))
+                    _n = max(16, int(_poly * 4))
                     for s in range(1, _n + 1):
                         tt = s / _n
                         bx = (1-tt)**2*cx + 2*(1-tt)*tt*x1 + tt**2*x
@@ -634,7 +634,7 @@ class SVGParser:
                     x1 = 2 * cx - pqx if pqx is not None else cx
                     y1 = 2 * cy - pqy if pqy is not None else cy
                     _poly = math.hypot(x1 - cx, y1 - cy) + math.hypot(x - x1, y - y1)
-                    _n = max(4, int(_poly))
+                    _n = max(16, int(_poly * 4))
                     for s in range(1, _n + 1):
                         tt = s / _n
                         bx = (1-tt)**2*cx + 2*(1-tt)*tt*x1 + tt**2*x
@@ -1069,7 +1069,7 @@ class AIParser:
                     _poly = (math.hypot(p1[0]-p0[0], p1[1]-p0[1]) +
                              math.hypot(p2[0]-p1[0], p2[1]-p1[1]) +
                              math.hypot(p3[0]-p2[0], p3[1]-p2[1]))
-                    _n = max(4, round(_poly))
+                    _n = max(16, int(_poly * 4))
                     for s in range(1, _n + 1):
                         t  = s / _n
                         mt = 1 - t
@@ -1520,37 +1520,31 @@ class DesignCanvas(_BaseCanvas):
                     self.canvas.create_polygon(coords, fill=_rgb_hex(fill),
                                                outline=outline, width=ow)
             elif stroke is not None:
-                # Caché de _pinch_corners: válido mientras pts no cambie (pan/zoom no lo cambia)
-                pinched = d.get('_pinched')
-                if pinched is None:
-                    pinched = _pinch_corners(pts)
-                    d['_pinched'] = pinched
-                pcoords = []
-                for pp in pinched:
-                    pcoords.append(pp[0] * zoom + off_x)
-                    pcoords.append(off_y - pp[1] * zoom)
-                if len(pcoords) >= 4:
+                coords = []
+                for pt in pts:
+                    coords.append(pt[0] * zoom + off_x)
+                    coords.append(off_y - pt[1] * zoom)
+                if len(coords) >= 4:
                     if is_sel:
                         clr, ow = '#ff6600', 2.5
                     elif is_group:
                         clr, ow = '#ff6600', 2.0
                     else:
                         clr, ow = _rgb_hex(stroke), 1.5
-                    self.canvas.create_line(pcoords, fill=clr, width=ow,
-                                            smooth=True, joinstyle=tk.ROUND, capstyle=tk.ROUND)
+                    self.canvas.create_line(coords, fill=clr, width=ow,
+                                            smooth=False, joinstyle=tk.MITER, capstyle=tk.BUTT)
 
         if self.show_cut:
             for path in self.cut_paths:
                 if len(path) < 2:
                     continue
-                pinched = _pinch_corners(path)
-                pcoords = []
-                for pp in pinched:
-                    pcoords.append(pp[0] * zoom + off_x)
-                    pcoords.append(off_y - pp[1] * zoom)
-                if len(pcoords) >= 4:
-                    self.canvas.create_line(pcoords, fill='#0055cc', width=1.5,
-                                            smooth=True, joinstyle=tk.ROUND, capstyle=tk.ROUND)
+                coords = []
+                for pt in path:
+                    coords.append(pt[0] * zoom + off_x)
+                    coords.append(off_y - pt[1] * zoom)
+                if len(coords) >= 4:
+                    self.canvas.create_line(coords, fill='#0055cc', width=1.5,
+                                            smooth=False, joinstyle=tk.MITER, capstyle=tk.BUTT)
         self._draw_origin()
 
 
@@ -2122,23 +2116,17 @@ class PlotterApp:
         ox = pad + (avail - pw * s) / 2 - min(xs) * s
         # Y-inverted: canvas y = oy - pt[1]*s
         oy = pad + (avail - ph * s) / 2 + max(ys) * s
-        draw_pts = _pinch_corners(pts) if stroke is not None else pts
         coords = []
-        for pt in draw_pts:
+        for pt in pts:
             coords.append(pt[0] * s + ox)
             coords.append(oy - pt[1] * s)
         if fill is not None and len(coords) >= 6:
-            # Para polígonos usamos los pts originales sin pinch
-            poly_coords = []
-            for pt in pts:
-                poly_coords.append(pt[0] * s + ox)
-                poly_coords.append(oy - pt[1] * s)
-            c.create_polygon(poly_coords, fill=_rgb_hex(fill),
+            c.create_polygon(coords, fill=_rgb_hex(fill),
                              outline=_rgb_hex(stroke) if stroke else _rgb_hex(fill),
                              width=0.5)
         elif stroke is not None and len(coords) >= 4:
             c.create_line(coords, fill=_rgb_hex(stroke), width=1.0,
-                          smooth=True, joinstyle='round', capstyle='round')
+                          smooth=False, joinstyle='miter', capstyle='butt')
         return c
 
     def _refresh_layers(self):
