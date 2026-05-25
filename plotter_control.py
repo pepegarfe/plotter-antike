@@ -1347,20 +1347,46 @@ class DesignCanvas(_BaseCanvas):
         self._sel_set_cb = None   # callback(set_of_indices) after rubber-band release
         self._rect_start = None   # canvas pixel (x,y) where drag started
         self._rect_id    = None   # canvas item id for the rubber-band rect
-        self.cut_paths  = []    # List[pts] overlay de vectores de corte
-        self.show_cut   = False
+        self.cut_paths   = []    # List[pts] overlay de vectores de corte
+        self.show_cut    = False
+        self._move_drag  = None  # (prev_x, prev_y) durante drag-move, None si no activo
+        self._move_cb    = None  # callback(dx_mm, dy_mm) durante drag
+        self._move_end_cb = None # callback() al soltar tras drag-move
         self.canvas.bind('<ButtonPress-1>',   self._sel_press,   add='+')
         self.canvas.bind('<ButtonRelease-1>', self._sel_release, add='+')
 
-    # ── drag: pan mode or rubber-band ─────────────────────────────────────────
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _hit_selection(self, cx, cy, threshold=20):
+        """True si (cx,cy) está a ≤threshold px de algún punto de la selección activa."""
+        if self._selected >= 0 and self._selected < len(self.styled):
+            indices = [self._selected]
+        elif self._sel_set:
+            indices = [i for i in self._sel_set if i < len(self.styled)]
+        else:
+            return False
+        for i in indices:
+            for pt in self.styled[i]['pts']:
+                px, py = self._to_canvas(*pt)
+                if math.hypot(cx - px, cy - py) <= threshold:
+                    return True
+        return False
+
+    # ── drag: pan / move / rubber-band ────────────────────────────────────────
 
     def _drag_start(self, event):
         if self.pan_mode:
-            self._drag = (event.x, event.y, self.off_x, self.off_y)
+            self._drag      = (event.x, event.y, self.off_x, self.off_y)
             self._rect_start = None
+            self._move_drag  = None
+        elif self._hit_selection(event.x, event.y):
+            self._move_drag  = (event.x, event.y)
+            self._rect_start = None
+            self._drag       = None
         else:
             self._rect_start = (event.x, event.y)
-            self._drag = None
+            self._drag       = None
+            self._move_drag  = None
 
     def _drag_move(self, event):
         if self.pan_mode:
@@ -1368,6 +1394,14 @@ class DesignCanvas(_BaseCanvas):
                 self.off_x = self._drag[2] + event.x - self._drag[0]
                 self.off_y = self._drag[3] + event.y - self._drag[1]
                 self.redraw()
+        elif self._move_drag is not None:
+            dx_px = event.x - self._move_drag[0]
+            dy_px = event.y - self._move_drag[1]
+            self._move_drag = (event.x, event.y)
+            dx_mm =  dx_px / self.zoom
+            dy_mm = -dy_px / self.zoom   # Y canvas invertido respecto a mm
+            if self._move_cb:
+                self._move_cb(dx_mm, dy_mm)
         elif self._rect_start:
             if self._rect_id:
                 self.canvas.delete(self._rect_id)
@@ -1379,11 +1413,16 @@ class DesignCanvas(_BaseCanvas):
     # ── click / rubber-band release ───────────────────────────────────────────
 
     def _sel_press(self, event):
-        pass   # drag_start already records _rect_start / _drag
+        pass   # drag_start already records state
 
     def _sel_release(self, event):
         if self.pan_mode:
             self._drag = None
+            return
+        if self._move_drag is not None:
+            self._move_drag = None
+            if self._move_end_cb:
+                self._move_end_cb()
             return
         if self._rect_id:
             self.canvas.delete(self._rect_id)
@@ -1543,6 +1582,9 @@ class PlotterApp:
         self._sel_set       = set() # indices selected by rubber-band (group)
         self._undo_stack    = []   # historial de estados para Ctrl+Z
         self._redo_stack    = []   # estados revertidos para Ctrl+Shift+Z
+        self.log            = None
+        self._log_buffer    = []   # mensajes previos a que se abra la ventana Log COM
+        self._clipboard     = []   # trazados copiados con Ctrl+C
 
         # Tkinter variables
         self.var_port      = tk.StringVar()
@@ -1573,10 +1615,13 @@ class PlotterApp:
         self._build_ui()
         self._update_work_area()
         self._refresh_ports()
+        self.root.after(400, self._auto_connect)
         self._schedule_port_refresh()
         self.root.bind('<Control-o>', lambda _: self.open_file())
         self.root.bind('<Control-z>', lambda _: self._undo())
         self.root.bind('<Control-Z>', lambda _: self._redo())
+        self.root.bind('<Control-c>', lambda _: self._copy_selected())
+        self.root.bind('<Control-v>', lambda _: self._paste())
         self.root.bind('<Control-equal>', lambda _: self._zoom(1.25))
         self.root.bind('<Control-plus>', lambda _: self._zoom(1.25))
         self.root.bind('<Control-minus>', lambda _: self._zoom(0.8))
@@ -1603,8 +1648,14 @@ class PlotterApp:
         f.add_command(label="Salir", command=self.root.quit)
         m.add_cascade(label="Archivo", menu=f)
 
+        pl = tk.Menu(m, tearoff=0)
+        pl.add_command(label="Panel de Plotter…", command=self._open_plotter_window)
+        m.add_cascade(label="Plotter", menu=pl)
+
         p = tk.Menu(m, tearoff=0)
         p.add_command(label="Actualizar puertos", command=self._refresh_ports)
+        p.add_separator()
+        p.add_command(label="Log COM…", command=self._open_log_window)
         m.add_cascade(label="Puerto", menu=p)
 
         h = tk.Menu(m, tearoff=0)
@@ -1729,57 +1780,77 @@ class PlotterApp:
         ttk.Label(ca_row, text="(0 = desactivado)", foreground='gray').pack(side=tk.LEFT)
 
     def _build_right(self, parent):
-        self.nb = nb = ttk.Notebook(parent)
-        nb.pack(fill=tk.BOTH, expand=True)
+        preview_tab = ttk.Frame(parent)
+        preview_tab.pack(fill=tk.BOTH, expand=True)
 
-        # ── Vista Previa tab ─────────────────────────────────────────────────
-        preview_tab = ttk.Frame(nb)
-        nb.add(preview_tab, text="  Vista Previa  ")
-
-        # ── Toolbar: Acciones + Vista ─────────────────────────────────────────
-        tb = ttk.Frame(preview_tab, padding=(4, 4, 4, 3))
-        tb.pack(fill=tk.X)
-
-        ttk.Button(tb, text="Test 10×10 mm", command=self._cut_test).pack(side=tk.LEFT, padx=2)
-        self.btn_send = ttk.Button(tb, text="Enviar Diseño ▶", command=self._send_design)
-        self.btn_send.pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb, text="Cancelar", command=self._cancel).pack(side=tk.LEFT, padx=2)
-
-        ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
-
-        ttk.Button(tb, text="Ajustar", command=self._fit_view).pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb, text="+", width=2, command=lambda: self._zoom(1.25)).pack(side=tk.LEFT, padx=1)
-        ttk.Button(tb, text="−", width=2, command=lambda: self._zoom(0.8)).pack(side=tk.LEFT, padx=(1, 4))
-
-        self._var_pan_mode = tk.BooleanVar(value=False)
-        self._btn_pan = tk.Checkbutton(
-            tb, text=" ↔ Mover ", variable=self._var_pan_mode,
-            indicatoron=False, command=self._on_pan_mode_toggle,
-            relief=tk.RAISED, bd=2, padx=3)
-        self._btn_pan.pack(side=tk.LEFT, padx=2)
-
+        self._var_pan_mode    = tk.BooleanVar(value=False)
         self._var_cut_overlay = tk.BooleanVar(value=False)
-        self._btn_cut = tk.Checkbutton(
-            tb, text=" ✂ Vectores ", variable=self._var_cut_overlay,
-            indicatoron=False, command=self._toggle_cut_overlay,
-            relief=tk.RAISED, bd=2, padx=3)
-        self._btn_cut.pack(side=tk.LEFT, padx=2)
 
-        self.lbl_info = ttk.Label(tb, text="", foreground='#666')
-        self.lbl_info.pack(side=tk.RIGHT, padx=8)
-
-        ttk.Separator(preview_tab).pack(fill=tk.X)
-
-        # ── Área principal: canvas + sidebar ─────────────────────────────────
+        # ── Área principal: barra iconos + canvas + sidebar ───────────────────
         content = ttk.Frame(preview_tab)
         content.pack(fill=tk.BOTH, expand=True)
+
+        # ── Barra de iconos izquierda ─────────────────────────────────────────
+        _IBG = '#ebebeb'
+
+        def _tooltip(widget, text):
+            tip = [None]
+            def _show(e):
+                tip[0] = tk.Toplevel(widget)
+                tip[0].wm_overrideredirect(True)
+                x = widget.winfo_rootx() + widget.winfo_width() + 6
+                y = widget.winfo_rooty() + widget.winfo_height() // 2 - 10
+                tip[0].wm_geometry(f"+{x}+{y}")
+                tk.Label(tip[0], text=text, bg='#ffffcc', fg='#222',
+                         font=('', 9), relief=tk.SOLID, bd=1,
+                         padx=5, pady=3).pack()
+            def _hide(e):
+                if tip[0]:
+                    tip[0].destroy()
+                    tip[0] = None
+            widget.bind('<Enter>', _show)
+            widget.bind('<Leave>', _hide)
+
+        def _ibtn(icon, tip, cmd):
+            b = tk.Button(icon_bar, text=icon, command=cmd,
+                          bg=_IBG, activebackground='#d0d0d0',
+                          relief=tk.FLAT, bd=0, font=('', 13), pady=7)
+            b.pack(fill=tk.X)
+            _tooltip(b, tip)
+            return b
+
+        def _itoggle(icon, tip, var, cmd):
+            b = tk.Checkbutton(icon_bar, text=icon, variable=var, command=cmd,
+                               indicatoron=False,
+                               bg=_IBG, activebackground='#d0d0d0',
+                               selectcolor='#c5dff8',
+                               relief=tk.FLAT, bd=0, font=('', 13), pady=7)
+            b.pack(fill=tk.X)
+            _tooltip(b, tip)
+            return b
+
+        icon_bar = tk.Frame(content, bg=_IBG, width=40)
+        icon_bar.pack(side=tk.LEFT, fill=tk.Y)
+        icon_bar.pack_propagate(False)
+
+        _ibtn("⤢", "Ajustar vista", self._fit_view)
+        _ibtn("⊕", "Zoom +", lambda: self._zoom(1.25))
+        _ibtn("⊖", "Zoom −", lambda: self._zoom(0.8))
+        tk.Frame(icon_bar, height=1, bg='#cccccc').pack(fill=tk.X, pady=4)
+        self._btn_pan = _itoggle("↔", "Mover", self._var_pan_mode, self._on_pan_mode_toggle)
+        self._btn_cut = _itoggle("✂", "Vectores de corte", self._var_cut_overlay, self._toggle_cut_overlay)
+
+        ttk.Separator(content, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y)
 
         # Canvas
         canvas_wrap = ttk.Frame(content)
         canvas_wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.design_canvas = DesignCanvas(canvas_wrap)
-        self.design_canvas._sel_set_cb = self._on_canvas_sel_rect
+        self.design_canvas._sel_set_cb  = self._on_canvas_sel_rect
+        self.design_canvas._move_cb     = self._on_canvas_drag_move
+        self.design_canvas._move_end_cb = self._on_canvas_drag_end
+        self._drag_undo_pushed = False
         self.design_canvas.canvas.config(takefocus=True)
         self.design_canvas.canvas.bind('<ButtonPress-1>',
                                        lambda e: self.design_canvas.canvas.focus_set(), add='+')
@@ -1796,6 +1867,19 @@ class PlotterApp:
         self._sidebar = tk.Frame(content, bg='#f4f4f4', width=178)
         self._sidebar.pack(side=tk.LEFT, fill=tk.Y)
         self._sidebar.pack_propagate(False)
+
+        # Botones de acción al fondo (se empaquetan antes que sb_nb para reservar espacio)
+        sb_bot = tk.Frame(self._sidebar, bg='#f4f4f4')
+        sb_bot.pack(side=tk.BOTTOM, fill=tk.X, padx=6, pady=(4, 6))
+
+        ttk.Button(sb_bot, text="□ 10×10", width=8,
+                   command=self._cut_test).pack(side=tk.LEFT)
+        self.btn_send = tk.Button(
+            sb_bot, text="Enviar Diseño ▶", command=self._send_design,
+            bg='#1a6fc4', fg='white', activebackground='#1558a0',
+            activeforeground='white', disabledforeground='#88aacc',
+            relief=tk.FLAT, bd=0, font=('', 9, 'bold'), cursor='hand2', padx=6)
+        self.btn_send.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
 
         sb_nb = ttk.Notebook(self._sidebar)
         sb_nb.pack(fill=tk.BOTH, expand=True)
@@ -1950,31 +2034,18 @@ class PlotterApp:
         self._layers_canvas.bind('<MouseWheel>', _layers_scroll)
         self._layers_inner.bind('<MouseWheel>', _layers_scroll)
 
-        # ── Plotter tab ───────────────────────────────────────────────────────
-        plotter_tab = ttk.Frame(nb)
-        nb.add(plotter_tab, text="  Plotter  ")
-        self._build_plotter_tab(plotter_tab)
-
-        # ── Log tab ──────────────────────────────────────────────────────────
-        log_tab = ttk.Frame(nb)
-        nb.add(log_tab, text="  Log COM  ")
-
-        lb = ttk.Frame(log_tab)
-        lb.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Button(lb, text="Limpiar", command=self._clear_log).pack(side=tk.LEFT)
-
-        self.log = scrolledtext.ScrolledText(log_tab, font=('Consolas', 9),
-                                             bg='#1e1e1e', fg='#d4d4d4',
-                                             insertbackground='white', state=tk.DISABLED)
-        self.log.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0, 4))
+        self._plotter_win = None
+        self._log_win = None
 
     def _build_statusbar(self):
         sb = ttk.Frame(self.root, relief=tk.SUNKEN, padding=(4, 2))
         sb.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Izquierda: estado del diseño
+        # Izquierda: estado del diseño + info paths
         ttk.Label(sb, textvariable=self.var_design_status,
                   foreground='#444').pack(side=tk.LEFT, padx=(2, 0))
+        self.lbl_info = ttk.Label(sb, text="", foreground='#888')
+        self.lbl_info.pack(side=tk.LEFT, padx=(10, 0))
 
         # Derecha: barra de progreso + estado del plotter (clic → tab Plotter)
         self.progressbar = ttk.Progressbar(sb, variable=self.var_progress,
@@ -1993,11 +2064,45 @@ class PlotterApp:
                                   cursor='hand2')
         sb_status_lbl.pack(side=tk.LEFT)
 
-        def _open_plotter_tab(_event=None):
-            self.nb.select(1)
-
         for w in (plotter_btn, self.sb_led, sb_status_lbl):
-            w.bind('<Button-1>', _open_plotter_tab)
+            w.bind('<Button-1>', lambda _e=None: self._open_plotter_window())
+
+    def _open_plotter_window(self):
+        if self._plotter_win and self._plotter_win.winfo_exists():
+            self._plotter_win.lift()
+            self._plotter_win.focus_force()
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Plotter")
+        win.resizable(False, False)
+        win.transient(self.root)
+        self._plotter_win = win
+        self._build_plotter_tab(win)
+
+    def _open_log_window(self):
+        if self._log_win and self._log_win.winfo_exists():
+            self._log_win.lift()
+            self._log_win.focus_force()
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Log COM")
+        win.geometry("640x400")
+        win.transient(self.root)
+        self._log_win = win
+
+        lb = ttk.Frame(win)
+        lb.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Button(lb, text="Limpiar", command=self._clear_log).pack(side=tk.LEFT)
+
+        self.log = scrolledtext.ScrolledText(win, font=('Consolas', 9),
+                                             bg='#1e1e1e', fg='#d4d4d4',
+                                             insertbackground='white', state=tk.DISABLED)
+        self.log.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0, 4))
+        if self._log_buffer:
+            self.log.config(state=tk.NORMAL)
+            self.log.insert(tk.END, "".join(self._log_buffer))
+            self.log.see(tk.END)
+            self.log.config(state=tk.DISABLED)
 
     # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -2071,15 +2176,39 @@ class PlotterApp:
 
     def _refresh_ports(self):
         ports = self.plotter.get_ports()
-        self.cb_port['values'] = ports
+        if hasattr(self, 'cb_port'):
+            self.cb_port['values'] = ports
         if ports and not self.var_port.get():
             self.var_port.set(ports[0])
-        self._log(f"Puertos detectados: {', '.join(ports) or 'ninguno'}")
+        prev = getattr(self, '_last_ports', None)
+        if ports != prev:
+            self._last_ports = ports
+            self._log(f"Puertos detectados: {', '.join(ports) or 'ninguno'}")
 
     def _schedule_port_refresh(self):
         if not self.plotter.connected:
             self._refresh_ports()
-        self.root.after(4000, self._schedule_port_refresh)
+            self._auto_connect()
+        self.root.after(3000, self._schedule_port_refresh)
+
+    def _auto_connect(self):
+        """Conecta automáticamente al arrancar si el puerto guardado está disponible."""
+        port = self.var_port.get()
+        if not port or self.plotter.connected:
+            return
+        if port not in self.plotter.get_ports():
+            return
+        try:
+            baud = int(self.var_baud.get() or 9600)
+            self.plotter.connect(port, baud)
+            if hasattr(self, 'btn_connect'):
+                self.btn_connect.config(text="Desconectar")
+            self._set_led(True)
+            self.var_status.set(f"Conectado — {port} @ {baud}")
+            self._log(f"Autoconectado a {port} @ {baud} baudios")
+            self.plotter.send("IN;")
+        except Exception as e:
+            self._log(f"Autoconexión fallida en {port}: {e}")
 
     def _toggle_connection(self):
         if self.plotter.connected:
@@ -2107,9 +2236,10 @@ class PlotterApp:
                 self._log(f"ERROR conexión: {e}")
 
     def _set_led(self, on):
-        self.led.delete('all')
-        color = '#00dd00' if on else '#dd0000'
-        self.led.create_oval(2, 2, 16, 16, fill=color, outline='')
+        if hasattr(self, 'led') and self.led.winfo_exists():
+            self.led.delete('all')
+            color = '#00dd00' if on else '#dd0000'
+            self.led.create_oval(2, 2, 16, 16, fill=color, outline='')
         self._set_sb_led(on)
 
     def _set_sb_led(self, on):
@@ -2191,7 +2321,7 @@ class PlotterApp:
             self.design_canvas.set_paths(effective, selected=-1)
             self._update_pos_display()
             total_pts = sum(len(d["pts"]) for d in paths)
-            self.lbl_info.config(text=f"{len(paths)} paths | {total_pts} puntos")
+            self._update_sel_info()
             self._log(f"Cargado: {len(paths)} paths, {total_pts} puntos")
             self.var_design_status.set(f"{Path(path).name}  ·  {len(paths)} paths | {total_pts} pts")
             self._refresh_layers()
@@ -2306,7 +2436,20 @@ class PlotterApp:
         self._update_pos_display()
         self._update_size_display()
         self._update_scale_display()
+        self._update_sel_info()
         self._refresh_layers()
+
+    def _update_sel_info(self):
+        """Actualiza lbl_info con los paths y puntos de la selección activa."""
+        if self._sel_idx >= 0 and self._sel_idx < len(self.current_styled):
+            pts = len(self.current_styled[self._sel_idx]['pts'])
+            self.lbl_info.config(text=f"Sel: 1 path · {pts} pts")
+        elif self._sel_set:
+            valid = [i for i in self._sel_set if i < len(self.current_styled)]
+            n_pts = sum(len(self.current_styled[i]['pts']) for i in valid)
+            self.lbl_info.config(text=f"Sel: {len(valid)} paths · {n_pts} pts")
+        else:
+            self.lbl_info.config(text="")
 
     def _update_pos_display(self):
         eff = self._effective_styled()
@@ -2763,7 +2906,8 @@ class PlotterApp:
         try:
             baud = int(baud_str)
             self.plotter.connect(port, baud)
-            self.btn_connect.config(text="Desconectar")
+            if hasattr(self, 'btn_connect'):
+                self.btn_connect.config(text="Desconectar")
             self._set_led(True)
             self.var_status.set(f"Conectado — {port} @ {baud}")
             self._log(f"Reconectado a {port} @ {baud} baudios")
@@ -2903,7 +3047,36 @@ class PlotterApp:
                 self.var_obj_sel.set("Todos")
         self.design_canvas.redraw()
         self._update_pos_display()
+        self._update_sel_info()
         self._refresh_layers()
+
+    def _on_canvas_drag_move(self, dx_mm, dy_mm):
+        """Llamado durante drag-move en el canvas: mueve la selección activa."""
+        if not self._drag_undo_pushed:
+            self._push_undo()
+            self._drag_undo_pushed = True
+        if self._sel_idx >= 0 and self._sel_idx < len(self.path_offsets):
+            self.path_offsets[self._sel_idx][0] += dx_mm
+            self.path_offsets[self._sel_idx][1] += dy_mm
+        elif self._sel_set:
+            for i in self._sel_set:
+                if i < len(self.path_offsets):
+                    self.path_offsets[i][0] += dx_mm
+                    self.path_offsets[i][1] += dy_mm
+        else:
+            return
+        # Solo redibuja visualmente; HPGL se regenera al soltar
+        styled = self._effective_styled()
+        self.design_canvas.styled    = styled
+        self.design_canvas._selected = self._sel_idx
+        self.design_canvas.cut_paths = [d['pts'] for d in styled]
+        self.design_canvas.redraw()
+
+    def _on_canvas_drag_end(self):
+        """Llamado al soltar el mouse tras drag-move: finaliza y regenera HPGL."""
+        self._drag_undo_pushed = False
+        self._generate_hpgl()
+        self._update_pos_display()
 
     def _clear_sel_set(self):
         """Clear the rubber-band selection and remove 'Selección' from combobox."""
@@ -2915,6 +3088,60 @@ class PlotterApp:
             self.cb_obj['values'] = vals
         if self.var_obj_sel.get() == "Selección":
             self.var_obj_sel.set("Todos")
+
+    def _copy_selected(self):
+        if not self.current_styled:
+            return
+        if self._sel_idx >= 0 and self._sel_idx < len(self.current_styled):
+            indices = [self._sel_idx]
+        elif self._sel_set:
+            indices = sorted(i for i in self._sel_set if i < len(self.current_styled))
+        else:
+            indices = list(range(len(self.current_styled)))
+        self._clipboard = [
+            ({'pts': list(self.current_styled[i]['pts']),
+              'fill': self.current_styled[i].get('fill'),
+              'stroke': self.current_styled[i].get('stroke'),
+              '_pinched': None},
+             list(self.path_offsets[i]),
+             self.path_scales[i],
+             self.path_rotations[i])
+            for i in indices
+        ]
+
+    def _paste(self):
+        if not self._clipboard or not self.current_styled:
+            return
+        self._push_undo()
+        new_indices = []
+        for d, offset, scale, rotation in self._clipboard:
+            self.current_styled.append(dict(d))
+            self.path_offsets.append([offset[0] + 5.0, offset[1] + 5.0])
+            self.path_scales.append(scale)
+            self.path_rotations.append(rotation)
+            new_indices.append(len(self.current_styled) - 1)
+
+        n = len(self.current_styled)
+        self.cb_obj['values'] = ["Todos"] + [f"Objeto {i+1}" for i in range(n)]
+        vals = list(self.cb_obj['values'])
+        if "Selección" not in vals:
+            vals.insert(1, "Selección")
+            self.cb_obj['values'] = vals
+
+        self._sel_idx = -1
+        self._sel_set = set(new_indices)
+        self.design_canvas._selected = -1
+        self.design_canvas._sel_set  = set(new_indices)
+        self.var_obj_sel.set("Selección")
+
+        effective = self._effective_styled()
+        self.design_canvas.cut_paths = [d['pts'] for d in effective]
+        self.design_canvas.set_paths(effective, selected=-1)
+        self._generate_hpgl()
+        self._update_pos_display()
+        total_pts = sum(len(d["pts"]) for d in self.current_styled)
+        self._update_sel_info()
+        self._refresh_layers()
 
     def _delete_selected(self):
         """Elimina el path individual seleccionado o todos los del grupo rubber-band."""
@@ -2954,10 +3181,10 @@ class PlotterApp:
             self.design_canvas.set_paths(effective, selected=-1)
             self._update_pos_display()
             total_pts = sum(len(d["pts"]) for d in self.current_styled)
-            self.lbl_info.config(text=f"{len(self.current_styled)} paths | {total_pts} puntos")
+            self._update_sel_info()
         else:
             self.design_canvas.set_paths([], selected=-1)
-            self.lbl_info.config(text="Sin diseño")
+            self._update_sel_info()
         self._refresh_layers()
 
     # ── Preview helpers ────────────────────────────────────────────────────────
@@ -3006,10 +3233,10 @@ class PlotterApp:
             self.design_canvas.set_paths(effective, selected=-1)
             self._update_pos_display()
             total_pts = sum(len(d['pts']) for d in self.current_styled)
-            self.lbl_info.config(text=f"{len(self.current_styled)} paths | {total_pts} puntos")
+            self._update_sel_info()
         else:
             self.design_canvas.set_paths([], selected=-1)
-            self.lbl_info.config(text="Sin diseño")
+            self._update_sel_info()
         self._log("Deshacer")
 
     def _redo(self):
@@ -3041,10 +3268,10 @@ class PlotterApp:
             self.design_canvas.set_paths(effective, selected=-1)
             self._update_pos_display()
             total_pts = sum(len(d['pts']) for d in self.current_styled)
-            self.lbl_info.config(text=f"{len(self.current_styled)} paths | {total_pts} puntos")
+            self._update_sel_info()
         else:
             self.design_canvas.set_paths([], selected=-1)
-            self.lbl_info.config(text="Sin diseño")
+            self._update_sel_info()
         self._log("Rehacer")
 
     def _fit_view(self):
@@ -3088,15 +3315,20 @@ class PlotterApp:
 
     def _log(self, msg):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
-        self.log.config(state=tk.NORMAL)
-        self.log.insert(tk.END, f"[{ts}] {msg}\n")
-        self.log.see(tk.END)
-        self.log.config(state=tk.DISABLED)
+        line = f"[{ts}] {msg}\n"
+        self._log_buffer.append(line)
+        if self.log and self.log.winfo_exists():
+            self.log.config(state=tk.NORMAL)
+            self.log.insert(tk.END, line)
+            self.log.see(tk.END)
+            self.log.config(state=tk.DISABLED)
 
     def _clear_log(self):
-        self.log.config(state=tk.NORMAL)
-        self.log.delete('1.0', tk.END)
-        self.log.config(state=tk.DISABLED)
+        self._log_buffer.clear()
+        if self.log and self.log.winfo_exists():
+            self.log.config(state=tk.NORMAL)
+            self.log.delete('1.0', tk.END)
+            self.log.config(state=tk.DISABLED)
 
     # ── Help dialogs ───────────────────────────────────────────────────────────
 
