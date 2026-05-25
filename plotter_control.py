@@ -1833,11 +1833,11 @@ class PlotterApp:
             widget.bind('<Enter>', _show)
             widget.bind('<Leave>', _hide)
 
-        def _ibtn(icon, tip, cmd):
+        def _ibtn(icon, tip, cmd, side=tk.TOP):
             b = tk.Button(icon_bar, text=icon, command=cmd,
                           bg=_IBG, activebackground='#d0d0d0',
                           relief=tk.FLAT, bd=0, font=('', 13), pady=7)
-            b.pack(fill=tk.X)
+            b.pack(fill=tk.X, side=side)
             _tooltip(b, tip)
             return b
 
@@ -1861,6 +1861,9 @@ class PlotterApp:
         tk.Frame(icon_bar, height=1, bg='#cccccc').pack(fill=tk.X, pady=4)
         self._btn_pan = _itoggle("↔", "Mover", self._var_pan_mode, self._on_pan_mode_toggle)
         self._btn_cut = _itoggle("✂", "Vectores de corte", self._var_cut_overlay, self._toggle_cut_overlay)
+
+        tk.Frame(icon_bar, height=1, bg='#cccccc').pack(fill=tk.X, side=tk.BOTTOM, pady=4)
+        _ibtn("□", "Test de corte 10×10 mm", self._cut_test, side=tk.BOTTOM)
 
         ttk.Separator(content, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y)
 
@@ -1894,14 +1897,12 @@ class PlotterApp:
         sb_bot = tk.Frame(self._sidebar, bg='#f4f4f4')
         sb_bot.pack(side=tk.BOTTOM, fill=tk.X, padx=6, pady=(4, 6))
 
-        ttk.Button(sb_bot, text="□ 10×10", width=8,
-                   command=self._cut_test).pack(side=tk.LEFT)
         self.btn_send = tk.Button(
             sb_bot, text="Enviar Diseño ▶", command=self._send_design,
             bg='#1a6fc4', fg='white', activebackground='#1558a0',
             activeforeground='white', disabledforeground='#88aacc',
             relief=tk.FLAT, bd=0, font=('', 9, 'bold'), cursor='hand2', padx=6)
-        self.btn_send.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
+        self.btn_send.pack(fill=tk.X)
 
         sb_nb = ttk.Notebook(self._sidebar)
         sb_nb.pack(fill=tk.BOTH, expand=True)
