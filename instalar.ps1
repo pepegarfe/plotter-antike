@@ -23,6 +23,16 @@ if (-not (Test-Path $srcExe)) {
     exit 1
 }
 
+# Cerrar la app si esta corriendo para poder sobreescribir el exe
+$running = Get-Process -Name 'PlotterAntike' -ErrorAction SilentlyContinue
+if ($running) {
+    Write-Host " Cerrando instancia anterior de $appName..." -ForegroundColor Yellow
+    $running | Stop-Process -Force
+    Start-Sleep -Milliseconds 800
+    Write-Host '   OK' -ForegroundColor Green
+    Write-Host ''
+}
+
 # Instalar en AppData del usuario (no requiere permisos de administrador)
 Write-Host " Instalando en: $dest"
 if (-not (Test-Path $dest)) {
