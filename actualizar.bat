@@ -60,8 +60,16 @@ echo.
 
 echo  [7/7] Publicando release en GitHub...
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy.MM.dd"') do set TAG=v%%i
+(
+  echo ## Instalacion
+  echo.
+  echo 1. Descarga PlotterAntike-installer.zip
+  echo 2. Extrae la carpeta
+  echo 3. Doble clic en instalar.bat
+  echo 4. Se crea un acceso directo en el Escritorio
+) > dist\release-notes.md
 gh release delete "%TAG%" --yes >nul 2>&1
-gh release create "%TAG%" "dist\PlotterAntike-installer.zip#PlotterAntike-installer.zip" --title "Plotter Antike %TAG%" --notes "## Instalacion%0a%0a1. Descarga **PlotterAntike-installer.zip**%0a2. Extrae la carpeta%0a3. Doble clic en **instalar.bat**%0a4. Se crea un acceso directo en el Escritorio" --latest
+gh release create "%TAG%" "dist\PlotterAntike-installer.zip" --title "Plotter Antike %TAG%" --notes-file "dist\release-notes.md" --latest
 if errorlevel 1 ( echo  ERROR: No se pudo publicar en GitHub. & pause & exit /b 1 )
 echo        OK
 echo.
