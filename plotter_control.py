@@ -175,6 +175,30 @@ def _apply_mtx(pts, mtx):
 
 # ── HPGL Converter ─────────────────────────────────────────────────────────────
 
+def _rdp_simplify(pts, tol):
+    """Ramer-Douglas-Peucker path simplification. Returns subset of pts within tol."""
+    if len(pts) <= 2:
+        return list(pts)
+    ax, ay = pts[0]
+    bx, by = pts[-1]
+    dx, dy = bx - ax, by - ay
+    dlen = math.hypot(dx, dy)
+    max_d, max_i = 0.0, 0
+    for i in range(1, len(pts) - 1):
+        px, py = pts[i]
+        if dlen > 1e-12:
+            d = abs(dx * (ay - py) - (ax - px) * dy) / dlen
+        else:
+            d = math.hypot(px - ax, py - ay)
+        if d > max_d:
+            max_d, max_i = d, i
+    if max_d > tol:
+        left  = _rdp_simplify(pts[:max_i + 1], tol)
+        right = _rdp_simplify(pts[max_i:], tol)
+        return left[:-1] + right
+    return [pts[0], pts[-1]]
+
+
 class HPGLConverter:
     """Convierte paths vectoriales a comandos HPGL."""
 
@@ -210,6 +234,11 @@ class HPGLConverter:
         Con forzado de esquinas activado, el trazado se corta en cada esquina
         detectada con PU; entre segmentos, obligando al plotter a detenerse.
         """
+        if len(points) < 2:
+            return
+
+        # Simplify for HPGL transmission — 0.025 mm = 1 HPGL unit, invisible to cutter
+        points = _rdp_simplify(list(points), 0.025)
         if len(points) < 2:
             return
 
@@ -720,8 +749,8 @@ _ACI = {1:(1,0,0),2:(1,1,0),3:(0,1,0),4:(0,1,1),5:(0,0,1),
         6:(1,0,1),7:(1,1,1),8:(.416,.416,.416),9:(.753,.753,.753)}
 
 class DXFParser:
-    # Max chord-to-arc deviation in DXF units (≈ mm for most cutting files)
-    _TOL = 0.01
+    # Max chord-to-arc deviation for DISPLAY (dense sampling for visual smoothness)
+    _TOL = 0.001
     # Endpoint-matching tolerance for path chaining (two points are "same" if closer than this)
     _CHAIN_TOL = 0.01
 
@@ -744,8 +773,8 @@ class DXFParser:
             ea += 2 * math.pi
         span = ea - sa
         arg = max(-1.0, min(1.0, 1.0 - self._TOL / r))
-        n_full = max(24, math.ceil(math.pi / math.acos(arg)))
-        n = max(8, math.ceil(n_full * span / (2 * math.pi)))
+        n_full = max(96, math.ceil(math.pi / math.acos(arg)))
+        n = max(12, math.ceil(n_full * span / (2 * math.pi)))
         return [(cx + r * math.cos(sa + span * k / n),
                  cy + r * math.sin(sa + span * k / n))
                 for k in range(n + 1)]
@@ -755,7 +784,7 @@ class DXFParser:
         if r <= 0:
             return []
         arg = max(-1.0, min(1.0, 1.0 - self._TOL / r))
-        n = max(24, math.ceil(math.pi / math.acos(arg)))
+        n = max(96, math.ceil(math.pi / math.acos(arg)))
         pts = [(cx + r * math.cos(2 * math.pi * k / n),
                 cy + r * math.sin(2 * math.pi * k / n))
                for k in range(n)]
