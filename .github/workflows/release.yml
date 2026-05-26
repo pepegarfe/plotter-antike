@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: pip install pyinstaller pillow pyserial svgpathtools ezdxf pymupdf
 
+      - name: Write version.txt
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ github.event.inputs.version }}" } else { "${{ github.ref_name }}" }
+          $tag.TrimStart('v') | Out-File -FilePath version.txt -Encoding utf8 -NoNewline
+
       - name: Build exe
         run: |
           python crear_icono.py
@@ -81,6 +87,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install pyinstaller pyserial svgpathtools ezdxf pymupdf
+
+      - name: Write version.txt
+        run: |
+          TAG=$([ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "${{ github.event.inputs.version }}" || echo "${{ github.ref_name }}")
+          echo "${TAG#v}" > version.txt
 
       - name: Build app
         run: |
