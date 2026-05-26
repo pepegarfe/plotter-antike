@@ -3445,13 +3445,19 @@ class PlotterApp:
                "¿Deseas descargar e instalar la actualización?")
         if not messagebox.askyesno("Actualización disponible", msg):
             return
-        win_url = next((a['browser_download_url'] for a in release_data.get('assets', [])
-                        if 'Windows' in a['name']), None)
-        if sys.platform == 'win32' and win_url:
-            threading.Thread(target=self._download_and_install, args=(win_url,), daemon=True).start()
-        else:
-            import webbrowser
-            webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
+        assets = release_data.get('assets', [])
+        if sys.platform == 'win32':
+            url = next((a['browser_download_url'] for a in assets if 'Windows' in a['name']), None)
+            if url:
+                threading.Thread(target=self._download_and_install, args=(url,), daemon=True).start()
+                return
+        elif sys.platform == 'darwin':
+            url = next((a['browser_download_url'] for a in assets if 'Mac' in a['name']), None)
+            if url:
+                threading.Thread(target=self._download_and_install_mac, args=(url,), daemon=True).start()
+                return
+        import webbrowser
+        webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
 
     def _download_and_install(self, url):
         try:
@@ -3479,6 +3485,33 @@ class PlotterApp:
             self.root.after(0, lambda: messagebox.showerror(
                 "Error de actualización", f"No se pudo instalar:\n{err}"))
 
+    def _download_and_install_mac(self, url):
+        try:
+            import urllib.request
+            import zipfile
+            import tempfile
+            import stat
+            self.root.after(0, lambda: self.var_status.set("Descargando actualización…"))
+            tmp_dir = tempfile.mkdtemp()
+            zip_path = os.path.join(tmp_dir, "update.zip")
+            def _progress(count, block, total):
+                if total > 0:
+                    pct = min(int(count * block * 100 / total), 100)
+                    self.root.after(0, lambda p=pct: self.var_status.set(f"Descargando… {p}%"))
+            urllib.request.urlretrieve(url, zip_path, reporthook=_progress)
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(tmp_dir)
+            new_bin = os.path.join(tmp_dir, "PlotterAntike")
+            if not os.path.exists(new_bin):
+                raise FileNotFoundError("PlotterAntike no encontrado en el paquete")
+            os.chmod(new_bin, os.stat(new_bin).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+            self.root.after(0, lambda: self._launch_installer_mac(new_bin))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda: self.var_status.set("Error en actualización"))
+            self.root.after(0, lambda: messagebox.showerror(
+                "Error de actualización", f"No se pudo instalar:\n{err}"))
+
     def _launch_installer(self, bat_path):
         messagebox.showinfo(
             "Actualización lista",
@@ -3488,6 +3521,27 @@ class PlotterApp:
         subprocess.Popen(
             ['cmd', '/c', bat_path],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+
+    def _launch_installer_mac(self, new_bin):
+        import stat
+        import subprocess
+        current = sys.executable
+        messagebox.showinfo(
+            "Actualización lista",
+            "La actualización se instalará ahora.\n"
+            "La aplicación se cerrará automáticamente.")
+        script = f"""#!/bin/bash
+sleep 1
+cp "{new_bin}" "{current}"
+chmod +x "{current}"
+"{current}" &
+"""
+        script_path = os.path.join(os.path.dirname(new_bin), "update.sh")
+        with open(script_path, 'w') as f:
+            f.write(script)
+        os.chmod(script_path, os.stat(script_path).st_mode | stat.S_IEXEC)
+        subprocess.Popen(['bash', script_path], start_new_session=True)
+        self.root.quit()
 
     # ── Config persistence ─────────────────────────────────────────────────────
 
