@@ -43,10 +43,32 @@ jobs:
             -Path dist\PlotterAntike.exe, dist\instalar.bat, dist\instalar.ps1, dist\desinstalar.bat, dist\desinstalar.ps1 `
             -DestinationPath PlotterAntike-Windows.zip
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: PlotterAntike-Windows.zip
+      - name: Determine version tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            echo "tag=${{ github.event.inputs.version }}" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Create or update release and upload Windows zip
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $TAG="${{ steps.tag.outputs.tag }}"
+          $REPO="${{ github.repository }}"
+          $EXISTS = gh release view $TAG --repo $REPO 2>$null
+          if (-not $?) {
+            gh release create $TAG `
+              --repo $REPO `
+              --title "Plotter Antike $TAG" `
+              --notes "## Instalacion`n`n### Windows`n1. Descarga **PlotterAntike-Windows.zip**`n2. Extrae la carpeta`n3. Doble clic en **instalar.bat**`n4. Se crea un acceso directo en el Escritorio`n`n### Mac`n1. Descarga **PlotterAntike-Mac.zip**`n2. Extrae y abre **PlotterAntike**`n3. Si Mac bloquea la app: clic derecho -> **Abrir**" `
+              --latest
+          }
+          gh release upload $TAG PlotterAntike-Windows.zip --repo $REPO --clobber
 
   build-mac:
     runs-on: macos-13
@@ -76,20 +98,6 @@ jobs:
           cd dist
           zip ../PlotterAntike-Mac.zip PlotterAntike
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac-build
-          path: PlotterAntike-Mac.zip
-
-  release:
-    needs: [build-windows, build-mac]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
       - name: Determine version tag
         id: tag
         run: |
@@ -99,33 +107,10 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Write release notes
-        run: |
-          cat > release-notes.md << 'EOF'
-          ## Instalación
-
-          ### Windows
-          1. Descarga **PlotterAntike-Windows.zip**
-          2. Extrae la carpeta
-          3. Doble clic en **instalar.bat**
-          4. Se crea un acceso directo en el Escritorio
-
-          ### Mac
-          1. Descarga **PlotterAntike-Mac.zip**
-          2. Extrae y abre **PlotterAntike**
-          3. Si Mac bloquea la app: clic derecho → **Abrir**
-          EOF
-
-      - name: Create GitHub Release
+      - name: Upload Mac zip to release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          gh release delete "$TAG" --repo ${{ github.repository }} --yes 2>/dev/null || true
-          gh release create "$TAG" \
-            artifacts/windows-build/PlotterAntike-Windows.zip \
-            artifacts/mac-build/PlotterAntike-Mac.zip \
-            --repo ${{ github.repository }} \
-            --title "Plotter Antike $TAG" \
-            --notes-file release-notes.md \
-            --latest
+          gh release upload "$TAG" PlotterAntike-Mac.zip \
+            --repo ${{ github.repository }} --clobber
