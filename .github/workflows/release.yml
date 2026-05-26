@@ -37,8 +37,10 @@ jobs:
         run: |
           Copy-Item instalar.bat dist\instalar.bat -Force
           Copy-Item instalar.ps1 dist\instalar.ps1 -Force
+          Copy-Item desinstalar.bat dist\desinstalar.bat -Force
+          Copy-Item desinstalar.ps1 dist\desinstalar.ps1 -Force
           Compress-Archive -Force `
-            -Path dist\PlotterAntike.exe, dist\instalar.bat, dist\instalar.ps1 `
+            -Path dist\PlotterAntike.exe, dist\instalar.bat, dist\instalar.ps1, dist\desinstalar.bat, dist\desinstalar.ps1 `
             -DestinationPath PlotterAntike-Windows.zip
 
       - uses: actions/upload-artifact@v4
