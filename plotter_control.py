@@ -2085,7 +2085,9 @@ class PlotterApp:
         self.lbl_info = ttk.Label(sb, text="", foreground='#888')
         self.lbl_info.pack(side=tk.LEFT, padx=(10, 0))
 
-        # Derecha: barra de progreso + estado del plotter (clic → tab Plotter)
+        # Derecha: versión + barra de progreso + estado del plotter (clic → tab Plotter)
+        ttk.Label(sb, text=f"v{VERSION}", foreground='#aaa').pack(side=tk.RIGHT, padx=(0, 8))
+
         self.progressbar = ttk.Progressbar(sb, variable=self.var_progress,
                                            maximum=100, length=220, mode='determinate')
         self.progressbar.pack(side=tk.RIGHT, padx=4)
