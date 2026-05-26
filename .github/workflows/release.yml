@@ -1,0 +1,129 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (ej. v2026.05.25)'
+        required: true
+        default: 'v2026.05.25'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyinstaller pillow pyserial svgpathtools ezdxf pymupdf
+
+      - name: Build exe
+        run: |
+          python crear_icono.py
+          python -m PyInstaller PlotterAntike.spec --noconfirm --clean
+
+      - name: Package installer zip
+        shell: pwsh
+        run: |
+          Copy-Item instalar.bat dist\instalar.bat -Force
+          Copy-Item instalar.ps1 dist\instalar.ps1 -Force
+          Compress-Archive -Force `
+            -Path dist\PlotterAntike.exe, dist\instalar.bat, dist\instalar.ps1 `
+            -DestinationPath PlotterAntike-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: PlotterAntike-Windows.zip
+
+  build-mac:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyinstaller pyserial svgpathtools ezdxf pymupdf
+
+      - name: Build app
+        run: |
+          pyinstaller --onefile --windowed --name PlotterAntike \
+            --hidden-import serial \
+            --hidden-import serial.tools \
+            --hidden-import serial.tools.list_ports \
+            --hidden-import svgpathtools \
+            --hidden-import ezdxf \
+            --hidden-import fitz \
+            plotter_control.py --noconfirm --clean
+
+      - name: Package zip
+        run: |
+          cd dist
+          zip ../PlotterAntike-Mac.zip PlotterAntike
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: PlotterAntike-Mac.zip
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine version tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## Instalación
+
+          ### Windows
+          1. Descarga **PlotterAntike-Windows.zip**
+          2. Extrae la carpeta
+          3. Doble clic en **instalar.bat**
+          4. Se crea un acceso directo en el Escritorio
+
+          ### Mac
+          1. Descarga **PlotterAntike-Mac.zip**
+          2. Extrae y abre **PlotterAntike**
+          3. Si Mac bloquea la app: clic derecho → **Abrir**
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          gh release delete "$TAG" --repo ${{ github.repository }} --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            artifacts/windows-build/PlotterAntike-Windows.zip \
+            artifacts/mac-build/PlotterAntike-Mac.zip \
+            --repo ${{ github.repository }} \
+            --title "Plotter Antike $TAG" \
+            --notes-file release-notes.md \
+            --latest
