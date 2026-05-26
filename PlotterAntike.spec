@@ -6,7 +6,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('icon.ico', '.'),   # icono disponible en sys._MEIPASS para la ventana
+        ('icon.ico', '.'),
+        ('version.txt', '.'),
     ],
     hiddenimports=[
         'serial',

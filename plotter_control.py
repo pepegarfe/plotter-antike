@@ -35,6 +35,17 @@ def _config_path():
         return d / 'plotter_config.json'
     return Path(__file__).parent / 'plotter_config.json'
 
+
+def _get_version():
+    try:
+        return _resource('version.txt').read_text().strip()
+    except Exception:
+        return "0.0.0"
+
+
+VERSION = _get_version()
+GITHUB_REPO = "pepegarfe/plotter-antike"
+
 # ── Optional dependencies ──────────────────────────────────────────────────────
 
 try:
@@ -1648,6 +1659,7 @@ class PlotterApp:
         self.root.bind('<Control-plus>', lambda _: self._zoom(1.25))
         self.root.bind('<Control-minus>', lambda _: self._zoom(0.8))
         self.root.after(120, self._ask_work_area_startup)
+        self.root.after(5000, lambda: self._check_for_updates(silent=True))
 
     # ── UI construction ────────────────────────────────────────────────────────
 
@@ -1683,6 +1695,8 @@ class PlotterApp:
         h = tk.Menu(m, tearoff=0)
         h.add_command(label="Dependencias", command=self._show_deps)
         h.add_command(label="Acerca de…", command=self._show_about)
+        h.add_separator()
+        h.add_command(label="Buscar actualizaciones…", command=lambda: self._check_for_updates(silent=False))
         m.add_cascade(label="Ayuda", menu=h)
         self.root.config(menu=m)
 
@@ -3391,12 +3405,88 @@ class PlotterApp:
 
     def _show_about(self):
         messagebox.showinfo("Acerca de",
-            "Plotter Antike — Controlador de Plotter de Corte\n\n"
+            f"Plotter Antike — Controlador de Plotter de Corte\n"
+            f"Versión {VERSION}\n\n"
             "Formatos de entrada : SVG, AI (PDF), DXF\n"
             "Protocolo de salida : HPGL\n"
             "Velocidad           : 10 – 800 mm/s\n"
             "Presión             : 10 – 500 g\n\n"
             "tkinter + pyserial + svgpathtools + ezdxf + pymupdf")
+
+    # ── Auto-update ────────────────────────────────────────────────────────────
+
+    def _check_for_updates(self, silent=True):
+        threading.Thread(target=self._update_check_thread, args=(silent,), daemon=True).start()
+
+    def _update_check_thread(self, silent):
+        try:
+            import urllib.request
+            import json as _json
+            url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            req = urllib.request.Request(url, headers={'User-Agent': 'PlotterAntike'})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = _json.loads(resp.read())
+            latest = data['tag_name'].lstrip('v')
+            if latest > VERSION:
+                self.root.after(0, lambda: self._show_update_dialog(latest, data))
+            elif not silent:
+                self.root.after(0, lambda: messagebox.showinfo(
+                    "Actualizaciones", f"Ya tienes la versión más reciente ({VERSION})."))
+        except Exception:
+            if not silent:
+                self.root.after(0, lambda: messagebox.showwarning(
+                    "Actualizaciones",
+                    "No se pudo verificar actualizaciones.\nComprueba tu conexión a internet."))
+
+    def _show_update_dialog(self, latest, release_data):
+        msg = (f"Nueva versión disponible: {latest}\n"
+               f"Versión actual: {VERSION}\n\n"
+               "¿Deseas descargar e instalar la actualización?")
+        if not messagebox.askyesno("Actualización disponible", msg):
+            return
+        win_url = next((a['browser_download_url'] for a in release_data.get('assets', [])
+                        if 'Windows' in a['name']), None)
+        if sys.platform == 'win32' and win_url:
+            threading.Thread(target=self._download_and_install, args=(win_url,), daemon=True).start()
+        else:
+            import webbrowser
+            webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
+
+    def _download_and_install(self, url):
+        try:
+            import urllib.request
+            import zipfile
+            import tempfile
+            import subprocess
+            self.root.after(0, lambda: self.var_status.set("Descargando actualización…"))
+            tmp_dir = tempfile.mkdtemp()
+            zip_path = os.path.join(tmp_dir, "update.zip")
+            def _progress(count, block, total):
+                if total > 0:
+                    pct = min(int(count * block * 100 / total), 100)
+                    self.root.after(0, lambda p=pct: self.var_status.set(f"Descargando… {p}%"))
+            urllib.request.urlretrieve(url, zip_path, reporthook=_progress)
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(tmp_dir)
+            bat_path = os.path.join(tmp_dir, "instalar.bat")
+            if not os.path.exists(bat_path):
+                raise FileNotFoundError("instalar.bat no encontrado en el paquete")
+            self.root.after(0, lambda: self._launch_installer(bat_path))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda: self.var_status.set("Error en actualización"))
+            self.root.after(0, lambda: messagebox.showerror(
+                "Error de actualización", f"No se pudo instalar:\n{err}"))
+
+    def _launch_installer(self, bat_path):
+        messagebox.showinfo(
+            "Actualización lista",
+            "La actualización se instalará ahora.\n"
+            "La aplicación se cerrará automáticamente.")
+        import subprocess
+        subprocess.Popen(
+            ['cmd', '/c', bat_path],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
 
     # ── Config persistence ─────────────────────────────────────────────────────
 
