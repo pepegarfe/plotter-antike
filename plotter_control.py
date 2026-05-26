@@ -1659,7 +1659,8 @@ class PlotterApp:
         self.root.bind('<Control-plus>', lambda _: self._zoom(1.25))
         self.root.bind('<Control-minus>', lambda _: self._zoom(0.8))
         self.root.after(120, self._ask_work_area_startup)
-        self.root.after(5000, lambda: self._check_for_updates(silent=True))
+        if getattr(sys, 'frozen', False):
+            self.root.after(5000, lambda: self._check_for_updates(silent=True))
 
     # ── UI construction ────────────────────────────────────────────────────────
 
