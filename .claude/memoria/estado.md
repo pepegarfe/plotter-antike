@@ -41,9 +41,21 @@ y se corrigió:
 negaba. Cuando `git log` contradice al doc, el doc está viejo. Reorganizar no es verificar: hubo que
 leer el código real, no copiar frases del doc anterior.
 
-## Cómo correrlo (para desarrollo/lectura en Mac)
+## Cómo correrlo en la Mac de Jose (instalado el 21-jul-2026)
+⚠️ **Usar el Python de Homebrew, NO el del sistema:**
 ```bash
-cd ~/plotter-antike && python plotter_control.py   # requiere Python 3.8+ con tkinter
+/opt/homebrew/bin/python3 /Users/josegf/plotter-antike/plotter_control.py   # Python 3.14, Tk 9.0
 ```
-Las dependencias (pyserial, svgpathtools, ezdxf, pymupdf) son **opcionales**: la app arranca sin
-ellas y solo deshabilita la función correspondiente (flags HAS_SERIAL/HAS_SVG/HAS_DXF/HAS_MUPDF).
+Hay un **ícono "Plotter Antike" en el Escritorio** (app de AppleScript) que lanza justo eso con
+doble clic. Dependencias instaladas para ese Python: `pyserial ezdxf pymupdf`
+(`... -m pip install --break-system-packages ...`). Las flags HAS_SERIAL/HAS_DXF/HAS_MUPDF gatean
+funciones opcionales; HAS_SVG casi no importa (el parser SVG primario usa la stdlib).
+
+### Por qué NO el Python del sistema (`/usr/bin/python3`) — la trampa que costó una sesión
+El Python del sistema trae **Tk 8.5.9 (de 2010)**, que se **rompe con el Modo Oscuro de macOS**:
+ignora los colores que el programa pide y pinta TODOS los fondos en negro → el contenido queda
+invisible aunque el código pida gris claro (`_IBG = '#ebebeb'`). **La señal:** widgets con `bg`
+claro explícito que salen oscuros = problema del motor Tk, no del código. **El arreglo definitivo**
+fue `brew install python-tk@3.14` (trae Tk 9.0, que sí respeta los colores) y correr con ese Python.
+Además se añadió al código un bloque `if sys.platform == 'darwin':` que fuerza tema `clam` + paleta
+clara **solo en Mac** (en Windows/Linux el tema nativo se ve bien y no se toca).

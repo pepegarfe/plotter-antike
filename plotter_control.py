@@ -1593,6 +1593,32 @@ class DesignCanvas(_BaseCanvas):
 class PlotterApp:
     def __init__(self):
         self.root = tk.Tk()
+        # SOLO en macOS: la UI está diseñada para fondo claro, pero en modo oscuro los widgets sin
+        # color explícito se pintan en negro y el contenido se vuelve invisible. En Windows/Linux el
+        # tema nativo se ve bien, así que no lo tocamos (el .exe distribuido debe verse nativo).
+        if sys.platform == 'darwin':
+            # tk_setPalette fija colores claros por defecto para todos los widgets clásicos; los que
+            # ya traen su propio bg (barra de iconos, sidebar) no se ven afectados.
+            try:
+                self.root.tk_setPalette(background='#f0f0f0', foreground='#000000',
+                                        activeBackground='#dcdcdc', activeForeground='#000000',
+                                        highlightBackground='#f0f0f0', highlightColor='#000000',
+                                        disabledForeground='#888888')
+            except Exception:
+                pass
+            # Los widgets ttk (pestañas, comboboxes, diálogos) ignoran tk_setPalette y siguen el tema
+            # nativo 'aqua', que se rompe con el modo oscuro. 'clam' dibuja sus propios colores claros
+            # y no obedece al modo del sistema.
+            try:
+                _style = ttk.Style()
+                if 'clam' in _style.theme_names():
+                    _style.theme_use('clam')
+                    _style.configure('.', background='#f0f0f0', foreground='#000000',
+                                     fieldbackground='#ffffff')
+                    _style.map('.', foreground=[('disabled', '#888888')])
+            except Exception:
+                pass
+            self.root.configure(bg='#f0f0f0')
         self.root.title("Plotter Antike — Controlador de Plotter de Corte")
         self.root.geometry("1380x780")
         self.root.minsize(1100, 640)

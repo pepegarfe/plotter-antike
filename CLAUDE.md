@@ -123,3 +123,10 @@ La app **arranca sin ninguna dependencia** y solo deshabilita la función que fa
 python plotter_control.py          # Python 3.8+ con tkinter
 pip install pyserial ezdxf pymupdf # o instalar_dependencias.bat
 ```
+
+- **En macOS: usar un Python con Tk 8.6+ (no el del sistema).** El Tk 8.5.9 de `/usr/bin/python3`
+  se rompe con el Modo Oscuro y pinta todos los fondos en negro. Detalles y la config de la Mac de
+  Jose en [[MEMORY]] (`estado.md`).
+- **No quitar el bloque `if sys.platform == 'darwin':`** del inicio de `PlotterApp.__init__` (fuerza
+  tema `clam` + paleta clara). Solo aplica en Mac a propósito: en Windows/Linux el tema nativo se ve
+  bien y no debe alterarse (el `.exe` distribuido debe verse nativo).
