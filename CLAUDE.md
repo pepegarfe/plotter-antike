@@ -2,6 +2,9 @@
 
 Leer este archivo **antes** de cualquier modificación al proyecto.
 
+**Historia, decisiones y lecciones del proyecto → [[MEMORY]]** (`.claude/memoria/`). Empezar por ahí
+para saber en qué estado quedó el trabajo.
+
 ---
 
 ## Descripción general
