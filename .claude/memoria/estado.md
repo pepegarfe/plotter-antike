@@ -21,16 +21,25 @@ no se puede probar el envío real al plotter aquí (no hay hardware ni el puerto
 - **No autodespliega** (es app de escritorio) → editar notas NO reinicia nada; sin candados de
   Watch Paths que cuidar, a diferencia de Omniseller.
 
-## ⚠️ El CLAUDE.md tiene datos desactualizados — NO confiar a ciegas, verificar contra código
-Documentación podrida detectada al dar de alta el proyecto (la trampa #4 de la skill `nuevo-proyecto`):
-- Dice que `plotter_control.py` tiene **~2500 líneas** → **real: 3646**. La app creció y no se actualizó.
-- Dice **"No hay panel izquierdo"** → pero el historial de git muestra commits *"Agregar panel de
-  Capas con thumbnails"* y *"Mover controles a sidebar derecha"*. La UI cambió; el CLAUDE.md quedó atrás.
+## CLAUDE.md auditado y reescrito el 21-jul-2026 (ya es de fiar)
+El CLAUDE.md original (500 líneas) describía una versión VIEJA del programa. Se verificó línea por
+línea contra el código y se reescribió corto (~150 líneas, solo invariantes). Lo que estaba podrido
+y se corrigió:
+- Decía **`smooth=True`** en los canvas → hoy es **`smooth=False`** (se quitó a propósito para
+  arreglar la fidelidad del corte). La regla vieja decía justo lo contrario de lo correcto.
+- Describía la función **`_pinch_corners`** y la caché **`_pinched`** como vivas → son **código
+  muerto**, nadie las llama.
+- Describía la clase **`CutCanvas`** y una ventana aparte para los vectores de corte → **eliminadas**;
+  hoy el corte es un overlay dentro de `DesignCanvas`.
+- Decía **"no hay panel izquierdo"** y un Notebook de 3 pestañas arriba → la UI real es **barra de
+  iconos a la izquierda + sidebar derecha** con pestañas "Props"/"Capas" y miniaturas de capas;
+  "Plotter" y "Log COM" son **ventanas aparte**.
+- No mencionaba features que SÍ existen: **espejo** (`_apply_mirror` H/V), **copiar/pegar**
+  (Ctrl+C/V), **auto-actualización** desde GitHub, **forzar esquinas** (`corner_angle`).
 
-**Por qué importa:** el CLAUDE.md se lee cada sesión como si fuera verdad. Si describe una UI que ya
-no existe, la IA razona sobre un programa fantasma. **Antes de tocar la UI o el layout, leer el
-código real, no el CLAUDE.md.** Pendiente: auditar y reescribir el CLAUDE.md contra `plotter_control.py`
-(hoy son 500 líneas de resumen de arquitectura, cuando la regla es <200 y solo lo no-derivable).
+**Lección (la señal que lo delató):** el historial de git mencionaba features que el CLAUDE.md
+negaba. Cuando `git log` contradice al doc, el doc está viejo. Reorganizar no es verificar: hubo que
+leer el código real, no copiar frases del doc anterior.
 
 ## Cómo correrlo (para desarrollo/lectura en Mac)
 ```bash
