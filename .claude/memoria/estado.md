@@ -41,6 +41,25 @@ y se corrigió:
 negaba. Cuando `git log` contradice al doc, el doc está viejo. Reorganizar no es verificar: hubo que
 leer el código real, no copiar frases del doc anterior.
 
+## Modernización de UI (21-jul-2026) — hecha
+Se hizo un rediseño visual grande, en olas verificadas una por una con capturas de Jose:
+- **Sistema de diseño (tokens):** clase `UI` (colores) + constantes `F_*` (fuentes) al inicio del
+  archivo. Antes había 3 grises casi iguales, 7 azules sueltos y fuentes de Windows. Ahora todo sale
+  de un lugar. **Acento de marca = magenta del corte** (`UI.ACCENT`). Ver [[MEMORY]]/CLAUDE.md.
+- **`_setup_theme()`** aplica la paleta a todos los widgets ttk (tema `clam`).
+- **Fuentes nativas por plataforma** (adiós 'Segoe UI'/'Consolas', que se veían feas en Mac).
+- Panel derecho ensanchado (178→216) para que no se corten las etiquetas; flechas `◂▸▾▴↺↻` en vez de
+  `< > v ^ << >>`; barra de iconos plana y uniforme; tooltips oscuros; ventanas con fondo claro.
+- Botón visible **"Abrir diseño…"**; el diálogo de área de trabajo ya solo aparece la 1ª vez.
+
+**Lecciones (señales para la próxima):**
+- **En macOS los `tk.Button`/`tk.Checkbutton` ignoran el color** → se ven como botón nativo abultado.
+  Si un botón con color de marca sale gris o inconsistente en Mac, es esto: usar **ttk con estilo**.
+- **Intenté meter el panel del Plotter en el sidebar (3ª pestaña) y quedó apretado** → Jose lo
+  rechazó y se **revirtió a ventana aparte**. Lección: un panel alto NO cabe en una columna angosta;
+  forzar espacio lo empeora. El panel del Plotter se queda como Toplevel (menú Plotter / clic en LED).
+- Los `tk.Toplevel` sin `bg` salen negros en modo oscuro de Mac.
+
 ## Cómo correrlo en la Mac de Jose (instalado el 21-jul-2026)
 ⚠️ **Usar el Python de Homebrew, NO el del sistema:**
 ```bash

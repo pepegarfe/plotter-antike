@@ -74,6 +74,70 @@ except ImportError:
     HAS_MUPDF = False
 
 
+# ── Sistema de diseño (tokens) ──────────────────────────────────────────────────
+# TODO el aspecto visual se decide aquí. Cambiar el look = cambiar estos valores,
+# no cazar colores sueltos por todo el archivo.
+
+# Fuentes nativas por plataforma (antes se pedían 'Segoe UI'/'Consolas', que sólo
+# existen en Windows: en Mac caían en una fuente por defecto tosca).
+if sys.platform == 'darwin':
+    _UI_FAMILY, _MONO_FAMILY = 'Helvetica Neue', 'Menlo'
+elif sys.platform == 'win32':
+    _UI_FAMILY, _MONO_FAMILY = 'Segoe UI', 'Consolas'
+else:
+    _UI_FAMILY, _MONO_FAMILY = 'DejaVu Sans', 'DejaVu Sans Mono'
+
+
+class UI:
+    """Paleta y tipografía. Un solo neutro, un solo acento (magenta de corte)."""
+    # Neutros (fondos y texto)
+    BG        = '#f0f1ee'   # fondo general de la app
+    SURFACE   = '#ffffff'   # campos, tarjetas
+    SURFACE_2 = '#f6f7f4'   # superficie sutilmente hundida
+    PANEL     = '#f2f3f0'   # barras laterales / paneles
+    INK       = '#1b1e24'   # texto principal
+    MUTED     = '#5c626d'   # texto secundario
+    FAINT     = '#9299a3'   # texto tenue / etiquetas de sección
+    LINE      = '#dfe1dc'   # separadores/bordes suaves
+    LINE_2    = '#cdd0c9'   # bordes más marcados
+    # Acento de marca — el magenta con que el software de corte marca las líneas
+    ACCENT    = '#c81c68'
+    ACCENT_DK = '#a5124f'   # hover / presionado
+    ACCENT_FT = '#e2a6c1'   # acento deshabilitado
+    ACCENT_SOFT = '#fbe7f0' # relleno de selección muy tenue
+    # Estado (reservados: NO decorar con estos)
+    GOOD      = '#2e7d57'
+    BAD       = '#c0392b'
+    WARN      = '#a9760f'
+    # Lienzo
+    CANVAS    = '#ffffff'
+    GRID      = '#eaebe7'
+    AXIS      = '#c9ccc5'
+    ORIGIN    = '#c0392b'
+    WORK_BG   = '#f4f6fb'   # relleno del área de trabajo (muy tenue)
+    WORK_LINE = '#9bb0cc'   # borde del área de trabajo (azul calmado)
+    SEL       = ACCENT      # trazado seleccionado (individual) → acento
+    GROUP     = '#2f6fb0'   # selección de grupo / rectángulo de selección
+    CUT       = '#0e8a7d'   # vectores de corte (teal, distinto de acento y grupo)
+
+
+def _font(size, *style):
+    return (_UI_FAMILY, size, *style)
+
+def _mono(size, *style):
+    return (_MONO_FAMILY, size, *style)
+
+# Tipografía con una escala fija (antes: tamaños sueltos 8/9/10/13 sin criterio)
+F_SECTION = _font(9)          # etiquetas de sección (mayúsculas)
+F_SUB     = _font(9)          # sub-etiquetas ("paso", "mm")
+F_LABEL   = _font(10)         # etiquetas de campo
+F_BODY    = _font(11)         # cuerpo / controles
+F_BTN     = _font(10)         # botones
+F_SEND    = _font(11, 'bold') # botón principal
+F_ICON    = _font(16)         # barra de iconos
+F_MONO    = _mono(10)         # datos técnicos (versión, coordenadas)
+
+
 # ── Color utilities ────────────────────────────────────────────────────────────
 
 _SVG_NAMED = {
@@ -1241,8 +1305,8 @@ class _BaseCanvas:
     MARGIN = 30
 
     def __init__(self, parent):
-        self.canvas = tk.Canvas(parent, bg='#fafafa', cursor='crosshair',
-                                highlightthickness=1, highlightbackground='#cccccc')
+        self.canvas = tk.Canvas(parent, bg=UI.CANVAS, cursor='crosshair',
+                                highlightthickness=1, highlightbackground=UI.LINE_2)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.zoom    = 1.0
         self.off_x   = self.MARGIN
@@ -1297,19 +1361,19 @@ class _BaseCanvas:
         for mm in range(-500, 2000, spacing):
             cx, _ = self._to_canvas(mm, 0)
             if 0 <= cx <= w:
-                self.canvas.create_line(cx, 0, cx, h, fill='#e8e8e8')
+                self.canvas.create_line(cx, 0, cx, h, fill=UI.GRID)
             _, cy = self._to_canvas(0, mm)
             if 0 <= cy <= h:
-                self.canvas.create_line(0, cy, w, cy, fill='#e8e8e8')
+                self.canvas.create_line(0, cy, w, cy, fill=UI.GRID)
         ox, oy = self._to_canvas(0, 0)
-        self.canvas.create_line(0, oy, w, oy, fill='#cccccc', width=1)
-        self.canvas.create_line(ox, 0, ox, h, fill='#cccccc', width=1)
+        self.canvas.create_line(0, oy, w, oy, fill=UI.LINE_2, width=1)
+        self.canvas.create_line(ox, 0, ox, h, fill=UI.LINE_2, width=1)
 
     def _draw_origin(self):
         ox, oy = self._to_canvas(0, 0)
-        self.canvas.create_line(ox-8, oy, ox+8, oy, fill='#cc0000', width=2)
-        self.canvas.create_line(ox, oy-8, ox, oy+8, fill='#cc0000', width=2)
-        self.canvas.create_oval(ox-3, oy-3, ox+3, oy+3, fill='#cc0000', outline='')
+        self.canvas.create_line(ox-8, oy, ox+8, oy, fill=UI.ORIGIN, width=2)
+        self.canvas.create_line(ox, oy-8, ox, oy+8, fill=UI.ORIGIN, width=2)
+        self.canvas.create_oval(ox-3, oy-3, ox+3, oy+3, fill=UI.ORIGIN, outline='')
 
     def redraw(self):
         pass  # override
@@ -1358,7 +1422,7 @@ class _BaseCanvas:
             cx1, cy1 = self._to_canvas(self._work_w, self._work_h)
             x0, y0 = min(cx0, cx1), min(cy0, cy1)
             x1, y1 = max(cx0, cx1), max(cy0, cy1)
-            self.canvas.create_rectangle(x0, y0, x1, y1, fill='#eef4ff', outline='')
+            self.canvas.create_rectangle(x0, y0, x1, y1, fill=UI.WORK_BG, outline='')
 
     def _draw_work_area_border(self):
         if self._work_w > 0 and self._work_h > 0:
@@ -1367,10 +1431,10 @@ class _BaseCanvas:
             x0, y0 = min(cx0, cx1), min(cy0, cy1)
             x1, y1 = max(cx0, cx1), max(cy0, cy1)
             self.canvas.create_rectangle(x0, y0, x1, y1,
-                                         fill='', outline='#4488cc', width=2, dash=(8, 4))
+                                         fill='', outline=UI.WORK_LINE, width=2, dash=(8, 4))
             self.canvas.create_text((x0+x1)/2, y0-8,
                                     text=f"{self._work_w:.0f} x {self._work_h:.0f} mm",
-                                    fill='#4488cc', font=('Segoe UI', 8))
+                                    fill=UI.WORK_LINE, font=F_SUB)
 
 
 # ── Design Canvas ── muestra el diseño con colores y rellenos ──────────────────
@@ -1378,7 +1442,7 @@ class _BaseCanvas:
 class DesignCanvas(_BaseCanvas):
     def __init__(self, parent):
         super().__init__(parent)
-        self.canvas.config(bg='white')
+        self.canvas.config(bg=UI.CANVAS)
         self.styled      = []    # List[{"pts", "fill", "stroke"}]
         self._selected   = -1   # highlighted single path index, -1 = none
         self._select_cb  = None  # callback(idx) on single-path click
@@ -1448,7 +1512,7 @@ class DesignCanvas(_BaseCanvas):
             x0, y0 = self._rect_start
             self._rect_id = self.canvas.create_rectangle(
                 x0, y0, event.x, event.y,
-                outline='#2266ee', width=1.5, dash=(5, 3))
+                outline=UI.GROUP, width=1.5, dash=(5, 3))
 
     # ── click / rubber-band release ───────────────────────────────────────────
 
@@ -1532,7 +1596,7 @@ class DesignCanvas(_BaseCanvas):
         if not self.styled:
             self.canvas.create_text(w//2, h//2,
                 text="Diseño original\n(abre un archivo para ver)",
-                fill='#aaaaaa', font=('Segoe UI', 10), justify=tk.CENTER)
+                fill=UI.FAINT, font=F_BODY, justify=tk.CENTER)
             self._draw_origin()
             return
 
@@ -1552,9 +1616,9 @@ class DesignCanvas(_BaseCanvas):
                     coords.append(off_y - pt[1] * zoom)
                 if len(coords) >= 6:
                     if is_sel:
-                        outline, ow = '#ff6600', 2.5
+                        outline, ow = UI.SEL, 2.5
                     elif is_group:
-                        outline, ow = '#ff6600', 2.0
+                        outline, ow = UI.SEL, 2.0
                     else:
                         outline, ow = (_rgb_hex(stroke) if stroke else ''), 1
                     self.canvas.create_polygon(coords, fill=_rgb_hex(fill),
@@ -1566,9 +1630,9 @@ class DesignCanvas(_BaseCanvas):
                     coords.append(off_y - pt[1] * zoom)
                 if len(coords) >= 4:
                     if is_sel:
-                        clr, ow = '#ff6600', 2.5
+                        clr, ow = UI.SEL, 2.5
                     elif is_group:
-                        clr, ow = '#ff6600', 2.0
+                        clr, ow = UI.SEL, 2.0
                     else:
                         clr, ow = _rgb_hex(stroke), 1.5
                     self.canvas.create_line(coords, fill=clr, width=ow,
@@ -1583,7 +1647,7 @@ class DesignCanvas(_BaseCanvas):
                     coords.append(pt[0] * zoom + off_x)
                     coords.append(off_y - pt[1] * zoom)
                 if len(coords) >= 4:
-                    self.canvas.create_line(coords, fill='#0055cc', width=1.5,
+                    self.canvas.create_line(coords, fill=UI.CUT, width=1.5,
                                             smooth=False, joinstyle=tk.MITER, capstyle=tk.BUTT)
         self._draw_origin()
 
@@ -1593,32 +1657,8 @@ class DesignCanvas(_BaseCanvas):
 class PlotterApp:
     def __init__(self):
         self.root = tk.Tk()
-        # SOLO en macOS: la UI está diseñada para fondo claro, pero en modo oscuro los widgets sin
-        # color explícito se pintan en negro y el contenido se vuelve invisible. En Windows/Linux el
-        # tema nativo se ve bien, así que no lo tocamos (el .exe distribuido debe verse nativo).
-        if sys.platform == 'darwin':
-            # tk_setPalette fija colores claros por defecto para todos los widgets clásicos; los que
-            # ya traen su propio bg (barra de iconos, sidebar) no se ven afectados.
-            try:
-                self.root.tk_setPalette(background='#f0f0f0', foreground='#000000',
-                                        activeBackground='#dcdcdc', activeForeground='#000000',
-                                        highlightBackground='#f0f0f0', highlightColor='#000000',
-                                        disabledForeground='#888888')
-            except Exception:
-                pass
-            # Los widgets ttk (pestañas, comboboxes, diálogos) ignoran tk_setPalette y siguen el tema
-            # nativo 'aqua', que se rompe con el modo oscuro. 'clam' dibuja sus propios colores claros
-            # y no obedece al modo del sistema.
-            try:
-                _style = ttk.Style()
-                if 'clam' in _style.theme_names():
-                    _style.theme_use('clam')
-                    _style.configure('.', background='#f0f0f0', foreground='#000000',
-                                     fieldbackground='#ffffff')
-                    _style.map('.', foreground=[('disabled', '#888888')])
-            except Exception:
-                pass
-            self.root.configure(bg='#f0f0f0')
+        self._setup_theme()
+        self.root.configure(bg=UI.BG)
         self.root.title("Plotter Antike — Controlador de Plotter de Corte")
         self.root.geometry("1380x780")
         self.root.minsize(1100, 640)
@@ -1684,11 +1724,84 @@ class PlotterApp:
         self.root.bind('<Control-equal>', lambda _: self._zoom(1.25))
         self.root.bind('<Control-plus>', lambda _: self._zoom(1.25))
         self.root.bind('<Control-minus>', lambda _: self._zoom(0.8))
-        self.root.after(120, self._ask_work_area_startup)
+        # El diálogo de área de trabajo solo la PRIMERA vez (cuando aún no hay config guardada).
+        # Después se recuerda; se puede cambiar cuando sea desde Archivo → Área de trabajo…
+        if not self._has_config:
+            self.root.after(120, self._ask_work_area_startup)
         if getattr(sys, 'frozen', False):
             self.root.after(5000, lambda: self._check_for_updates(silent=True))
 
     # ── UI construction ────────────────────────────────────────────────────────
+
+    def _setup_theme(self):
+        """Tema de diseño para todos los widgets ttk (pestañas, botones, listas,
+        spinboxes, barra de progreso…). Se basa en 'clam' porque dibuja sus propios
+        colores y no obedece al modo oscuro del sistema (necesario en macOS y coherente
+        en Windows/Linux). Los colores salen de la paleta UNA sola vez."""
+        s = ttk.Style()
+        try:
+            s.theme_use('clam')
+        except tk.TclError:
+            return
+        # Base
+        s.configure('.', background=UI.PANEL, foreground=UI.INK,
+                    fieldbackground=UI.SURFACE, bordercolor=UI.LINE,
+                    lightcolor=UI.LINE, darkcolor=UI.LINE,
+                    font=F_BODY, focuscolor=UI.ACCENT)
+        s.map('.', foreground=[('disabled', UI.FAINT)])
+        s.configure('TFrame', background=UI.PANEL)
+        s.configure('TLabel', background=UI.PANEL, foreground=UI.INK)
+        # Botones neutros
+        s.configure('TButton', background=UI.SURFACE, foreground=UI.INK,
+                    bordercolor=UI.LINE_2, relief='flat', padding=(9, 5), font=F_BTN)
+        s.map('TButton',
+              background=[('pressed', UI.LINE), ('active', UI.SURFACE_2)],
+              bordercolor=[('active', UI.LINE_2)])
+        # Botón de acento (acciones primarias)
+        s.configure('Accent.TButton', background=UI.ACCENT, foreground='#ffffff',
+                    bordercolor=UI.ACCENT, font=F_SEND, padding=(10, 7))
+        s.map('Accent.TButton',
+              background=[('pressed', UI.ACCENT_DK), ('active', UI.ACCENT_DK)],
+              foreground=[('disabled', UI.ACCENT_FT)])
+        # Barra de iconos: botones planos con hover; los toggles marcan estado en acento.
+        # (ttk en vez de tk.Button/Checkbutton: en macOS los clásicos ignoran el estilo.)
+        s.configure('Icon.TButton', background=UI.PANEL, foreground=UI.INK,
+                    borderwidth=0, relief='flat', padding=6, font=F_ICON, anchor='center')
+        s.map('Icon.TButton', background=[('pressed', UI.LINE_2), ('active', UI.LINE)])
+        s.configure('Icon.Toolbutton', background=UI.PANEL, foreground=UI.MUTED,
+                    borderwidth=0, relief='flat', padding=6, font=F_ICON, anchor='center')
+        s.map('Icon.Toolbutton',
+              background=[('selected', UI.ACCENT_SOFT), ('active', UI.LINE)],
+              foreground=[('selected', UI.ACCENT)])
+        # Contenedores
+        s.configure('TLabelframe', background=UI.PANEL, bordercolor=UI.LINE, relief='solid')
+        s.configure('TLabelframe.Label', background=UI.PANEL, foreground=UI.FAINT, font=F_SECTION)
+        # Pestañas
+        s.configure('TNotebook', background=UI.PANEL, borderwidth=0, tabmargins=(2, 4, 2, 0))
+        s.configure('TNotebook.Tab', background=UI.PANEL, foreground=UI.MUTED,
+                    padding=(14, 7), font=F_BTN, borderwidth=0)
+        s.map('TNotebook.Tab',
+              background=[('selected', UI.SURFACE)],
+              foreground=[('selected', UI.ACCENT)])
+        # Campos
+        s.configure('TCombobox', fieldbackground=UI.SURFACE, background=UI.SURFACE,
+                    arrowcolor=UI.MUTED, bordercolor=UI.LINE_2, padding=3)
+        s.map('TCombobox', fieldbackground=[('readonly', UI.SURFACE)],
+              bordercolor=[('focus', UI.ACCENT)])
+        s.configure('TSpinbox', fieldbackground=UI.SURFACE, background=UI.SURFACE,
+                    arrowcolor=UI.MUTED, bordercolor=UI.LINE_2, padding=3)
+        s.map('TSpinbox', bordercolor=[('focus', UI.ACCENT)])
+        s.configure('TEntry', fieldbackground=UI.SURFACE, bordercolor=UI.LINE_2, padding=3)
+        s.map('TEntry', bordercolor=[('focus', UI.ACCENT)])
+        # Indicadores
+        s.configure('TProgressbar', background=UI.ACCENT, troughcolor=UI.LINE, bordercolor=UI.LINE)
+        s.configure('Horizontal.TScale', background=UI.PANEL, troughcolor=UI.LINE)
+        s.configure('TSeparator', background=UI.LINE)
+        s.configure('TScrollbar', background=UI.PANEL, troughcolor=UI.SURFACE_2,
+                    arrowcolor=UI.MUTED, bordercolor=UI.LINE)
+        # Barra de estado
+        s.configure('Status.TFrame', background=UI.SURFACE_2)
+        s.configure('Status.TLabel', background=UI.SURFACE_2, foreground=UI.MUTED)
 
     def _build_ui(self):
         self._build_menu()
@@ -1832,7 +1945,7 @@ class PlotterApp:
         ttk.Spinbox(oc_row, from_=0.0, to=10.0, increment=0.5,
                     textvariable=self.var_overcut, width=7,
                     format="%.1f").pack(side=tk.LEFT, padx=4)
-        ttk.Label(oc_row, text="(0 = desactivado)", foreground='gray').pack(side=tk.LEFT)
+        ttk.Label(oc_row, text="(0 = desactivado)", foreground=UI.FAINT).pack(side=tk.LEFT)
 
         ca_row = ttk.Frame(pf)
         ca_row.pack(fill=tk.X, pady=(4, 2))
@@ -1840,7 +1953,7 @@ class PlotterApp:
         ttk.Spinbox(ca_row, from_=0.0, to=175.0, increment=5.0,
                     textvariable=self.var_corner_angle, width=7,
                     format="%.0f").pack(side=tk.LEFT, padx=4)
-        ttk.Label(ca_row, text="(0 = desactivado)", foreground='gray').pack(side=tk.LEFT)
+        ttk.Label(ca_row, text="(0 = desactivado)", foreground=UI.FAINT).pack(side=tk.LEFT)
 
     def _build_right(self, parent):
         preview_tab = ttk.Frame(parent)
@@ -1854,19 +1967,17 @@ class PlotterApp:
         content.pack(fill=tk.BOTH, expand=True)
 
         # ── Barra de iconos izquierda ─────────────────────────────────────────
-        _IBG = '#ebebeb'
-
         def _tooltip(widget, text):
             tip = [None]
             def _show(e):
-                tip[0] = tk.Toplevel(widget)
+                tip[0] = tk.Toplevel(widget, bg=UI.INK)
                 tip[0].wm_overrideredirect(True)
                 x = widget.winfo_rootx() + widget.winfo_width() + 6
                 y = widget.winfo_rooty() + widget.winfo_height() // 2 - 10
                 tip[0].wm_geometry(f"+{x}+{y}")
-                tk.Label(tip[0], text=text, bg='#ffffcc', fg='#222',
-                         font=('', 9), relief=tk.SOLID, bd=1,
-                         padx=5, pady=3).pack()
+                tk.Label(tip[0], text=text, bg=UI.INK, fg='#ffffff',
+                         font=F_SUB, relief=tk.FLAT, bd=0,
+                         padx=8, pady=4).pack()
             def _hide(e):
                 if tip[0]:
                     tip[0].destroy()
@@ -1875,35 +1986,31 @@ class PlotterApp:
             widget.bind('<Leave>', _hide)
 
         def _ibtn(icon, tip, cmd, side=tk.TOP):
-            b = tk.Button(icon_bar, text=icon, command=cmd,
-                          bg=_IBG, activebackground='#d0d0d0',
-                          relief=tk.FLAT, bd=0, font=('', 13), pady=7)
-            b.pack(fill=tk.X, side=side)
+            b = ttk.Button(icon_bar, text=icon, command=cmd,
+                           style='Icon.TButton', takefocus=False)
+            b.pack(fill=tk.X, side=side, padx=3, pady=1)
             _tooltip(b, tip)
             return b
 
         def _itoggle(icon, tip, var, cmd):
-            b = tk.Checkbutton(icon_bar, text=icon, variable=var, command=cmd,
-                               indicatoron=False,
-                               bg=_IBG, activebackground='#d0d0d0',
-                               selectcolor='#c5dff8',
-                               relief=tk.FLAT, bd=0, font=('', 13), pady=7)
-            b.pack(fill=tk.X)
+            b = ttk.Checkbutton(icon_bar, text=icon, variable=var, command=cmd,
+                                style='Icon.Toolbutton', takefocus=False)
+            b.pack(fill=tk.X, padx=3, pady=1)
             _tooltip(b, tip)
             return b
 
-        icon_bar = tk.Frame(content, bg=_IBG, width=40)
+        icon_bar = tk.Frame(content, bg=UI.PANEL, width=48)
         icon_bar.pack(side=tk.LEFT, fill=tk.Y)
         icon_bar.pack_propagate(False)
 
         _ibtn("⤢", "Ajustar vista", self._fit_view)
         _ibtn("⊕", "Zoom +", lambda: self._zoom(1.25))
         _ibtn("⊖", "Zoom −", lambda: self._zoom(0.8))
-        tk.Frame(icon_bar, height=1, bg='#cccccc').pack(fill=tk.X, pady=4)
+        tk.Frame(icon_bar, height=1, bg=UI.LINE_2).pack(fill=tk.X, pady=4)
         self._btn_pan = _itoggle("↔", "Mover", self._var_pan_mode, self._on_pan_mode_toggle)
         self._btn_cut = _itoggle("✂", "Vectores de corte", self._var_cut_overlay, self._toggle_cut_overlay)
 
-        tk.Frame(icon_bar, height=1, bg='#cccccc').pack(fill=tk.X, side=tk.BOTTOM, pady=4)
+        tk.Frame(icon_bar, height=1, bg=UI.LINE_2).pack(fill=tk.X, side=tk.BOTTOM, pady=4)
         _ibtn("□", "Test de corte 10×10 mm", self._cut_test, side=tk.BOTTOM)
 
         ttk.Separator(content, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y)
@@ -1930,42 +2037,49 @@ class PlotterApp:
         sb_sep = ttk.Separator(content, orient=tk.VERTICAL)
         sb_sep.pack(side=tk.LEFT, fill=tk.Y)
 
-        self._sidebar = tk.Frame(content, bg='#f4f4f4', width=178)
+        self._sidebar = tk.Frame(content, bg=UI.PANEL, width=216)
         self._sidebar.pack(side=tk.LEFT, fill=tk.Y)
         self._sidebar.pack_propagate(False)
 
+        # Acción primaria de entrada: abrir un diseño. Antes solo estaba en el menú/Ctrl+O.
+        sb_top = tk.Frame(self._sidebar, bg=UI.PANEL)
+        sb_top.pack(side=tk.TOP, fill=tk.X, padx=6, pady=(8, 2))
+        self.btn_open = ttk.Button(sb_top, text="Abrir diseño…", command=self.open_file,
+                                   cursor='hand2')
+        self.btn_open.pack(fill=tk.X, ipady=2)
+
         # Botones de acción al fondo (se empaquetan antes que sb_nb para reservar espacio)
-        sb_bot = tk.Frame(self._sidebar, bg='#f4f4f4')
+        sb_bot = tk.Frame(self._sidebar, bg=UI.PANEL)
         sb_bot.pack(side=tk.BOTTOM, fill=tk.X, padx=6, pady=(4, 6))
 
-        self.btn_send = tk.Button(
-            sb_bot, text="Enviar Diseño ▶", command=self._send_design,
-            bg='#1a6fc4', fg='white', activebackground='#1558a0',
-            activeforeground='white', disabledforeground='#88aacc',
-            relief=tk.FLAT, bd=0, font=('', 9, 'bold'), cursor='hand2', padx=6)
-        self.btn_send.pack(fill=tk.X)
+        # ttk (no tk.Button): en macOS los botones clásicos ignoran el color de fondo;
+        # el estilo Accent.TButton del tema sí lo respeta en las tres plataformas.
+        self.btn_send = ttk.Button(
+            sb_bot, text="Enviar Diseño  ▶", command=self._send_design,
+            style='Accent.TButton', cursor='hand2')
+        self.btn_send.pack(fill=tk.X, ipady=3)
 
         sb_nb = ttk.Notebook(self._sidebar)
         sb_nb.pack(fill=tk.BOTH, expand=True)
 
-        props_tab  = tk.Frame(sb_nb, bg='#f4f4f4')
-        layers_tab = tk.Frame(sb_nb, bg='#f4f4f4')
+        props_tab  = tk.Frame(sb_nb, bg=UI.PANEL)
+        layers_tab = tk.Frame(sb_nb, bg=UI.PANEL)
         sb_nb.add(props_tab,  text=" Props ")
         sb_nb.add(layers_tab, text=" Capas ")
 
         def _sec(title):
-            tk.Label(props_tab, text=title, bg='#f4f4f4',
-                     fg='#999999', font=('', 8)).pack(anchor=tk.W, padx=10, pady=(10, 1))
+            tk.Label(props_tab, text=title, bg=UI.PANEL,
+                     fg=UI.FAINT, font=F_SUB).pack(anchor=tk.W, padx=10, pady=(10, 1))
             ttk.Separator(props_tab).pack(fill=tk.X, padx=6)
-            f = tk.Frame(props_tab, bg='#f4f4f4')
+            f = tk.Frame(props_tab, bg=UI.PANEL)
             f.pack(fill=tk.X, padx=8, pady=(4, 2))
             return f
 
         def _lbl(parent, text):
-            return tk.Label(parent, text=text, bg='#f4f4f4', fg='#444444', font=('', 9))
+            return tk.Label(parent, text=text, bg=UI.PANEL, fg=UI.INK, font=F_LABEL)
 
         def _sublbl(parent, text):
-            return tk.Label(parent, text=text, bg='#f4f4f4', fg='#aaaaaa', font=('', 8))
+            return tk.Label(parent, text=text, bg=UI.PANEL, fg=UI.FAINT, font=F_SUB)
 
         # ── Objeto ──
         f = _sec("OBJETO")
@@ -1976,7 +2090,7 @@ class PlotterApp:
 
         # ── Posición ──
         f = _sec("POSICIÓN")
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=1)
         _lbl(row, "X").pack(side=tk.LEFT)
         sb_px = ttk.Spinbox(row, from_=-9999, to=9999, increment=0.5,
@@ -1984,12 +2098,12 @@ class PlotterApp:
                              command=self._apply_obj_position)
         sb_px.pack(side=tk.LEFT, padx=(4, 2))
         sb_px.bind('<Return>', self._apply_obj_position)
-        ttk.Button(row, text="<", width=2,
+        ttk.Button(row, text="◂", width=3,
                    command=lambda: self._nudge_pos('x', -1)).pack(side=tk.LEFT)
-        ttk.Button(row, text=">", width=2,
+        ttk.Button(row, text="▸", width=3,
                    command=lambda: self._nudge_pos('x', +1)).pack(side=tk.LEFT, padx=(1, 0))
 
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=1)
         _lbl(row, "Y").pack(side=tk.LEFT)
         sb_py = ttk.Spinbox(row, from_=-9999, to=9999, increment=0.5,
@@ -1997,19 +2111,19 @@ class PlotterApp:
                              command=self._apply_obj_position)
         sb_py.pack(side=tk.LEFT, padx=(4, 2))
         sb_py.bind('<Return>', self._apply_obj_position)
-        ttk.Button(row, text="v", width=2,
+        ttk.Button(row, text="▾", width=3,
                    command=lambda: self._nudge_pos('y', -1)).pack(side=tk.LEFT)
-        ttk.Button(row, text="^", width=2,
+        ttk.Button(row, text="▴", width=3,
                    command=lambda: self._nudge_pos('y', +1)).pack(side=tk.LEFT, padx=(1, 0))
 
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=(3, 1))
         _sublbl(row, "paso").pack(side=tk.LEFT)
         ttk.Combobox(row, textvariable=self.var_pos_step, width=4,
                      values=["0.1", "0.5", "1", "5", "10", "50"]).pack(side=tk.LEFT, padx=(4, 2))
         _sublbl(row, "mm").pack(side=tk.LEFT)
 
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=(4, 2))
         ttk.Button(row, text="Centrar",
                    command=self._center_design).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
@@ -2018,7 +2132,7 @@ class PlotterApp:
 
         # ── Tamaño ──
         f = _sec("TAMAÑO")
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=1)
         _lbl(row, "W").pack(side=tk.LEFT)
         w_sb = ttk.Spinbox(row, from_=0.01, to=99999, increment=1.0,
@@ -2028,7 +2142,7 @@ class PlotterApp:
         w_sb.bind('<Return>', self._apply_size_w)
         _sublbl(row, "mm").pack(side=tk.LEFT)
 
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=1)
         _lbl(row, "H").pack(side=tk.LEFT)
         h_sb = ttk.Spinbox(row, from_=0.01, to=99999, increment=1.0,
@@ -2040,7 +2154,7 @@ class PlotterApp:
 
         # ── Rotación ──
         f = _sec("ROTACIÓN")
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=1)
         rot_sb = ttk.Spinbox(row, from_=0, to=359.9, increment=45,
                               textvariable=self.var_rotate, width=6,
@@ -2048,12 +2162,12 @@ class PlotterApp:
         rot_sb.pack(side=tk.LEFT)
         rot_sb.bind('<Return>', self._apply_rotation)
         _sublbl(row, "°").pack(side=tk.LEFT, padx=(2, 6))
-        ttk.Button(row, text="<<", width=3,
+        ttk.Button(row, text="↺", width=3,
                    command=lambda: self._nudge_rotate(-1)).pack(side=tk.LEFT)
-        ttk.Button(row, text=">>", width=3,
+        ttk.Button(row, text="↻", width=3,
                    command=lambda: self._nudge_rotate(+1)).pack(side=tk.LEFT, padx=(2, 0))
 
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=(3, 1))
         _sublbl(row, "paso").pack(side=tk.LEFT)
         ttk.Combobox(row, textvariable=self.var_rot_step, width=4,
@@ -2062,7 +2176,7 @@ class PlotterApp:
 
         # ── Espejo ──
         f = _sec("ESPEJO")
-        row = tk.Frame(f, bg='#f4f4f4')
+        row = tk.Frame(f, bg=UI.PANEL)
         row.pack(fill=tk.X, pady=(2, 2))
         ttk.Button(row, text="↔ Horizontal",
                    command=lambda: self._apply_mirror('h')).pack(side=tk.LEFT, fill=tk.X,
@@ -2072,19 +2186,19 @@ class PlotterApp:
                                                                   expand=True)
 
         # ── Capas panel ───────────────────────────────────────────────────────
-        layers_outer = tk.Frame(layers_tab, bg='#f4f4f4')
+        layers_outer = tk.Frame(layers_tab, bg=UI.PANEL)
         layers_outer.pack(fill=tk.BOTH, expand=True)
 
         layers_scroll = tk.Scrollbar(layers_outer, orient=tk.VERTICAL)
         layers_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self._layers_canvas = tk.Canvas(layers_outer, bg='#f4f4f4',
+        self._layers_canvas = tk.Canvas(layers_outer, bg=UI.PANEL,
                                         yscrollcommand=layers_scroll.set,
                                         highlightthickness=0)
         self._layers_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         layers_scroll.config(command=self._layers_canvas.yview)
 
-        self._layers_inner = tk.Frame(self._layers_canvas, bg='#f4f4f4')
+        self._layers_inner = tk.Frame(self._layers_canvas, bg=UI.PANEL)
         _lwin = self._layers_canvas.create_window((0, 0), window=self._layers_inner, anchor='nw')
 
         self._layers_inner.bind('<Configure>',
@@ -2102,17 +2216,17 @@ class PlotterApp:
         self._log_win = None
 
     def _build_statusbar(self):
-        sb = ttk.Frame(self.root, relief=tk.SUNKEN, padding=(4, 2))
+        sb = ttk.Frame(self.root, style='Status.TFrame', padding=(8, 3))
         sb.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Izquierda: estado del diseño + info paths
         ttk.Label(sb, textvariable=self.var_design_status,
-                  foreground='#444').pack(side=tk.LEFT, padx=(2, 0))
-        self.lbl_info = ttk.Label(sb, text="", foreground='#888')
+                  foreground=UI.MUTED).pack(side=tk.LEFT, padx=(2, 0))
+        self.lbl_info = ttk.Label(sb, text="", foreground=UI.FAINT)
         self.lbl_info.pack(side=tk.LEFT, padx=(10, 0))
 
         # Derecha: versión + barra de progreso + estado del plotter (clic → tab Plotter)
-        ttk.Label(sb, text=f"v{VERSION}", foreground='#aaa').pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Label(sb, text=f"v {VERSION}", style='Status.TLabel').pack(side=tk.RIGHT, padx=(0, 8))
 
         self.progressbar = ttk.Progressbar(sb, variable=self.var_progress,
                                            maximum=100, length=220, mode='determinate')
@@ -2138,7 +2252,7 @@ class PlotterApp:
             self._plotter_win.lift()
             self._plotter_win.focus_force()
             return
-        win = tk.Toplevel(self.root)
+        win = tk.Toplevel(self.root, bg=UI.PANEL)
         win.title("Plotter")
         win.resizable(False, False)
         win.transient(self.root)
@@ -2150,7 +2264,7 @@ class PlotterApp:
             self._log_win.lift()
             self._log_win.focus_force()
             return
-        win = tk.Toplevel(self.root)
+        win = tk.Toplevel(self.root, bg=UI.PANEL)
         win.title("Log COM")
         win.geometry("640x400")
         win.transient(self.root)
@@ -2160,7 +2274,7 @@ class PlotterApp:
         lb.pack(fill=tk.X, padx=4, pady=4)
         ttk.Button(lb, text="Limpiar", command=self._clear_log).pack(side=tk.LEFT)
 
-        self.log = scrolledtext.ScrolledText(win, font=('Consolas', 9),
+        self.log = scrolledtext.ScrolledText(win, font=F_MONO,
                                              bg='#1e1e1e', fg='#d4d4d4',
                                              insertbackground='white', state=tk.DISABLED)
         self.log.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0, 4))
@@ -2173,7 +2287,7 @@ class PlotterApp:
     # ── Connection ─────────────────────────────────────────────────────────────
 
     def _make_layer_thumb(self, parent, pts, fill, stroke, bg, size=28):
-        border = '#cc4400' if bg == '#ff6600' else '#cccccc'
+        border = '#cc4400' if bg == UI.SEL else UI.LINE_2
         c = tk.Canvas(parent, width=size, height=size, bg=bg,
                       highlightthickness=1, highlightbackground=border,
                       cursor='hand2')
@@ -2208,16 +2322,16 @@ class PlotterApp:
         for w in self._layers_inner.winfo_children():
             w.destroy()
         if not self.current_styled:
-            tk.Label(self._layers_inner, text="Sin trazados", bg='#f4f4f4',
-                     fg='#aaaaaa', font=('', 9)).pack(padx=8, pady=14)
+            tk.Label(self._layers_inner, text="Sin trazados", bg=UI.PANEL,
+                     fg=UI.FAINT, font=F_LABEL).pack(padx=8, pady=14)
             self._layers_canvas.configure(scrollregion=self._layers_canvas.bbox('all'))
             return
         for i, d in enumerate(self.current_styled):
             is_sel   = (self._sel_idx == i)
             is_group = (i in self._sel_set)
             active   = is_sel or is_group
-            bg = '#ff6600' if active else ('#f4f4f4' if i % 2 == 0 else '#ebebeb')
-            fg = '#ffffff' if active else '#333333'
+            bg = UI.SEL if active else (UI.PANEL if i % 2 == 0 else UI.SURFACE_2)
+            fg = '#ffffff' if active else UI.INK
 
             item = tk.Frame(self._layers_inner, bg=bg, cursor='hand2')
             item.pack(fill=tk.X)
@@ -2226,7 +2340,7 @@ class PlotterApp:
             thumb.pack(side=tk.LEFT, padx=(4, 3), pady=3)
 
             lbl = tk.Label(item, text=f"Objeto {i+1}", bg=bg, fg=fg,
-                           font=('', 9), cursor='hand2', anchor='w')
+                           font=F_LABEL, cursor='hand2', anchor='w')
             lbl.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
 
             def _click(_e, idx=i):
@@ -2328,7 +2442,7 @@ class PlotterApp:
     def _set_led(self, on):
         if hasattr(self, 'led') and self.led.winfo_exists():
             self.led.delete('all')
-            color = '#00dd00' if on else '#dd0000'
+            color = UI.GOOD if on else UI.BAD
             self.led.create_oval(2, 2, 16, 16, fill=color, outline='')
         self._set_sb_led(on)
 
@@ -2336,7 +2450,7 @@ class PlotterApp:
         if not hasattr(self, 'sb_led'):
             return
         self.sb_led.delete('all')
-        color = '#0077cc' if on else '#cc2222'
+        color = UI.GOOD if on else UI.BAD
         self.sb_led.create_oval(1, 1, 13, 13, fill=color, outline='')
 
     # ── File ───────────────────────────────────────────────────────────────────
@@ -3386,10 +3500,10 @@ class PlotterApp:
         if not self.current_hpgl:
             messagebox.showinfo("Sin HPGL", "Abre un archivo primero.")
             return
-        win = tk.Toplevel(self.root)
+        win = tk.Toplevel(self.root, bg=UI.PANEL)
         win.title("HPGL generado")
         win.geometry("640x520")
-        txt = scrolledtext.ScrolledText(win, font=('Consolas', 9))
+        txt = scrolledtext.ScrolledText(win, font=F_MONO)
         txt.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
         txt.insert(tk.END, self.current_hpgl)
         txt.config(state=tk.DISABLED)
@@ -3576,6 +3690,8 @@ chmod +x "{current}"
     _CONFIG_PATH = _config_path()
 
     def _load_config(self):
+        # ¿Ya existe config? Si sí, no es la primera vez: no molestamos con el diálogo de inicio.
+        self._has_config = self._CONFIG_PATH.exists()
         try:
             if self._CONFIG_PATH.exists():
                 data = json.loads(self._CONFIG_PATH.read_text())
@@ -3607,7 +3723,7 @@ chmod +x "{current}"
         self._open_work_area_dialog(startup=True)
 
     def _open_work_area_dialog(self, startup=False):
-        dlg = tk.Toplevel(self.root)
+        dlg = tk.Toplevel(self.root, bg=UI.PANEL)
         dlg.title("Área de trabajo")
         dlg.resizable(False, False)
         dlg.grab_set()
@@ -3615,9 +3731,9 @@ chmod +x "{current}"
 
         if startup:
             ttk.Label(dlg, text="¿Cuál es el área de trabajo del plotter?",
-                      font=('Segoe UI', 10, 'bold')).pack(padx=20, pady=(18, 4))
+                      font=_font(12, 'bold')).pack(padx=20, pady=(18, 4))
             ttk.Label(dlg, text="Podés cambiarlo después en  Archivo → Área de trabajo…",
-                      foreground='#888888').pack(padx=20, pady=(0, 10))
+                      foreground=UI.MUTED).pack(padx=20, pady=(0, 10))
 
         frm = ttk.Frame(dlg, padding=(20, 8, 20, 4))
         frm.pack()

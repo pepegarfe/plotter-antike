@@ -84,6 +84,25 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
 
 ---
 
+## Aspecto visual — sistema de diseño (tokens)
+
+Desde jul-2026 la UI tiene **un sistema de diseño centralizado** al inicio del archivo. **No
+hardcodear colores ni fuentes en los widgets** — todo sale de aquí:
+
+- **Colores:** la clase `UI` (un neutro, el acento magenta `UI.ACCENT`, colores de estado, y los del
+  lienzo). Cambiar el look = cambiar esos valores, no cazar hex por el archivo.
+- **Fuentes:** constantes `F_SECTION`, `F_LABEL`, `F_BODY`, `F_ICON`, `F_MONO`, etc., construidas con
+  la **familia nativa por plataforma** (`_UI_FAMILY`/`_MONO_FAMILY`). ⚠️ **Nunca volver a poner
+  `'Segoe UI'` o `'Consolas'` literales**: no existen en Mac y caen en una fuente tosca.
+- **Tema:** `_setup_theme()` configura TODOS los widgets ttk (pestañas, botones, listas, spinboxes,
+  barra de progreso, iconos) con la paleta, sobre el tema `clam`. Estilos propios: `Accent.TButton`
+  (acciones primarias), `Icon.TButton` / `Icon.Toolbutton` (barra de iconos).
+- ⚠️ **En macOS, `tk.Button` y `tk.Checkbutton` IGNORAN el color de fondo** (se dibujan como botón
+  nativo). Para botones con color de marca o de estado, usar **ttk con un estilo del tema**, no tk
+  clásico. (Por eso "Enviar Diseño" y la barra de iconos son ttk.)
+- ⚠️ **Los `tk.Toplevel` necesitan `bg=UI.PANEL`** o en modo oscuro de macOS salen con fondo negro.
+- **No quitar** el bloque de tema/paleta al inicio de `PlotterApp.__init__` ni `_setup_theme()`.
+
 ## Dependencias opcionales
 
 La app **arranca sin ninguna dependencia** y solo deshabilita la función que falte:
