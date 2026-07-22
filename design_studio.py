@@ -47,14 +47,21 @@ class Api:
         return _set_workarea(w, h)
 
     def open_design(self):
-        """Abre un diálogo nativo, parsea el archivo con el motor y devuelve los trazados en mm."""
+        """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI) o un proyecto (.dstudio)."""
         res = self.window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
-            file_types=('Vectores (*.svg;*.dxf;*.ai)', 'Todos los archivos (*.*)'))
+            file_types=('Diseños y proyectos (*.svg;*.dxf;*.ai;*.dstudio)', 'Todos los archivos (*.*)'))
         if not res:
             return {'ok': False, 'cancelled': True}
         path = res[0] if isinstance(res, (list, tuple)) else res
         ext = os.path.splitext(path)[1].lower()
+        if ext == '.dstudio':
+            try:
+                proj = json.loads(open(path, encoding='utf-8').read())
+                return {'ok': True, 'kind': 'project', 'project': proj,
+                        'name': os.path.basename(path)}
+            except Exception as e:
+                return {'ok': False, 'error': f'No se pudo abrir el proyecto: {e}'}
         try:
             if ext == '.svg':
                 styled = core.SVGParser().parse(path)
@@ -63,7 +70,7 @@ class Api:
             elif ext == '.ai':
                 styled = core.AIParser().parse(path)
             else:
-                return {'ok': False, 'error': 'Formato no soportado (usa SVG, DXF o AI).'}
+                return {'ok': False, 'error': 'Formato no soportado (usa SVG, DXF, AI o .dstudio).'}
         except Exception as e:
             return {'ok': False, 'error': f'No se pudo leer el archivo: {e}'}
 
@@ -114,6 +121,23 @@ class Api:
         try:
             with open(path, 'w') as f:
                 f.write(hpgl)
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo guardar: {e}'}
+        return {'ok': True, 'path': os.path.basename(path)}
+
+    def save_project(self, data):
+        """Guarda el proyecto completo (trazados + transforms + área + corte) a un .dstudio."""
+        name = (data.get('name') or 'proyecto')
+        name = name.rsplit('.', 1)[0] + '.dstudio'
+        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res if isinstance(res, str) else res[0]
+        if not path.lower().endswith('.dstudio'):
+            path += '.dstudio'
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f)
         except Exception as e:
             return {'ok': False, 'error': f'No se pudo guardar: {e}'}
         return {'ok': True, 'path': os.path.basename(path)}
