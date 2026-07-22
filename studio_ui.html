@@ -138,6 +138,7 @@
   .selfield{width:100%;height:32px;border-radius:7px;background:var(--input);border:1px solid var(--line-2);color:var(--ink);font:inherit;font-size:13px;padding:0 8px;cursor:pointer;outline:none;}
   .selfield:focus{border-color:var(--accent);}
   .toolsum{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:7px;line-height:1.5;}
+  .opname{float:right;color:var(--accent);font-weight:700;}
   /* Modal de fresas */
   .tlist{display:flex;flex-direction:column;gap:2px;max-height:180px;overflow-y:auto;margin-bottom:10px;}
   .trow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;cursor:pointer;}
@@ -351,12 +352,25 @@
       <select class="selfield" id="toolPick"></select>
       <div class="toolsum" id="toolSum">—</div>
       <div class="rowbtns"><button class="gbtn" id="btnTools">⚙ Gestionar fresas…</button></div>
-      <div class="grp-t sec">Corte · Perfil</div>
-      <div class="seg" id="sideSeg" style="margin-top:0">
-        <button class="on" data-s="outside" title="La fresa corre por FUERA de la línea — para recortar piezas a su medida exacta">Fuera</button>
-        <button data-s="inside" title="Por DENTRO de la línea — para huecos y ventanas a medida exacta">Dentro</button>
-        <button data-s="on" title="El centro de la fresa va SOBRE la línea (sin compensar). Único modo para trazos abiertos">Línea</button>
+      <div class="grp-t sec">Operación<span class="opname" id="opName">Perfil</span></div>
+      <div class="seg" id="opSeg" style="margin-top:0">
+        <button class="on" data-o="profile" title="Perfil — cortar siguiendo el contorno (con compensación de la fresa)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" stroke-dasharray="2.6 2.2" opacity=".65"/></svg></button>
+        <button data-o="pocket" title="Cajeado — vaciar el interior de las formas cerradas con anillos concéntricos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="1.2" opacity=".65"/><rect x="10.5" y="10.5" width="3" height="3" rx=".6" fill="currentColor" stroke="none" opacity=".8"/></svg></button>
+        <button data-o="drill" title="Taladro — barreno en el centro de cada contorno cerrado (círculos = puntos de taladro)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button>
       </div>
+      <div id="profileOpts">
+        <div class="seg" id="sideSeg">
+          <button class="on" data-s="outside" title="La fresa corre por FUERA de la línea — para recortar piezas a su medida exacta">Fuera</button>
+          <button data-s="inside" title="Por DENTRO de la línea — para huecos y ventanas a medida exacta">Dentro</button>
+          <button data-s="on" title="El centro de la fresa va SOBRE la línea (sin compensar). Único modo para trazos abiertos">Línea</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:9px">
+          <div class="field" title="Puentes que sujetan la pieza para que no salga volando al soltarse (0 = sin puentes)"><label>Puentes</label><input id="tabN" value="3"></div>
+          <div class="field" title="Ancho de cada puente"><label>An.</label><input id="tabW" value="8"><span class="u">mm</span></div>
+          <div class="field" title="Alto del puente medido desde el fondo del corte"><label>Al.</label><input id="tabH" value="3"><span class="u">mm</span></div>
+        </div>
+      </div>
+      <div class="muted-note" id="opNote" style="display:none;margin-top:9px"></div>
       <div class="grid2" style="margin-top:9px">
         <div class="field" title="Profundidad total del corte (se llena sola con el grosor del material)"><label>Prof.</label><input id="cutDepth"><span class="u">mm</span></div>
         <div class="field" title="Pasadas que hará la fresa (profundidad ÷ pasada de la fresa)"><label>Pasadas</label><input id="passInfo" disabled></div>
@@ -449,6 +463,7 @@
       </div>
       <div class="mrow">
         <div class="field" style="flex:1" title="Vueltas por minuto del husillo. Ojo: el controlador puede ignorarlo (ver manual RichAuto, ajuste 'S Read')."><label>Husillo</label><input id="tfRpm"><span class="u">RPM</span></div>
+        <div class="field" style="flex:1" title="Paso lateral del cajeado, como % del diámetro (40% es un buen punto de partida)"><label>Paso</label><input id="tfStep"><span class="u">%Ø</span></div>
       </div>
       <div class="mrow" style="margin-top:12px">
         <button class="pbtn" id="toolNew">＋ Nueva</button>
@@ -673,13 +688,18 @@
       for(var j=1;j<e.length;j++){var b2=tp(e[j][0],e[j][1]); ctx.lineTo(b2[0],b2[1]);}
       ctx.stroke();
     }
-    // trayectorias CNC (centro de la fresa) — azul, encima del diseño
+    // trayectorias CNC (centro de la fresa) — azul, encima del diseño; taladros como círculos con cruz
     if(state.machine==='cnc' && cncPrev){
       ctx.strokeStyle=grpC; ctx.lineWidth=1.6;
-      for(var t=0;t<cncPrev.length;t++){ var tpts=cncPrev[t]; if(tpts.length<2) continue;
+      for(var t=0;t<cncPrev.tps.length;t++){ var tpts=cncPrev.tps[t]; if(tpts.length<2) continue;
         ctx.beginPath(); var t0=tp(tpts[0][0],tpts[0][1]); ctx.moveTo(t0[0],t0[1]);
         for(var u=1;u<tpts.length;u++){ var tu=tp(tpts[u][0],tpts[u][1]); ctx.lineTo(tu[0],tu[1]); }
         ctx.stroke(); }
+      var dr=(cncPrev.dia/2)*view.scale;
+      for(var q=0;q<cncPrev.drills.length;q++){ var dpt=tp(cncPrev.drills[q][0],cncPrev.drills[q][1]);
+        ctx.beginPath(); ctx.arc(dpt[0],dpt[1],Math.max(2,dr),0,Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(dpt[0]-4,dpt[1]); ctx.lineTo(dpt[0]+4,dpt[1]);
+        ctx.moveTo(dpt[0],dpt[1]-4); ctx.lineTo(dpt[0],dpt[1]+4); ctx.stroke(); }
     }
     // caja de selección
     if(m!=='all' && doc.paths.length){ var A=activeIdx(); var bb=bboxOf(A); var p0=tp(bb[0],bb[3]), p1=tp(bb[2],bb[1]);
@@ -1067,7 +1087,7 @@
   function cncTool(){ if(!state.cnc) return null; var id=state.cnc.tool_sel, ts=state.cnc.tools||[];
     for(var i=0;i<ts.length;i++) if(ts[i].id===id) return ts[i];
     return ts[0]||null; }
-  function fmtTool(t){ return t ? ('Ø '+t.dia+' mm · pasada '+t.pass_depth+' mm · '+Math.round(t.feed)+' mm/min · '+Math.round(t.rpm)+' RPM') : '—'; }
+  function fmtTool(t){ return t ? ('Ø '+t.dia+' mm · pasada '+t.pass_depth+' mm · '+Math.round(t.feed)+' mm/min · '+Math.round(t.rpm)+' RPM · paso '+(t.stepover_pct||40)+'%') : '—'; }
   function paintCnc(){ if(!state.cnc) return;
     el('matThick').value=state.cnc.material.thickness;
     var t=cncTool(); el('matDia').value=t?t.dia:'';
@@ -1114,7 +1134,8 @@
   function tnum(id,fb){ var v=parseFloat(el(id).value); return isNaN(v)?fb:v; }
   function pullToolFields(){ var t=tEdit.list[tEdit.cur]; if(!t) return;
     t.name=el('tfName').value||'Fresa'; t.dia=tnum('tfDia',t.dia); t.pass_depth=tnum('tfPass',t.pass_depth);
-    t.feed=tnum('tfFeed',t.feed); t.plunge=tnum('tfPlunge',t.plunge); t.rpm=tnum('tfRpm',t.rpm); }
+    t.feed=tnum('tfFeed',t.feed); t.plunge=tnum('tfPlunge',t.plunge); t.rpm=tnum('tfRpm',t.rpm);
+    t.stepover_pct=tnum('tfStep',t.stepover_pct||40); }
   function paintTools(){ var L=el('toolList'); L.innerHTML='';
     tEdit.list.forEach(function(t,i){ var r=document.createElement('div'); r.className='trow'+(i===tEdit.cur?' on':'');
       var nm=document.createElement('span'); nm.className='tnm'; nm.textContent=t.name;
@@ -1124,7 +1145,8 @@
       L.appendChild(r); });
     var t=tEdit.list[tEdit.cur]||{};
     el('tfName').value=t.name||''; el('tfDia').value=t.dia!=null?t.dia:''; el('tfPass').value=t.pass_depth!=null?t.pass_depth:'';
-    el('tfFeed').value=t.feed!=null?t.feed:''; el('tfPlunge').value=t.plunge!=null?t.plunge:''; el('tfRpm').value=t.rpm!=null?t.rpm:''; }
+    el('tfFeed').value=t.feed!=null?t.feed:''; el('tfPlunge').value=t.plunge!=null?t.plunge:''; el('tfRpm').value=t.rpm!=null?t.rpm:'';
+    el('tfStep').value=t.stepover_pct!=null?t.stepover_pct:40; }
   function openTools(){ if(!state.cnc) return;
     tEdit.list=JSON.parse(JSON.stringify(state.cnc.tools||[])); tEdit.cur=0;
     tEdit.list.forEach(function(t,i){ if(t.id===state.cnc.tool_sel) tEdit.cur=i; });
@@ -1133,7 +1155,7 @@
   el('toolsClose').addEventListener('click',function(){ el('toolsModal').style.display='none'; });
   el('toolsModal').addEventListener('click',function(e){ if(e.target===el('toolsModal')) el('toolsModal').style.display='none'; });
   el('toolNew').addEventListener('click',function(){ pullToolFields();
-    tEdit.list.push({id:'t'+Date.now(), name:'Fresa nueva', dia:6, pass_depth:3, feed:2000, plunge:600, rpm:18000});
+    tEdit.list.push({id:'t'+Date.now(), name:'Fresa nueva', dia:6, pass_depth:3, feed:2000, plunge:600, rpm:18000, stepover_pct:40});
     tEdit.cur=tEdit.list.length-1; paintTools(); });
   el('toolDel').addEventListener('click',function(){ if(tEdit.list.length<=1){ toast('Debe quedar al menos una fresa'); return; }
     tEdit.list.splice(tEdit.cur,1); tEdit.cur=Math.max(0,tEdit.cur-1); paintTools(); });
@@ -1143,8 +1165,21 @@
       if(r&&r.ok){ state.cnc=r; paintCnc(); refreshInspector(); el('toolsModal').style.display='none'; toast('Biblioteca guardada · '+r.tools.length+' fresas'); }
       else toast((r&&r.error)||'No se pudo guardar'); }).catch(function(e){toast('Error: '+e);}); });
 
-  // --- Fase B: perfil (fuera/dentro/línea), previsualización y export .tap ---
+  // --- Fases B/C: operación (perfil/cajeado/taladro), previsualización y export .tap ---
   function curSide(){ var b=el('sideSeg').querySelector('.on'); return b?b.getAttribute('data-s'):'outside'; }
+  function curOp(){ var b=el('opSeg').querySelector('.on'); return b?b.getAttribute('data-o'):'profile'; }
+  var OP_NOTES={ pocket:'Cajeado: vacía el interior de las formas cerradas con anillos concéntricos (paso = "Paso %Ø" de la fresa). La pared se corta al final.',
+                 drill:'Taladro: barrena en el CENTRO de cada contorno cerrado. Dibuja círculos chicos donde quieras los barrenos.' };
+  function paintOp(){ var o=curOp();
+    el('opName').textContent = {profile:'Perfil', pocket:'Cajeado', drill:'Taladro'}[o]||'';
+    el('profileOpts').style.display = o==='profile'?'block':'none';
+    el('opNote').style.display = OP_NOTES[o]?'block':'none';
+    el('opNote').textContent = OP_NOTES[o]||''; }
+  el('opSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+    el('opSeg').querySelectorAll('button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+    paintOp(); killPrev(); draw(); });
+  paintOp();
+  ['tabN','tabW','tabH'].forEach(function(id){ el(id).addEventListener('input',function(){ killPrev(); draw(); }); });
   var depthAuto=null;   // si el campo trae el valor auto, sigue al grosor del material
   function paintDepth(){ if(!state.cnc) return; var th=state.cnc.material.thickness;
     var v=parseFloat(el('cutDepth').value);
@@ -1156,8 +1191,9 @@
   el('sideSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     el('sideSeg').querySelectorAll('button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
     killPrev(); draw(); });
-  function tapPayload(){ return { paths: effAll(), name: state.name, side: curSide(),
+  function tapPayload(){ return { paths: effAll(), name: state.name, op: curOp(), side: curSide(),
     depth: parseFloat(el('cutDepth').value)||state.cnc.material.thickness,
+    tabs: { n: parseInt(el('tabN').value,10)||0, w: parseFloat(el('tabW').value)||8, h: parseFloat(el('tabH').value)||3 },
     tool: cncTool(), material: state.cnc.material }; }
   var CNCB={ prev:function(d){ return api()? api().cnc_toolpath(d) : postJSON('/api/cnc_toolpath',d); },
              tap: function(d){ return api()? api().save_tap(d)     : postJSON('/api/tap',d); } };
@@ -1166,8 +1202,10 @@
     if(!hasDoc()||!state.cnc) return;
     CNCB.prev(tapPayload()).then(function(r){
       if(!r||!r.ok){ toast((r&&r.error)||'No se pudieron calcular las trayectorias'); return; }
-      cncPrev=r.toolpaths; el('btnTpPrev').classList.add('on'); draw();
-      toast('Trayectorias: '+cncPrev.length+' · ≈ '+Math.floor(r.secs/60)+' min '+(r.secs%60)+' s'+
+      cncPrev={tps:r.toolpaths||[], drills:r.drills||[], dia:r.dia||6};
+      el('btnTpPrev').classList.add('on'); draw();
+      var n=cncPrev.tps.length+cncPrev.drills.length;
+      toast((r.op==='drill'?'Barrenos: ':'Trayectorias: ')+n+' · ≈ '+Math.floor(r.secs/60)+' min '+(r.secs%60)+' s'+
             (r.skipped?' · '+r.skipped+' trazo(s) abierto(s) fuera':'')); })
       .catch(function(e){toast('Error: '+e);}); });
   function saveTap(){ if(!hasDoc()||!state.cnc) return;

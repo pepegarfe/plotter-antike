@@ -71,11 +71,11 @@ CNC_DEFAULTS = {
     'material': {'thickness': 15.0, 'z_zero': 'top'},  # z_zero: 'top' (cara superior) | 'bed' (cama)
     'tool_sel': 't6-mdf',
     'tools': [
-        {'id': 't6-mdf', 'name': 'Fresa 6 mm · MDF/triplay',        'dia': 6.0,   'pass_depth': 5.0, 'feed': 2500, 'plunge': 800,  'rpm': 18000},
-        {'id': 't6-acr', 'name': 'Fresa 6 mm · Acrílico',           'dia': 6.0,   'pass_depth': 4.0, 'feed': 1800, 'plunge': 500,  'rpm': 18000},
-        {'id': 't6-pvc', 'name': 'Fresa 6 mm · PVC espumado',       'dia': 6.0,   'pass_depth': 8.0, 'feed': 3000, 'plunge': 1000, 'rpm': 16000},
-        {'id': 't6-mad', 'name': 'Fresa 6 mm · Madera sólida',      'dia': 6.0,   'pass_depth': 4.0, 'feed': 2000, 'plunge': 600,  'rpm': 18000},
-        {'id': 't3-det', 'name': 'Fresa 3.175 mm (1/8″) · Detalle', 'dia': 3.175, 'pass_depth': 2.5, 'feed': 1500, 'plunge': 500,  'rpm': 20000},
+        {'id': 't6-mdf', 'name': 'Fresa 6 mm · MDF/triplay',        'dia': 6.0,   'pass_depth': 5.0, 'feed': 2500, 'plunge': 800,  'rpm': 18000, 'stepover_pct': 40},
+        {'id': 't6-acr', 'name': 'Fresa 6 mm · Acrílico',           'dia': 6.0,   'pass_depth': 4.0, 'feed': 1800, 'plunge': 500,  'rpm': 18000, 'stepover_pct': 40},
+        {'id': 't6-pvc', 'name': 'Fresa 6 mm · PVC espumado',       'dia': 6.0,   'pass_depth': 8.0, 'feed': 3000, 'plunge': 1000, 'rpm': 16000, 'stepover_pct': 45},
+        {'id': 't6-mad', 'name': 'Fresa 6 mm · Madera sólida',      'dia': 6.0,   'pass_depth': 4.0, 'feed': 2000, 'plunge': 600,  'rpm': 18000, 'stepover_pct': 40},
+        {'id': 't3-det', 'name': 'Fresa 3.175 mm (1/8″) · Detalle', 'dia': 3.175, 'pass_depth': 2.5, 'feed': 1500, 'plunge': 500,  'rpm': 20000, 'stepover_pct': 40},
     ],
 }
 
@@ -131,6 +131,7 @@ def cnc_set(patch):
                     'feed': max(1, float(t.get('feed', 2000))),
                     'plunge': max(1, float(t.get('plunge', 500))),
                     'rpm': max(0, float(t.get('rpm', 18000))),
+                    'stepover_pct': min(90, max(10, float(t.get('stepover_pct') or 40))),
                 })
             if not tools:
                 return {'ok': False, 'error': 'Debe quedar al menos una fresa.'}
@@ -146,50 +147,68 @@ def cnc_set(patch):
         return {'ok': False, 'error': str(e)}
 
 
-# ---- Fase B: trayectorias de perfil y G-code .tap (ver cnc_gcode.py) ----
+# ---- Fases B/C: trayectorias (perfil/cajeado/taladro) y G-code .tap (ver cnc_gcode.py) ----
 
-def _cnc_payload(data):
-    """Normaliza el payload de la UI: trazados efectivos + fresa + material + corte."""
+_NO_CLOSED = ('Ningún trazado cerrado que procesar '
+              '(los trazos abiertos solo admiten Perfil "Sobre la línea").')
+
+
+def _cnc_make(data):
+    """Normaliza el payload de la UI y calcula las trayectorias de la operación pedida.
+    Devuelve (op, toolpaths, drills, skipped, tool, material, depth, tabs, name)."""
+    import cnc_gcode
     paths = [[(float(p[0]), float(p[1])) for p in pts] for pts in (data.get('paths') or [])]
+    if not paths:
+        raise ValueError('No hay trazados.')
     tool = data.get('tool') or {}
     material = data.get('material') or {}
     depth = float(data.get('depth') or material.get('thickness') or 15.0)
-    side = data.get('side') or 'outside'
-    if side not in ('outside', 'inside', 'on'):
-        side = 'outside'
-    return paths, tool, material, depth, side
+    op = data.get('op') or 'profile'
+    dia = float(tool.get('dia', 6.0))
+    tps, drills = [], []
+    if op == 'pocket':
+        step = dia * float(tool.get('stepover_pct') or 40) / 100.0
+        tps, skipped = cnc_gcode.make_pocket(paths, dia, step)
+    elif op == 'drill':
+        drills, skipped = cnc_gcode.drill_points(paths)
+    else:
+        op = 'profile'
+        side = data.get('side') if data.get('side') in ('outside', 'inside', 'on') else 'outside'
+        tps, skipped = cnc_gcode.make_toolpaths(paths, side, dia)
+    if not tps and not drills:
+        raise ValueError(_NO_CLOSED)
+    tabs = data.get('tabs') or None
+    if tabs and not int(tabs.get('n') or 0):
+        tabs = None
+    return (op, tps, drills, skipped, tool, material, depth, tabs,
+            data.get('name') or 'diseno')
+
+
+def _cnc_gcode(op, tps, drills, tool, material, depth, tabs, name):
+    import cnc_gcode
+    if op == 'drill':
+        return cnc_gcode.build_drill(drills, tool, material, depth, name=name)
+    label = 'cajeado' if op == 'pocket' else 'perfil'
+    return cnc_gcode.build_gcode(tps, tool, material, depth, name=name,
+                                 tabs=(tabs if op == 'profile' else None), op=label)
 
 
 def cnc_toolpaths_preview(data):
-    """Solo las polilíneas del centro de la fresa (para pintarlas en el lienzo) + estimación."""
-    import cnc_gcode
+    """Trayectorias para pintar en el lienzo (+ puntos de taladro) + estimación de tiempo."""
     try:
-        paths, tool, material, depth, side = _cnc_payload(data)
-        if not paths:
-            return {'ok': False, 'error': 'No hay trazados.'}
-        tps, skipped = cnc_gcode.make_toolpaths(paths, side, float(tool.get('dia', 6.0)))
-        if not tps:
-            return {'ok': False, 'error': 'Ningún trazado cerrado que compensar '
-                                          '(los trazos abiertos solo admiten "Sobre la línea").'}
-        _, secs = cnc_gcode.build_gcode(tps, tool, material, depth)
-        return {'ok': True, 'toolpaths': tps, 'skipped': skipped, 'secs': round(secs)}
+        op, tps, drills, skipped, tool, material, depth, tabs, name = _cnc_make(data)
+        _, secs = _cnc_gcode(op, tps, drills, tool, material, depth, tabs, name)
+        return {'ok': True, 'op': op, 'toolpaths': tps, 'drills': drills,
+                'dia': float(tool.get('dia', 6.0)), 'skipped': skipped, 'secs': round(secs)}
     except Exception as e:
         return {'ok': False, 'error': f'Trayectorias: {e}'}
 
 
 def cnc_build_tap(data):
     """El archivo .tap completo (texto) listo para guardar/descargar."""
-    import cnc_gcode
     try:
-        paths, tool, material, depth, side = _cnc_payload(data)
-        if not paths:
-            return {'ok': False, 'error': 'No hay trazados.'}
-        tps, skipped = cnc_gcode.make_toolpaths(paths, side, float(tool.get('dia', 6.0)))
-        if not tps:
-            return {'ok': False, 'error': 'Ningún trazado cerrado que compensar '
-                                          '(los trazos abiertos solo admiten "Sobre la línea").'}
-        tap, secs = cnc_gcode.build_gcode(tps, tool, material, depth,
-                                          name=data.get('name') or 'diseno')
+        op, tps, drills, skipped, tool, material, depth, tabs, name = _cnc_make(data)
+        tap, secs = _cnc_gcode(op, tps, drills, tool, material, depth, tabs, name)
         return {'ok': True, 'tap': tap, 'lines': tap.count('\n'),
                 'skipped': skipped, 'secs': round(secs)}
     except Exception as e:
