@@ -1,8 +1,11 @@
 ---
 name: design-studio
 description: Design Studio — la interfaz nueva (web/pywebview) que reconstruye Plotter Antike; estado y cómo correrla/compilarla
-metadata:
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: 661c489b-f53b-4842-91af-46e807877393
+  modified: 2026-07-22T16:13:51.699Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -55,14 +58,14 @@ Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `
 - **Selección múltiple**: Shift / Cmd / Ctrl + clic suma/quita; Shift+arrastre = marco aditivo
   (`mousedown`/`mouseup` del lienzo; respeta grupos como unidad).
 
-**SIN COMMIT todavía** (studio_ui.html modificado, verificado en vivo):
+**Commit `73229b8`** (ya pusheado):
 - **Alinear-a**: el `<select>` de texto "Selección/Área de trabajo" ahora es un **segmentado con iconos**
   (id `alignTo`, dos `<button data-to>`; estilo `.seg`). De regalo mejoró el resaltado del modo B/N/Color.
 
-### Pendientes al abrir la próxima sesión
-1. **Commit del segmentado de alinear** (studio_ui.html sin subir; Jose no ha pedido el commit aún).
-2. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
-3. Diferidas que Jose puede querer: organizar orden (z-order / orden de corte), texto, contorno/offset,
+### Pendientes al 22-jul-2026 (árbol limpio, todo pusheado)
+1. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
+   Necesita hardware; nadie puede cerrarlo desde la Mac.
+2. Diferidas que Jose puede querer: organizar orden (z-order / orden de corte), texto, contorno/offset,
    presets de material, optimizar orden de corte, snapping.
 
 ## Lanzador de escritorio (Mac) — ícono "Design Studio.app"
