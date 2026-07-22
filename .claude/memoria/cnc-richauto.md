@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T22:30:24.434Z
+  modified: 2026-07-22T22:59:10.048Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -191,6 +191,26 @@ M30
     `cnc_get()` migra configs viejas completando llaves faltantes del material.
   - Diferido consciente (existe en Aspire, es pulido): leads, edición de pasadas ±15%, rampas
     zig-zag/espiral, última pasada separada, editor de tabs con clic, preview 3D.
+
+- **G. Fresas por material (Tool Database estilo Aspire) — ✅ CONSTRUIDA 22-jul-2026** (Jose pidió
+  el careo contra la Tool Database de Aspire V12; el defecto era que el material iba PEGADO EN EL
+  NOMBRE de la fresa — tu fresa de 6 mm existía 4 veces). Esquema v2 de `cnc_config.json`:
+  - **Fresa = GEOMETRÍA** (nombre, Ø, notas) **+ `cut{}` = datos de corte POR MATERIAL**
+    (pasada/avance/bajada/RPM/paso). **`materials[]`** gestionable (modal ⚙ junto al selector)
+    y **`material.type`** = material ACTIVO, elegido en el panel Material: las fresas usan su
+    juego de datos automáticamente. `flatTool()` en la UI aplana geometría+datos del material
+    activo — el motor de G-code sigue recibiendo el dict plano de siempre (no se tocó).
+  - **Migración v1→v2 automática** en `cnc_get()` (agrupa por nombre-base sin sufijo de material
+    + Ø; palabra clave del nombre → material; sin palabra clave → sus datos van a TODOS).
+    Verificada sobre la config real de Jose: 5 fresas → 2. El archivo se reescribe migrado.
+  - **Snapshot al Calcular**: la trayectoria congela la fresa aplanada (`t.tool`); editar la
+    biblioteca o cambiar material activo NO altera trayectorias ya calculadas (como Aspire).
+  - **Exportar/Importar biblioteca** (materiales+fresas, JSON `antike-tools`): botones en el
+    modal de fresas; Api `tools_export/tools_import` + rutas `/api/tools_export|tools_import`.
+    Importar REEMPLAZA. "→ todos" copia los datos de corte del material activo a los demás.
+  - Al borrar un material se PODAN los datos de corte huérfanos de todas las fresas.
+  - No construido a propósito: tipos de herramienta (V-bit/ball nose — hasta V-carve), número
+    de herramienta (RichAuto sin ATC), chip load, grupos en árbol (<15 fresas).
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
