@@ -52,6 +52,20 @@ cd ~/plotter-antike && /opt/homebrew/bin/python3 -m PyInstaller --windowed --noc
   --collect-all webview design_studio.py    # → dist/DesignStudio.app
 ```
 
+## Calco de imagen (Image Trace) — `img_trace.py`
+Convierte fotos (PNG/JPG…) en trazos de corte. Dos modos:
+- **B/N (silueta):** Pillow (gris + umbral) → **potrace** (CLI, `brew install potrace`) → SVG con curvas
+  Bézier suaves → `core.SVGParser` → trazos. Máxima fidelidad de contorno (familia del calco de Illustrator).
+- **Color:** **vtracer** separa por colores. ⚠️ **El binding Python de vtracer 0.6.15 CRASHEA (segfault)
+  si se le pasa CUALQUIER parámetro** — solo funciona con defaults. Solución: controlar la cantidad de
+  colores **reduciéndolos antes con `Image.quantize`** y llamar a vtracer sin argumentos.
+- **Dependencias** (para el Python de Homebrew): `potrace` (Homebrew) + `Pillow` + `vtracer` (pip
+  `--break-system-packages`; hay wheel cp314). El módulo se llama **`img_trace.py`** (NO `trace.py`,
+  que choca con la stdlib).
+- **UI:** herramienta en el riel (icono de foto) → sube imagen → modal con Umbral/Suavizado/Ignorar
+  manchas/Invertir (B/N) o Colores (color) → "Calcar" carga el resultado como diseño (agrupado).
+- **La fidelidad la limita la imagen de entrada:** nítida y de alto contraste = buen calco.
+
 ## Conectar el plotter: Mac vs Windows (para probar la Fase 3)
 El motor usa `pyserial` → `serial.tools.list_ports.comports()`, que nombra el puerto distinto según el
 sistema. Es el MISMO dispositivo, distinto nombre:
