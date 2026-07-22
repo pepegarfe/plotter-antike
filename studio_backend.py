@@ -68,7 +68,8 @@ def _cnc_path():
 CNC_DEFAULTS = {
     'machine': 'plotter',                              # máquina activa al abrir la app
     'work': [1220.0, 2440.0],                          # cama de la CNC de Jose (122×244 cm)
-    'material': {'thickness': 15.0, 'z_zero': 'top'},  # z_zero: 'top' (cara superior) | 'bed' (cama)
+    'material': {'thickness': 15.0, 'z_zero': 'top',   # z_zero: 'top' (cara superior) | 'bed' (cama)
+                 'clearance': 5.0, 'home_end': True},  # Z segura (mm) y "volver a X0 Y0 al terminar"
     'tool_sel': 't6-mdf',
     'tools': [
         {'id': 't6-mdf', 'name': 'Fresa 6 mm · MDF/triplay',        'dia': 6.0,   'pass_depth': 5.0, 'feed': 2500, 'plunge': 800,  'rpm': 18000, 'stepover_pct': 40},
@@ -90,6 +91,8 @@ def cnc_get():
             for k in ('machine', 'work', 'material', 'tool_sel', 'tools'):
                 if k in saved:
                     data[k] = saved[k]
+            # config guardada por versiones viejas: completar llaves nuevas del material
+            data['material'] = {**CNC_DEFAULTS['material'], **(data.get('material') or {})}
     except Exception:
         pass
     data['ok'] = True
@@ -113,13 +116,18 @@ def cnc_set(patch):
             cur['work'] = [w, h]
         if 'material' in patch:
             m = patch['material'] or {}
-            t = float(m.get('thickness', cur['material']['thickness']))
+            old = cur['material']
+            t = float(m.get('thickness', old['thickness']))
             if not (0 < t <= 500):
                 return {'ok': False, 'error': 'Grosor de material fuera de rango (0–500 mm).'}
-            zz = m.get('z_zero', cur['material']['z_zero'])
+            zz = m.get('z_zero', old['z_zero'])
             if zz not in ('top', 'bed'):
                 return {'ok': False, 'error': 'Cero de Z inválido.'}
-            cur['material'] = {'thickness': t, 'z_zero': zz}
+            cl = float(m.get('clearance', old.get('clearance', 5.0)))
+            if not (1 <= cl <= 200):
+                return {'ok': False, 'error': 'La Z segura debe estar entre 1 y 200 mm.'}
+            cur['material'] = {'thickness': t, 'z_zero': zz, 'clearance': cl,
+                               'home_end': bool(m.get('home_end', old.get('home_end', True)))}
         if 'tools' in patch:
             tools = []
             for t in (patch['tools'] or []):
@@ -165,39 +173,53 @@ def _cnc_make(data):
     depth = float(data.get('depth') or material.get('thickness') or 15.0)
     op = data.get('op') or 'profile'
     dia = float(tool.get('dia', 6.0))
+    direction = 'conv' if data.get('direction') == 'conv' else 'climb'
+    allowance = float(data.get('allowance') or 0)
     tps, drills = [], []
     if op == 'pocket':
         step = dia * float(tool.get('stepover_pct') or 40) / 100.0
-        tps, skipped = cnc_gcode.make_pocket(paths, dia, step)
+        tps, skipped = cnc_gcode.make_pocket(paths, dia, step, direction, allowance)
     elif op == 'drill':
         drills, skipped = cnc_gcode.drill_points(paths)
     else:
         op = 'profile'
         side = data.get('side') if data.get('side') in ('outside', 'inside', 'on') else 'outside'
-        tps, skipped = cnc_gcode.make_toolpaths(paths, side, dia)
+        tps, skipped = cnc_gcode.make_toolpaths(paths, side, dia, direction, allowance)
     if not tps and not drills:
         raise ValueError(_NO_CLOSED)
     tabs = data.get('tabs') or None
-    if tabs and not int(tabs.get('n') or 0):
+    if tabs and not tabs.get('on', True):
         tabs = None
+    if tabs:
+        v = float(tabs.get('v', tabs.get('n', 0)) or 0)   # 'n' = formato viejo (cantidad)
+        tabs = {'mode': 'dist' if tabs.get('mode') == 'dist' else 'n', 'v': v,
+                'w': float(tabs.get('w') or 8), 'h': float(tabs.get('h') or 3)}
+        if v <= 0:
+            tabs = None
     return (op, tps, drills, skipped, tool, material, depth, tabs,
-            data.get('name') or 'diseno')
+            bool(data.get('ramp')), data.get('name') or 'diseno')
 
 
-def _cnc_gcode(op, tps, drills, tool, material, depth, tabs, name):
-    import cnc_gcode
+def _as_job(data):
+    """Convierte un payload de trayectoria en un job de cnc_gcode.build_jobs()."""
+    op, tps, drills, skipped, tool, material, depth, tabs, ramp, name = _cnc_make(data)
+    start = max(0.0, float(data.get('start') or 0))
     if op == 'drill':
-        return cnc_gcode.build_drill(drills, tool, material, depth, name=name)
-    label = 'cajeado' if op == 'pocket' else 'perfil'
-    return cnc_gcode.build_gcode(tps, tool, material, depth, name=name,
-                                 tabs=(tabs if op == 'profile' else None), op=label)
+        job = {'op': 'drill', 'points': drills, 'tool': tool, 'depth': depth, 'start': start,
+               'label': data.get('label') or ('taladro %d puntos' % len(drills))}
+    else:
+        job = {'op': 'contour', 'toolpaths': tps, 'tool': tool, 'depth': depth, 'start': start,
+               'tabs': (tabs if op == 'profile' else None), 'ramp': ramp,
+               'label': data.get('label') or ('cajeado' if op == 'pocket' else 'perfil')}
+    return job, op, tps, drills, skipped, tool, material, name
 
 
 def cnc_toolpaths_preview(data):
     """Trayectorias para pintar en el lienzo (+ puntos de taladro) + estimación de tiempo."""
+    import cnc_gcode
     try:
-        op, tps, drills, skipped, tool, material, depth, tabs, name = _cnc_make(data)
-        _, secs = _cnc_gcode(op, tps, drills, tool, material, depth, tabs, name)
+        job, op, tps, drills, skipped, tool, material, name = _as_job(data)
+        _, secs = cnc_gcode.build_jobs([job], material, name)
         return {'ok': True, 'op': op, 'toolpaths': tps, 'drills': drills,
                 'dia': float(tool.get('dia', 6.0)), 'skipped': skipped, 'secs': round(secs)}
     except Exception as e:
@@ -205,10 +227,33 @@ def cnc_toolpaths_preview(data):
 
 
 def cnc_build_tap(data):
-    """El archivo .tap completo (texto) listo para guardar/descargar."""
+    """El .tap completo. Acepta UNA trayectoria (payload plano) o VARIAS en orden
+    (data['jobs'] = lista de payloads; material/name compartidos). Todas las de la
+    lista deben usar la MISMA fresa: el RichAuto no tiene cambiador automático."""
+    import cnc_gcode
     try:
-        op, tps, drills, skipped, tool, material, depth, tabs, name = _cnc_make(data)
-        tap, secs = _cnc_gcode(op, tps, drills, tool, material, depth, tabs, name)
+        raw = data.get('jobs')
+        if raw:
+            mat, name = data.get('material') or {}, data.get('name') or 'diseno'
+            ids = {(j.get('tool') or {}).get('id') or (j.get('tool') or {}).get('name')
+                   for j in raw}
+            if len(ids) > 1:
+                return {'ok': False, 'error':
+                        'Las trayectorias activas usan FRESAS DISTINTAS. Exporta un archivo '
+                        'por fresa (apaga las otras trayectorias con el ojito) — en la '
+                        'máquina se cambia la fresa y se vuelve a fijar el cero de Z.'}
+            jobs, skipped = [], 0
+            for j in raw:
+                try:
+                    job, _, _, _, sk, _, _, _ = _as_job({**j, 'material': mat, 'name': name})
+                except Exception as e:
+                    return {'ok': False, 'error': f"{j.get('label') or 'trayectoria'}: {e}"}
+                jobs.append(job)
+                skipped += sk
+            tap, secs = cnc_gcode.build_jobs(jobs, mat, name)
+        else:
+            job, _, _, _, skipped, _, mat, name = _as_job(data)
+            tap, secs = cnc_gcode.build_jobs([job], mat, name)
         return {'ok': True, 'tap': tap, 'lines': tap.count('\n'),
                 'skipped': skipped, 'secs': round(secs)}
     except Exception as e:

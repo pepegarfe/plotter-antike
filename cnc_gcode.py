@@ -1,40 +1,43 @@
 #!/usr/bin/env python3
 """
-Trayectorias de corte y G-code (.tap) para la CNC RichAuto — Fases B y C de Design Studio.
+Trayectorias de corte y G-code (.tap) para la CNC RichAuto — Fases B/C/D/E de Design Studio.
 
-Recibe los trazados EFECTIVOS del diseño (mm, Y hacia arriba — la misma geometría que se ve
-en el lienzo) y produce:
-- make_toolpaths(): PERFIL — el centro de la fresa compensado con shapely según el lado
-  (fuera/dentro/sobre la línea), consciente del anidado (una letra "O": el contorno de
-  afuera se expande y el hueco se contrae, como en Aspire).
-- make_pocket(): VACIADO — anillos concéntricos hacia adentro (paso = stepover de la fresa)
-  hasta vaciar el interior; los huecos anidados se respetan. Orden: de adentro hacia afuera,
-  la pared queda al final (acabado más limpio).
-- drill_points(): TALADRO — el centro (del bbox) de cada contorno cerrado.
-- build_gcode() / build_drill(): el archivo G-code en el dialecto más conservador que existe
-  — solo G00/G01, sin arcos — que es lo que el manual de RichAuto usa en sus ejemplos y
-  evita los problemas de G02/G03 reportados con estos controladores DSP. build_gcode admite
-  PUENTES (tabs): en las pasadas finales la fresa sube y pasa por encima de los puentes para
-  que la pieza no salga volando al soltarse.
+Recibe los trazados EFECTIVOS del diseño (mm, Y hacia arriba) y produce:
+- make_toolpaths(): PERFIL compensado (fuera/dentro/sobre la línea) con anidado tipo "O".
+- make_pocket(): CAJEADO por anillos concéntricos, zona por zona, del centro a la pared.
+- drill_points(): TALADRO en el centro de cada contorno cerrado.
+- build_jobs(): el .tap de UNA O VARIAS trayectorias en orden (todas con la MISMA fresa —
+  el RichAuto no tiene cambiador automático; con fresas distintas se exporta por separado).
 
-Convenciones (ver .claude/memoria/cnc-richauto.md):
-- Unidades mm (G21), coordenadas absolutas (G90). Avances en mm/min.
-- ⚠️ El controlador puede IGNORAR F y S de fábrica ("F Read = Ign" en el handle:
-  AUTO PRO SETUP → G Code Setup). El archivo los incluye siempre.
-- Cero de Z: 'top' = cara superior del material, 'bed' = cama (la cara queda en Z=grosor).
-- Comentarios SOLO en ASCII: el manual advierte que caracteres raros rompen la lectura.
+ORDEN DE CORTE (Fase D): huecos antes que el contorno que suelta la pieza; piezas por vecino
+más próximo; cada anillo arranca en su vértice más cercano a la posición actual.
+
+PUENTES (tabs): por cantidad o "uno cada X mm"; RAMPEADOS (pendiente 1:2) — la fresa sube y
+baja interpolando XYZ, sin escalones verticales.
+
+ENTRADA EN RAMPA (Fase E, opcional por trayectoria): en vez de hundir la fresa en vertical,
+cada pasada desciende avanzando por el contorno (pendiente 1:5, como el ramp de Aspire) y el
+tramo de rampa se repasa a profundidad plena al cerrar la vuelta. La pasada siguiente arranca
+donde terminó el repaso. Recomendada para acrílico y fresas de 1 filo.
+
+Dialecto: solo G00/G01 (sin arcos), G90 G21 G17, avances mm/min, comentarios ASCII puro.
+⚠️ El controlador puede IGNORAR F y S de fábrica ("F Read = Ign" en el handle).
+Cero de Z: 'top' = cara superior del material, 'bed' = cama (la cara queda en Z=grosor).
 """
 import math
 
 try:
     from shapely.geometry import Polygon
+    from shapely.geometry.polygon import orient
     HAS_SHAPELY = True
 except ImportError:
     HAS_SHAPELY = False
 
-_CLOSE_TOL = 0.05   # mm: un trazado cuyo fin coincide con su inicio (±tolerancia) es cerrado
-_SAFE_MM = 5.0      # altura de seguridad sobre la cara superior del material
-_PECK_CLEAR = 2.0   # mm sobre el material al que sube el taladro entre picotazos
+_CLOSE_TOL = 0.05    # mm: fin ≈ inicio → trazado cerrado
+_SAFE_MM = 5.0       # altura de seguridad sobre la cara superior del material
+_PECK_CLEAR = 2.0    # mm sobre el material entre picotazos del taladro
+_TAB_SLOPE = 2.0     # rampa de los puentes: 2 mm de avance por 1 mm de subida
+_ENTRY_SLOPE = 5.0   # entrada en rampa: 5 mm de avance por 1 mm de bajada (~11°)
 
 
 def _is_closed(pts):
@@ -42,22 +45,59 @@ def _is_closed(pts):
             math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) <= _CLOSE_TOL)
 
 
-def _rings(geom):
-    """Todos los anillos (exteriores e interiores) de un Polygon/MultiPolygon, como listas de puntos."""
-    polys = getattr(geom, 'geoms', [geom])
-    out = []
-    for p in polys:
-        if p.is_empty or not isinstance(p, Polygon):
-            continue
-        out.append([list(c) for c in p.exterior.coords])
-        for hole in p.interiors:
-            out.append([list(c) for c in hole.coords])
+def _d2(a, b):
+    return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
+
+
+# ---------- orden de corte (Fase D) ----------
+
+def _rot_to_nearest(pts, cur):
+    """Re-arranca un anillo cerrado en su vértice más cercano a `cur` (viaje mínimo)."""
+    if not _is_closed(pts):
+        return pts
+    core = pts[:-1]
+    i = min(range(len(core)), key=lambda k: _d2(core[k], cur))
+    if i:
+        core = core[i:] + core[:i]
+    return core + [[core[0][0], core[0][1]]]
+
+
+def _order_units(units, start=(0.0, 0.0)):
+    """units = piezas; cada pieza = anillos en orden interno fijo (huecos → exterior).
+    Vecino más próximo entre piezas + rotación del arranque de cada anillo."""
+    cur, out, rem = list(start), [], list(units)
+    while rem:
+        def entry_d(u):
+            ring = u[0]
+            step = max(1, len(ring) // 48)
+            return min(_d2(cur, ring[k]) for k in range(0, len(ring), step))
+        bi = min(range(len(rem)), key=lambda k: entry_d(rem[k]))
+        for ring in rem.pop(bi):
+            ring = _rot_to_nearest(ring, cur)
+            out.append(ring)
+            cur = ring[-1]
     return out
 
 
+def _units_from(geom, sign=1.0):
+    """Piezas de un Polygon/MultiPolygon: por pieza, HUECOS primero y exterior AL FINAL.
+    sign orienta los anillos (+1 = exterior antihorario/huecos horario = CLIMB en corte
+    exterior con husillo horario; -1 = lo contrario)."""
+    units = []
+    for p in getattr(geom, 'geoms', [geom]):
+        if p.is_empty or not isinstance(p, Polygon):
+            continue
+        p = orient(p, sign)
+        rings = [[list(c) for c in h.coords] for h in p.interiors]
+        rings.append([list(c) for c in p.exterior.coords])
+        units.append(rings)
+    return units
+
+
+# ---------- trayectorias ----------
+
 def _closed_region(paths):
-    """Región par-impar (como se pintan los rellenos) de los trazados cerrados.
-    Devuelve (region | None, n_abiertos_saltados)."""
+    """Región par-impar de los trazados cerrados. (region | None, n_abiertos_saltados)."""
     if not HAS_SHAPELY:
         raise RuntimeError('Falta shapely para compensar la fresa. '
                            'Instálala con: pip install shapely')
@@ -66,7 +106,7 @@ def _closed_region(paths):
         if _is_closed(pts):
             poly = Polygon(pts)
             if not poly.is_valid:
-                poly = poly.buffer(0)   # repara auto-intersecciones
+                poly = poly.buffer(0)
             if not poly.is_empty:
                 region = poly if region is None else region.symmetric_difference(poly)
         elif len(pts) >= 2:
@@ -74,43 +114,93 @@ def _closed_region(paths):
     return region, skipped
 
 
-def make_toolpaths(paths, side, tool_dia):
-    """PERFIL: polilíneas del centro de la fresa. side: 'outside' | 'inside' | 'on'."""
+def make_toolpaths(paths, side, tool_dia, direction='climb', allowance=0.0):
+    """PERFIL: polilíneas del centro de la fresa, YA ORDENADAS. side: outside|inside|on.
+    direction: 'climb' (concordante, el default de Aspire) | 'conv' (convencional).
+    allowance: holgura en mm — positiva DEJA material (para acabado), negativa sobrecorta."""
     if side == 'on':
-        return [[list(p) for p in pts] for pts in paths if len(pts) >= 2], 0
+        return _order_on(paths), 0
     region, skipped = _closed_region(paths)
     if region is None:
         return [], skipped
-    r = float(tool_dia) / 2.0
-    offset = region.buffer(r if side == 'outside' else -r, quad_segs=16)
-    return _rings(offset), skipped
+    dist = float(tool_dia) / 2.0 + float(allowance or 0)
+    if dist <= 0.05:
+        raise ValueError('La holgura negativa se come el radio de la fresa.')
+    offset = region.buffer(dist if side == 'outside' else -dist, quad_segs=16)
+    # husillo horario: climb = material a la IZQUIERDA del avance
+    sign = 1.0 if ((side == 'outside') == (direction != 'conv')) else -1.0
+    return _order_units(_units_from(offset, sign)), skipped
 
 
-def make_pocket(paths, tool_dia, stepover_mm):
-    """VACIADO: anillos concéntricos hacia adentro. Por cada zona conexa, de adentro
-    hacia afuera (la pared perimetral se corta al final)."""
+def _order_on(paths):
+    """'Sobre la línea': sin compensar; los contornos más anidados primero, luego NN."""
+    closed = [[list(p) for p in pts] for pts in paths if _is_closed(pts) and len(pts) >= 2]
+    opens = [[list(p) for p in pts] for pts in paths if not _is_closed(pts) and len(pts) >= 2]
+    if not HAS_SHAPELY or len(closed) < 2:
+        groups = [closed] if closed else []
+    else:
+        polys = [Polygon(c) for c in closed]
+        polys = [p if p.is_valid else p.buffer(0) for p in polys]
+        depth = [sum(1 for j, q in enumerate(polys)
+                     if j != i and q.contains(polys[i].representative_point()))
+                 for i in range(len(polys))]
+        byd = {}
+        for i, c in enumerate(closed):
+            byd.setdefault(depth[i], []).append(c)
+        groups = [byd[d] for d in sorted(byd, reverse=True)]
+    out, cur = [], [0.0, 0.0]
+    for grp in groups:
+        ordered = _order_units([[c] for c in grp], start=tuple(cur))
+        out.extend(ordered)
+        if ordered:
+            cur = ordered[-1][-1]
+    if opens:
+        out.extend(_order_units([[o] for o in opens], start=tuple(cur)))
+    return out
+
+
+def make_pocket(paths, tool_dia, stepover_mm, direction='climb', allowance=0.0):
+    """CAJEADO: anillos concéntricos; cada zona completa (centro → pared), zonas por NN.
+    allowance positiva deja material en la pared (pasada de acabado aparte)."""
     region, skipped = _closed_region(paths)
     if region is None:
         return [], skipped
-    r = float(tool_dia) / 2.0
+    r = float(tool_dia) / 2.0 + float(allowance or 0)
+    if r <= 0.05:
+        raise ValueError('La holgura negativa se come el radio de la fresa.')
     step = max(0.5, float(stepover_mm))
-    out = []
+    sign = -1.0 if direction != 'conv' else 1.0     # cortar por dentro: climb = anillo horario
+    units = []
     for poly in getattr(region, 'geoms', [region]):
-        levels = []
-        k = 0
+        levels, k = [], 0
         while True:
             off = poly.buffer(-(r + k * step), quad_segs=16)
             if off.is_empty:
                 break
-            levels.append(_rings(off))
+            levels.append(_rings_flat(off, sign))
             k += 1
-        for lev in reversed(levels):        # del centro hacia la pared
-            out.extend(lev)
-    return out, skipped
+        rings = []
+        for lev in reversed(levels):
+            rings.extend(lev)
+        if rings:
+            units.append(rings)
+    return _order_units(units), skipped
+
+
+def _rings_flat(geom, sign=1.0):
+    out = []
+    for p in getattr(geom, 'geoms', [geom]):
+        if p.is_empty or not isinstance(p, Polygon):
+            continue
+        p = orient(p, sign)
+        out.append([list(c) for c in p.exterior.coords])
+        for hole in p.interiors:
+            out.append([list(c) for c in hole.coords])
+    return out
 
 
 def drill_points(paths):
-    """TALADRO: centro (del bbox) de cada contorno cerrado."""
+    """TALADRO: centro (del bbox) de cada contorno cerrado, en orden NN."""
     pts, skipped = [], 0
     for p in paths:
         if _is_closed(p):
@@ -119,10 +209,15 @@ def drill_points(paths):
             pts.append([(min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0])
         elif len(p) >= 2:
             skipped += 1
-    return pts, skipped
+    out, cur = [], [0.0, 0.0]
+    while pts:
+        i = min(range(len(pts)), key=lambda k: _d2(cur, pts[k]))
+        cur = pts.pop(i)
+        out.append(cur)
+    return out, skipped
 
 
-# ---------- puentes (tabs) ----------
+# ---------- geometría de arco ----------
 
 def _cum(pts):
     c = [0.0]
@@ -132,7 +227,6 @@ def _cum(pts):
 
 
 def _point_at(pts, cum, s):
-    """Punto sobre la polilínea a distancia de arco s (interpolado)."""
     for i in range(1, len(pts)):
         if cum[i] >= s - 1e-9:
             seg = cum[i] - cum[i-1]
@@ -142,42 +236,75 @@ def _point_at(pts, cum, s):
     return [pts[-1][0], pts[-1][1]]
 
 
-def _sub(pts, cum, a, b):
-    """Tramo de la polilínea entre distancias de arco a..b, con extremos interpolados."""
-    out = [_point_at(pts, cum, a)]
-    for i in range(len(pts)):
-        if a + 1e-9 < cum[i] < b - 1e-9:
-            out.append([pts[i][0], pts[i][1]])
-    out.append(_point_at(pts, cum, b))
-    return out
+# ---------- puentes ----------
+
+def _tab_count(perim, tabs):
+    if tabs.get('mode') == 'dist':
+        return max(2, int(math.ceil(perim / max(10.0, float(tabs['v'])))))
+    return int(tabs.get('v', tabs.get('n', 0)) or 0)
 
 
-def _split_ring(pts, ntabs, tab_w):
-    """Divide un anillo cerrado en tramos [(puntos, es_puente)] con ntabs puentes de
-    ancho tab_w repartidos parejo (centrados lejos del punto de arranque)."""
-    cum = _cum(pts)
-    perim = cum[-1]
-    if ntabs < 1 or tab_w <= 0 or perim <= ntabs * tab_w * 2:
+def _tab_zones(perim, ntabs, tab_w, ramp_len):
+    zones = []
+    full = tab_w + 2 * ramp_len
+    if ntabs < 1 or perim <= ntabs * full * 1.5:
         return None
-    ivs = []
     for i in range(ntabs):
         c = perim * (i + 0.5) / ntabs
-        a, b = c - tab_w / 2.0, c + tab_w / 2.0
-        if a < 0:
-            ivs += [(0.0, b), (perim + a, perim)]
-        elif b > perim:
-            ivs += [(a, perim), (0.0, b - perim)]
+        zones.append((c - full / 2.0, c + full / 2.0))
+    return zones
+
+
+def _tab_z(s, zones, perim, z_cut, z_tab, ramp_len):
+    """Altura que imponen los puentes en la posición de arco s (z_cut si no hay puente)."""
+    for a, b in zones:
+        for sh in (0.0, -perim, perim):      # el puente puede cruzar el empalme del anillo
+            aa, bb = a + sh, b + sh
+            if aa <= s <= bb:
+                up = min(s - aa, bb - s)
+                if up >= ramp_len:
+                    return z_tab
+                return z_cut + (z_tab - z_cut) * (up / ramp_len)
+    return z_cut
+
+
+# ---------- emisión de una pasada (rampa de entrada + puentes unificados) ----------
+
+def _ring_pass(pts, cum, perim, s0, z_from, z_cut, entry_len, zones, z_tab, tab_ramp):
+    """Vértices [x,y,z] de una pasada de anillo cerrado: arranca en s0, desciende en rampa
+    los primeros entry_len mm (si entry_len>0), da la vuelta completa y repasa el tramo de
+    rampa a fondo. z = max(rampa de entrada, techo de puente). Devuelve (vértices, s_final)."""
+    end = s0 + perim + (entry_len if entry_len > 0 else 0.0)
+    st = {s0, end}
+    if entry_len > 0:
+        st.add(s0 + entry_len)
+    k0, k1 = int(s0 // perim), int(end // perim) + 1
+    for k in range(k0, k1 + 1):
+        base = k * perim
+        for c in cum[:-1]:
+            s = c + base
+            if s0 - 1e-9 <= s <= end + 1e-9:
+                st.add(s)
+        if zones:
+            for a, b in zones:
+                for x in (a, a + tab_ramp, b - tab_ramp, b):
+                    s = x + base
+                    if s0 - 1e-9 <= s <= end + 1e-9:
+                        st.add(s)
+    out = []
+    for s in sorted(st):
+        if entry_len > 0 and s < s0 + entry_len:
+            z = z_from + (z_cut - z_from) * ((s - s0) / entry_len)
         else:
-            ivs.append((a, b))
-    cuts = sorted({0.0, perim} | {x for iv in ivs for x in iv})
-    pieces = []
-    for a, b in zip(cuts[:-1], cuts[1:]):
-        if b - a < 1e-6:
+            z = z_cut
+        if zones:
+            z = max(z, _tab_z(s % perim, zones, perim, z_cut, z_tab, tab_ramp))
+        p = _point_at(pts, cum, s % perim)
+        if out and abs(p[0]-out[-1][0]) < 1e-6 and abs(p[1]-out[-1][1]) < 1e-6 \
+               and abs(z-out[-1][2]) < 1e-6:
             continue
-        mid = (a + b) / 2.0
-        tab = any(x0 - 1e-9 <= mid <= x1 + 1e-9 for x0, x1 in ivs)
-        pieces.append((_sub(pts, cum, a, b), tab))
-    return pieces
+        out.append([p[0], p[1], z])
+    return out, (s0 + entry_len) % perim if entry_len > 0 else s0
 
 
 # ---------- G-code ----------
@@ -193,91 +320,131 @@ def _f(v):
 
 
 def _ascii(s):
-    """Comentarios en ASCII puro: el manual de RichAuto advierte que caracteres no
-    estándar en el archivo pueden hacer que el controlador falle al leerlo."""
     import unicodedata
     s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode('ascii')
     return ''.join(c if c.isprintable() and c not in '()' else ' ' for c in s).strip()
 
 
-def _header(name, tool, extra, depth, npasses):
-    return [
-        '( %s - Design Studio )' % _ascii(name or 'diseno'),
-        '( Fresa: %s / O %s mm / %s / %d pasadas hasta %s mm )' %
-        (_ascii(tool.get('name', '?')), _f(float(tool['dia'])), _ascii(extra),
-         npasses, _f(float(depth))),
-        'G90 G21 G17',
-    ]
-
-
 def _z_levels(material):
     thick = float(material.get('thickness', 15.0))
     z_top = thick if material.get('z_zero') == 'bed' else 0.0
-    return z_top, z_top + _SAFE_MM
+    clear = float(material.get('clearance', _SAFE_MM) or _SAFE_MM)   # "Z segura" configurable
+    return z_top, z_top + clear
 
 
-def build_gcode(toolpaths, tool, material, depth, name='', tabs=None, op='perfil'):
-    """PERFIL o VACIADO. tabs = {'n':3,'w':8,'h':3} deja puentes en los anillos cerrados
-    (solo actúan en las pasadas que ya rebasaron la altura del puente). Devuelve (texto, seg)."""
-    z_top, safe = _z_levels(material)
+def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=0.0):
+    """Emite perfil/cajeado. `start` = prof. inicial (el corte va de start a start+depth).
+    Devuelve segundos estimados."""
     feed, plunge = float(tool['feed']), float(tool['plunge'])
     depth = float(depth)
+    start = max(0.0, float(start or 0))
+    z_start = z_top - start                       # de aquí hacia abajo se corta
     depths = _passes(depth, float(tool['pass_depth']))
-    tab_n = int((tabs or {}).get('n', 0) or 0)
-    tab_w = float((tabs or {}).get('w', 8.0))
-    tab_h = min(float((tabs or {}).get('h', 3.0)), depth)
-    z_tab = z_top - (depth - tab_h)     # techo del puente
-    lines = _header(name, tool, op, depth, len(depths))
-    lines += ['G00 Z%s' % _f(safe), 'M03 S%d' % int(float(tool.get('rpm', 18000)))]
+    tabs = tabs or {}
+    tab_w = float(tabs.get('w', 8.0))
+    tab_h = min(float(tabs.get('h', 3.0)), depth)
+    z_tab = z_start - (depth - tab_h)             # techo del puente (desde el fondo real)
+    tab_ramp = tab_h * _TAB_SLOPE
     secs = 0.0
     for pts in toolpaths:
         if len(pts) < 2:
             continue
         closed = _is_closed(pts)
-        length = _cum(pts)[-1]
-        pieces = _split_ring(pts, tab_n, tab_w) if (closed and tab_n > 0) else None
+        cum = _cum(pts)
+        perim = cum[-1]
+        zones = None
+        if closed and tabs:
+            n = _tab_count(perim, tabs)
+            if n > 0:
+                zones = _tab_zones(perim, n, tab_w, tab_ramp)
         lines.append('G00 X%s Y%s' % (_f(pts[0][0]), _f(pts[0][1])))
+        s_cur, z_prev, z_now = 0.0, z_start, None   # z_now = altura real de la fresa (None = arriba)
         for d in depths:
-            z_cut = z_top - d
-            if pieces and z_cut < z_tab - 1e-9:      # esta pasada ya toca los puentes
-                z_now = None
-                for seg, is_tab in pieces:
-                    z_want = z_tab if is_tab else z_cut
-                    if z_now is None or abs(z_want - z_now) > 1e-9:
-                        lines.append('G01 Z%s F%s' % (_f(z_want), _f(plunge)))
-                        z_now = z_want
-                    for p in seg[1:]:
-                        lines.append('G01 X%s Y%s F%s' % (_f(p[0]), _f(p[1]), _f(feed)))
+            z_cut = z_start - d
+            pass_zones = zones if (zones and z_cut < z_tab - 1e-9) else None
+            entry = min(perim / 3.0, (z_prev - z_cut) * _ENTRY_SLOPE) if (ramp and closed) else 0.0
+            if pass_zones or entry > 0:
+                verts, s_cur = _ring_pass(pts, cum, perim, s_cur, z_prev, z_cut,
+                                          entry, pass_zones, z_tab, tab_ramp)
+                if z_now is None or abs(verts[0][2] - z_now) > 1e-9:   # no repetir una Z en la que ya está
+                    lines.append('G01 Z%s F%s' % (_f(verts[0][2]), _f(plunge)))
+                for x, y, z in verts[1:]:
+                    lines.append('G01 X%s Y%s Z%s F%s' % (_f(x), _f(y), _f(z), _f(feed)))
+                z_now = verts[-1][2]
             else:
                 lines.append('G01 Z%s F%s' % (_f(z_cut), _f(plunge)))
                 for p in pts[1:]:
                     lines.append('G01 X%s Y%s F%s' % (_f(p[0]), _f(p[1]), _f(feed)))
                 if not closed and d != depths[-1]:
-                    # trazo abierto: volver al inicio por arriba antes de la siguiente pasada
                     lines.append('G00 Z%s' % _f(safe))
                     lines.append('G00 X%s Y%s' % (_f(pts[0][0]), _f(pts[0][1])))
-            secs += (length / feed + float(tool['pass_depth']) / plunge) * 60.0
+                    z_now = None
+                else:
+                    z_now = z_cut
+            z_prev = z_cut
+            secs += (perim / feed + float(tool['pass_depth']) / plunge) * 60.0
         lines.append('G00 Z%s' % _f(safe))
-    lines += ['M05', 'G00 X0 Y0', 'M30']
-    return '\n'.join(lines) + '\n', secs
+    return secs
 
 
-def build_drill(points, tool, material, depth, name=''):
-    """TALADRO con picoteo: baja por pasadas y entre cada una sube a despejar viruta."""
-    z_top, safe = _z_levels(material)
+def _drill_body(lines, points, tool, depth, z_top, safe, start=0.0):
     plunge = float(tool['plunge'])
     depth = float(depth)
+    z_start = z_top - max(0.0, float(start or 0))
     depths = _passes(depth, float(tool['pass_depth']))
-    lines = _header(name, tool, 'taladro %d puntos' % len(points), depth, len(depths))
-    lines += ['G00 Z%s' % _f(safe), 'M03 S%d' % int(float(tool.get('rpm', 18000)))]
     secs = 0.0
     for x, y in points:
         lines.append('G00 X%s Y%s' % (_f(x), _f(y)))
         for i, d in enumerate(depths):
-            lines.append('G01 Z%s F%s' % (_f(z_top - d), _f(plunge)))
+            lines.append('G01 Z%s F%s' % (_f(z_start - d), _f(plunge)))
             if i < len(depths) - 1:
-                lines.append('G00 Z%s' % _f(z_top + _PECK_CLEAR))   # picotazo: despeja viruta
+                lines.append('G00 Z%s' % _f(z_top + _PECK_CLEAR))
             secs += (d / plunge) * 60.0 * 2
         lines.append('G00 Z%s' % _f(safe))
-    lines += ['M05', 'G00 X0 Y0', 'M30']
+    return secs
+
+
+def build_jobs(jobs, material, name=''):
+    """El .tap de una lista de trabajos EN ORDEN. Cada job:
+    {'op','toolpaths'|'points','tool','depth','tabs'|None,'ramp':bool,'label'}.
+    Todos deben usar la MISMA fresa (validarlo antes). Devuelve (texto, segundos)."""
+    z_top, safe = _z_levels(material)
+    tool = jobs[0]['tool']
+    what = jobs[0].get('label', 'perfil') if len(jobs) == 1 else '%d trayectorias' % len(jobs)
+    maxd = max(float(j['depth']) for j in jobs)
+    lines = [
+        '( %s - Design Studio )' % _ascii(name or 'diseno'),
+        '( Fresa: %s / O %s mm / %s / hasta %s mm )' %
+        (_ascii(tool.get('name', '?')), _f(float(tool['dia'])), _ascii(what), _f(maxd)),
+        'G90 G21 G17',
+        'G00 Z%s' % _f(safe),
+        'M03 S%d' % int(float(tool.get('rpm', 18000))),
+    ]
+    secs = 0.0
+    for j in jobs:
+        lines.append('( -- %s -- )' % _ascii(j.get('label', j['op'])))
+        if j['op'] == 'drill':
+            secs += _drill_body(lines, j['points'], j['tool'], j['depth'], z_top, safe,
+                                start=j.get('start', 0.0))
+        else:
+            secs += _contour_body(lines, j['toolpaths'], j['tool'], j['depth'],
+                                  j.get('tabs'), bool(j.get('ramp')), z_top, safe,
+                                  start=j.get('start', 0.0))
+    lines.append('M05')
+    if material.get('home_end', True):        # "posición final": volver al origen (configurable)
+        lines.append('G00 X0 Y0')
+    lines.append('M30')
     return '\n'.join(lines) + '\n', secs
+
+
+# --- envolturas de un solo trabajo (compatibilidad con pruebas y backend viejo) ---
+
+def build_gcode(toolpaths, tool, material, depth, name='', tabs=None, op='perfil', ramp=False):
+    return build_jobs([{'op': 'contour', 'toolpaths': toolpaths, 'tool': tool,
+                        'depth': depth, 'tabs': tabs, 'ramp': ramp, 'label': op}],
+                      material, name)
+
+
+def build_drill(points, tool, material, depth, name=''):
+    return build_jobs([{'op': 'drill', 'points': points, 'tool': tool, 'depth': depth,
+                        'label': 'taladro %d puntos' % len(points)}], material, name)
