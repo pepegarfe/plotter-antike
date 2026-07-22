@@ -146,6 +146,56 @@ def cnc_set(patch):
         return {'ok': False, 'error': str(e)}
 
 
+# ---- Fase B: trayectorias de perfil y G-code .tap (ver cnc_gcode.py) ----
+
+def _cnc_payload(data):
+    """Normaliza el payload de la UI: trazados efectivos + fresa + material + corte."""
+    paths = [[(float(p[0]), float(p[1])) for p in pts] for pts in (data.get('paths') or [])]
+    tool = data.get('tool') or {}
+    material = data.get('material') or {}
+    depth = float(data.get('depth') or material.get('thickness') or 15.0)
+    side = data.get('side') or 'outside'
+    if side not in ('outside', 'inside', 'on'):
+        side = 'outside'
+    return paths, tool, material, depth, side
+
+
+def cnc_toolpaths_preview(data):
+    """Solo las polilíneas del centro de la fresa (para pintarlas en el lienzo) + estimación."""
+    import cnc_gcode
+    try:
+        paths, tool, material, depth, side = _cnc_payload(data)
+        if not paths:
+            return {'ok': False, 'error': 'No hay trazados.'}
+        tps, skipped = cnc_gcode.make_toolpaths(paths, side, float(tool.get('dia', 6.0)))
+        if not tps:
+            return {'ok': False, 'error': 'Ningún trazado cerrado que compensar '
+                                          '(los trazos abiertos solo admiten "Sobre la línea").'}
+        _, secs = cnc_gcode.build_gcode(tps, tool, material, depth)
+        return {'ok': True, 'toolpaths': tps, 'skipped': skipped, 'secs': round(secs)}
+    except Exception as e:
+        return {'ok': False, 'error': f'Trayectorias: {e}'}
+
+
+def cnc_build_tap(data):
+    """El archivo .tap completo (texto) listo para guardar/descargar."""
+    import cnc_gcode
+    try:
+        paths, tool, material, depth, side = _cnc_payload(data)
+        if not paths:
+            return {'ok': False, 'error': 'No hay trazados.'}
+        tps, skipped = cnc_gcode.make_toolpaths(paths, side, float(tool.get('dia', 6.0)))
+        if not tps:
+            return {'ok': False, 'error': 'Ningún trazado cerrado que compensar '
+                                          '(los trazos abiertos solo admiten "Sobre la línea").'}
+        tap, secs = cnc_gcode.build_gcode(tps, tool, material, depth,
+                                          name=data.get('name') or 'diseno')
+        return {'ok': True, 'tap': tap, 'lines': tap.count('\n'),
+                'skipped': skipped, 'secs': round(secs)}
+    except Exception as e:
+        return {'ok': False, 'error': f'G-code: {e}'}
+
+
 def build_hpgl(data):
     """Genera HPGL desde trazados efectivos (mm) + parámetros de corte."""
     conv = core.HPGLConverter(

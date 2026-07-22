@@ -18,7 +18,8 @@ from bottle import Bottle, static_file, request, response, HTTPResponse
 import plotter_control as core
 from studio_backend import (SERVICE, set_workarea as _set_workarea,
                             cnc_get as _cnc_get, cnc_set as _cnc_set,
-                            flip_paths_y as _flip_paths_y)
+                            flip_paths_y as _flip_paths_y,
+                            cnc_toolpaths_preview as _cnc_preview, cnc_build_tap as _cnc_tap)
 import img_trace as tracer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,6 +67,16 @@ def api_cnc_get():
 @app.post('/api/cnc')
 def api_cnc_set():
     return _json(_cnc_set(request.json or {}))
+
+
+@app.post('/api/cnc_toolpath')
+def api_cnc_toolpath():
+    return _json(_cnc_preview(request.json or {}))
+
+
+@app.post('/api/tap')
+def api_tap():
+    return _json(_cnc_tap(request.json or {}))
 
 
 @app.post('/api/trace_upload')

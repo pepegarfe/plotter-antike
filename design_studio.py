@@ -13,7 +13,8 @@ import webview
 
 import plotter_control as core   # el motor existente (parsers, HPGL, controlador)
 from studio_backend import (SERVICE, set_workarea as _set_workarea,
-                            cnc_get as _cnc_get, cnc_set as _cnc_set, flip_paths_y)
+                            cnc_get as _cnc_get, cnc_set as _cnc_set, flip_paths_y,
+                            cnc_toolpaths_preview as _cnc_preview, cnc_build_tap as _cnc_tap)
 import img_trace as tracer
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
@@ -54,6 +55,30 @@ class Api:
 
     def cnc_set(self, patch):
         return _cnc_set(patch or {})
+
+    def cnc_toolpath(self, data):
+        """Trayectorias del centro de la fresa, para previsualizar en el lienzo."""
+        return _cnc_preview(data or {})
+
+    def save_tap(self, data):
+        """Genera el G-code y lo guarda como .tap con diálogo nativo."""
+        r = _cnc_tap(data or {})
+        if not r.get('ok'):
+            return r
+        name = ((data or {}).get('name') or 'diseno').rsplit('.', 1)[0] + '.tap'
+        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res if isinstance(res, str) else res[0]
+        if not path.lower().endswith('.tap'):
+            path += '.tap'
+        try:
+            with open(path, 'w', newline='\n') as f:
+                f.write(r['tap'])
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo guardar: {e}'}
+        return {'ok': True, 'path': os.path.basename(path),
+                'lines': r['lines'], 'secs': r['secs'], 'skipped': r['skipped']}
 
     # --- Calco de imagen ---
     def trace_pick(self):
