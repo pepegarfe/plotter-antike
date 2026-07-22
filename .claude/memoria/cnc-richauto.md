@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T20:43:46.886Z
+  modified: 2026-07-22T22:04:02.621Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -150,7 +150,29 @@ M30
     empalme del anillo — se maneja con corrimientos ±perímetro).
   - ⚠️ **Lección de prueba:** en tramos RECTOS una rampa correcta NO tiene puntos intermedios
     (un G01 interpola XYZ solo); lo que hay que asertar es "ningún cambio de Z sin avance XY".
-- **E. (futuro, decidir si vale)**: V-carve.
+- **E. Flujo de trayectorias estilo Aspire — ✅ CONSTRUIDA 22-jul-2026** (pedida por Jose:
+  "elegir trayectorias, orden, render, rampas, puentes opcionales"; verificada con pruebas +
+  e2e; falta vistazo de Jose; se commitea JUNTO con la D). Qué se hizo:
+  - **Lista de trayectorias** en la pestaña CNC: "＋ Nueva de la selección" (sin selección =
+    todo el diseño) crea una trayectoria con los parámetros del editor; cada fila tiene ojito
+    (incluir/excluir), ↑↓ (orden de corte), ✕. La fila seleccionada carga sus parámetros al
+    editor y TODO cambio del editor escribe en ella (`commitEditor`). Sin lista, el flujo viejo
+    de "una operación → todo" sigue funcionando (fallback).
+  - **uid estable por trazado** (`doc.uid`, `uidSeq`): las trayectorias referencian objetos por
+    uid y sobreviven a borrar/pegar/deshacer; el `.dstudio` v2 guarda uids + `cncTps`.
+  - **Puentes con checkbox** (on/off explícito) y **entrada en rampa** (checkbox, perfil y
+    cajeado): cada pasada desciende avanzando por el contorno (pendiente 1:5, `_ENTRY_SLOPE`),
+    repasa el tramo de rampa a fondo y la siguiente pasada arranca donde terminó
+    (`_ring_pass` unifica rampa + puentes con `z = max(rampa, techo_puente)`). Verificado:
+    CERO hundimientos verticales en material con rampa activa.
+  - **Render**: botón "▣ Render" pinta las trayectorias al ANCHO REAL de la fresa (lineCap
+    round), color madera más oscuro cuanto más profundo; taladros como círculos llenos.
+  - **Export multi-trabajo**: las trayectorias activas salen EN ORDEN en un solo `.tap`
+    (`build_jobs`, marcas `( -- nombre -- )`, un solo M03/M30). **Fresas distintas → rechazo
+    con mensaje** (el RichAuto no tiene ATC; se exporta un archivo por fresa apagando las
+    otras). Backend acepta payload viejo (plano) y nuevo (`jobs`).
+  - **Gotcha emisión**: al encadenar pasadas, no re-emitir `G01 Z` a la altura donde ya está
+    la fresa (movimiento nulo que ensucia el archivo) — se rastrea `z_now`.
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
