@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T22:59:10.048Z
+  modified: 2026-07-22T23:04:39.596Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -211,6 +211,15 @@ M30
   - Al borrar un material se PODAN los datos de corte huérfanos de todas las fresas.
   - No construido a propósito: tipos de herramienta (V-bit/ball nose — hasta V-carve), número
     de herramienta (RichAuto sin ATC), chip load, grupos en árbol (<15 fresas).
+  - **Biblioteca default investigada (22-jul)**: 5 fresas comunes × 4 materiales, con números de
+    ARRANQUE basados en tablas de chip load (feed = RPM × filos × chip load) y práctica publicada
+    — 6mm 1 filo O-flute (acrílico/PVC: 1 filo expulsa la viruta caliente y no derrite), 6mm
+    2 filos espiral (MDF/maderas), 6mm compresión (triplay/melamina, borde limpio ambas caras;
+    1ª pasada > ~1×Ø), 3.175mm 1F y 2F (detalle). PVC espumado: rápido y con menos RPM (14-15k)
+    para no derretir (publicado 3.5–6.5 m/min; defaults conservadores). Reglas de sanidad
+    verificadas (acr 1F > 2F en avance). Fuentes: toolstoday.com/learn/understanding-cnc-feeds-
+    and-speeds, workshopcalc.com/reference/cnc-feeds-speeds-chart, woodweb.com (PVC foam),
+    cncrouterstore.ca chip load chart. ⚠️ Son puntos de partida — se afinan cortando.
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
