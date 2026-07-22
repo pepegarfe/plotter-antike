@@ -11,15 +11,30 @@ En ambos casos la salida es un SVG que se parsea con el motor existente (core.SV
 así fluye por el mismo camino que un diseño importado (lienzo + HPGL).
 """
 import os
+import shutil
 import tempfile
 import subprocess
 
 from PIL import Image, ImageOps
 
 import plotter_control as core
+from studio_backend import flip_paths_y
 
 # Imagen fuente cargada (para re-calcar al cambiar los controles sin re-subirla).
 _STATE = {'path': None, 'name': None}
+
+
+def _potrace_bin():
+    """Ruta absoluta de potrace. Lanzada desde Finder (ícono del Escritorio) o desde un
+    entorno recortado, la app NO tiene /opt/homebrew/bin en el PATH y el nombre pelado
+    'potrace' truena con 'No such file or directory'."""
+    p = shutil.which('potrace')
+    if p:
+        return p
+    for cand in ('/opt/homebrew/bin/potrace', '/usr/local/bin/potrace', '/opt/local/bin/potrace'):
+        if os.path.exists(cand):
+            return cand
+    raise RuntimeError('No se encontró potrace. Instálalo con: brew install potrace')
 
 
 def set_source(path):
@@ -48,7 +63,9 @@ def _svg_to_paths(svg_path):
         for x, y in rp:
             xs.append(x); ys.append(y)
     bbox = [min(xs), min(ys), max(xs), max(ys)] if xs else [0, 0, 0, 0]
-    return paths, bbox
+    # La fuente aquí SIEMPRE es un SVG (potrace/vtracer) => Y-abajo => voltear a Y-arriba.
+    # El volteo es sobre el centro del conjunto, así que el bbox no cambia.
+    return flip_paths_y(paths), bbox
 
 
 def _prep_bw(path, threshold, invert, max_side=1400):
@@ -92,7 +109,7 @@ def trace(options):
             pbm = tempfile.mktemp(suffix='.pbm')
             bw.save(pbm)
             subprocess.run(
-                ['potrace', '-s', '-o', svg,
+                [_potrace_bin(), '-s', '-o', svg,
                  '--turdsize', str(int(options.get('speckle', 2))),
                  '--alphamax', str(float(options.get('smooth', 1.0))),
                  pbm],

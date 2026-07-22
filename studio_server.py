@@ -16,7 +16,9 @@ import socket
 from bottle import Bottle, static_file, request, response, HTTPResponse
 
 import plotter_control as core
-from studio_backend import SERVICE, set_workarea as _set_workarea
+from studio_backend import (SERVICE, set_workarea as _set_workarea,
+                            cnc_get as _cnc_get, cnc_set as _cnc_set,
+                            flip_paths_y as _flip_paths_y)
 import img_trace as tracer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +56,16 @@ def api_workarea():
 def api_set_workarea():
     d = request.json or {}
     return _json(_set_workarea(d.get('w'), d.get('h')))
+
+
+@app.get('/api/cnc')
+def api_cnc_get():
+    return _json(_cnc_get())
+
+
+@app.post('/api/cnc')
+def api_cnc_set():
+    return _json(_cnc_set(request.json or {}))
 
 
 @app.post('/api/trace_upload')
@@ -110,6 +122,8 @@ def api_parse():
         for x, y in rp:
             xs.append(x); ys.append(y)
     bbox = [min(xs), min(ys), max(xs), max(ys)] if xs else [0, 0, 0, 0]
+    if ext == '.svg':
+        _flip_paths_y(paths)   # solo SVG viene Y-abajo; AI/DXF ya llegan Y-arriba
     return _json({'ok': True, 'name': name, 'paths': paths, 'bbox': bbox, 'work': _workarea()})
 
 

@@ -37,6 +37,115 @@ def set_workarea(w, h):
         return {'ok': False, 'error': str(e)}
 
 
+def flip_paths_y(paths):
+    """Voltea verticalmente (sobre el centro del conjunto) una lista de {'pts':[[x,y],..]}.
+
+    Convención: la UI dibuja Y hacia ARRIBA, y TODO lo que se le entrega debe venir ya en esa
+    orientación. El parser SVG entrega Y-abajo (hay que voltear); el de AI ya invierte la Y al
+    parsear y el DXF es Y-arriba de nacimiento (NO voltear). ⚠️ El volteo va POR FORMATO aquí
+    en el backend — un volteo ciego de todo en la UI fue el bug que puso los .ai/.dxf de cabeza.
+    """
+    ys = [p[1] for d in paths for p in d['pts']]
+    if not ys:
+        return paths
+    m = min(ys) + max(ys)
+    for d in paths:
+        d['pts'] = [[p[0], round(m - p[1], 3)] for p in d['pts']]
+    return paths
+
+
+# ===== CNC (RichAuto) — Fase A: máquina, material y biblioteca de fresas =====
+# ⚠️ En archivo PROPIO (cnc_config.json), no en plotter_config.json: la app tkinter
+# (_save_config en plotter_control.py) sobrescribe ese JSON con solo sus llaves y
+# borraría lo nuestro en silencio. Mismo folder que la config del plotter.
+
+def _cnc_path():
+    return core._config_path().with_name('cnc_config.json')
+
+
+# Presets iniciales por material (puntos de partida sensatos para un router 1220×2440;
+# Jose los afina con su máquina). feed/plunge en mm/min, pass_depth = profundidad por pasada.
+CNC_DEFAULTS = {
+    'machine': 'plotter',                              # máquina activa al abrir la app
+    'work': [1220.0, 2440.0],                          # cama de la CNC de Jose (122×244 cm)
+    'material': {'thickness': 15.0, 'z_zero': 'top'},  # z_zero: 'top' (cara superior) | 'bed' (cama)
+    'tool_sel': 't6-mdf',
+    'tools': [
+        {'id': 't6-mdf', 'name': 'Fresa 6 mm · MDF/triplay',        'dia': 6.0,   'pass_depth': 5.0, 'feed': 2500, 'plunge': 800,  'rpm': 18000},
+        {'id': 't6-acr', 'name': 'Fresa 6 mm · Acrílico',           'dia': 6.0,   'pass_depth': 4.0, 'feed': 1800, 'plunge': 500,  'rpm': 18000},
+        {'id': 't6-pvc', 'name': 'Fresa 6 mm · PVC espumado',       'dia': 6.0,   'pass_depth': 8.0, 'feed': 3000, 'plunge': 1000, 'rpm': 16000},
+        {'id': 't6-mad', 'name': 'Fresa 6 mm · Madera sólida',      'dia': 6.0,   'pass_depth': 4.0, 'feed': 2000, 'plunge': 600,  'rpm': 18000},
+        {'id': 't3-det', 'name': 'Fresa 3.175 mm (1/8″) · Detalle', 'dia': 3.175, 'pass_depth': 2.5, 'feed': 1500, 'plunge': 500,  'rpm': 20000},
+    ],
+}
+
+
+def cnc_get():
+    """Config del CNC completa (defaults + lo guardado encima)."""
+    data = json.loads(json.dumps(CNC_DEFAULTS))   # copia profunda de los defaults
+    try:
+        p = _cnc_path()
+        if p.exists():
+            saved = json.loads(p.read_text())
+            for k in ('machine', 'work', 'material', 'tool_sel', 'tools'):
+                if k in saved:
+                    data[k] = saved[k]
+    except Exception:
+        pass
+    data['ok'] = True
+    return data
+
+
+def cnc_set(patch):
+    """Aplica un cambio parcial (solo las llaves presentes) y persiste. Devuelve la config completa."""
+    try:
+        patch = patch or {}
+        cur = cnc_get()
+        cur.pop('ok', None)
+        if 'machine' in patch:
+            if patch['machine'] not in ('plotter', 'cnc'):
+                return {'ok': False, 'error': 'Máquina desconocida.'}
+            cur['machine'] = patch['machine']
+        if 'work' in patch:
+            w, h = float(patch['work'][0]), float(patch['work'][1])
+            if w < 10 or h < 10:
+                return {'ok': False, 'error': 'El área mínima es 10 × 10 mm.'}
+            cur['work'] = [w, h]
+        if 'material' in patch:
+            m = patch['material'] or {}
+            t = float(m.get('thickness', cur['material']['thickness']))
+            if not (0 < t <= 500):
+                return {'ok': False, 'error': 'Grosor de material fuera de rango (0–500 mm).'}
+            zz = m.get('z_zero', cur['material']['z_zero'])
+            if zz not in ('top', 'bed'):
+                return {'ok': False, 'error': 'Cero de Z inválido.'}
+            cur['material'] = {'thickness': t, 'z_zero': zz}
+        if 'tools' in patch:
+            tools = []
+            for t in (patch['tools'] or []):
+                tools.append({
+                    'id': str(t.get('id') or f't{len(tools)}'),
+                    'name': str(t.get('name') or 'Fresa'),
+                    'dia': max(0.1, float(t.get('dia', 6.0))),
+                    'pass_depth': max(0.1, float(t.get('pass_depth', 3.0))),
+                    'feed': max(1, float(t.get('feed', 2000))),
+                    'plunge': max(1, float(t.get('plunge', 500))),
+                    'rpm': max(0, float(t.get('rpm', 18000))),
+                })
+            if not tools:
+                return {'ok': False, 'error': 'Debe quedar al menos una fresa.'}
+            cur['tools'] = tools
+        if 'tool_sel' in patch:
+            cur['tool_sel'] = str(patch['tool_sel'])
+        if not any(t['id'] == cur['tool_sel'] for t in cur['tools']):
+            cur['tool_sel'] = cur['tools'][0]['id']
+        _cnc_path().write_text(json.dumps(cur, ensure_ascii=False, indent=1))
+        cur['ok'] = True
+        return cur
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
 def build_hpgl(data):
     """Genera HPGL desde trazados efectivos (mm) + parámetros de corte."""
     conv = core.HPGLConverter(

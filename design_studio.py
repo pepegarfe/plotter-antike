@@ -12,7 +12,8 @@ import json
 import webview
 
 import plotter_control as core   # el motor existente (parsers, HPGL, controlador)
-from studio_backend import SERVICE, set_workarea as _set_workarea
+from studio_backend import (SERVICE, set_workarea as _set_workarea,
+                            cnc_get as _cnc_get, cnc_set as _cnc_set, flip_paths_y)
 import img_trace as tracer
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
@@ -46,6 +47,13 @@ class Api:
 
     def set_workarea(self, w, h):
         return _set_workarea(w, h)
+
+    # --- CNC (Fase A): máquina activa, material y biblioteca de fresas ---
+    def cnc_get(self):
+        return _cnc_get()
+
+    def cnc_set(self, patch):
+        return _cnc_set(patch or {})
 
     # --- Calco de imagen ---
     def trace_pick(self):
@@ -107,6 +115,8 @@ class Api:
             for x, y in rp:
                 xs.append(x); ys.append(y)
         bbox = [min(xs), min(ys), max(xs), max(ys)] if xs else [0, 0, 0, 0]
+        if ext == '.svg':
+            flip_paths_y(paths)   # solo SVG viene Y-abajo; AI/DXF ya llegan Y-arriba
         ww, wh = _load_workarea()
         return {'ok': True, 'name': os.path.basename(path),
                 'paths': paths, 'bbox': bbox, 'work': [ww, wh]}
