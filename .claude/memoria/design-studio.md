@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T16:13:51.699Z
+  modified: 2026-07-22T17:17:31.901Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -126,19 +126,37 @@ plotter, se pulsa ↻, y **el nombre nuevo que aparece es el plotter**. Baud cas
 2. **Falta el driver del chip** (CH340 / CP210x / Prolific): si al enchufar y refrescar la lista NO
    cambia, es esto — hay que instalar el driver del chip del cable.
 
-## Eje Y: los imports salían boca abajo (arreglado 21-jul-2026)
-Los archivos (SVG/DXF/AI) y las imágenes usan **Y hacia ABAJO** (origen arriba-izquierda). El lienzo
-de Design Studio dibuja **Y hacia ARRIBA** (`tp()`: `oy - y*scale`). Sin corregir, **TODO import salía
-verticalmente volteado** — no solo el calco; solo saltó a la vista con una foto porque tiene un "arriba"
-obvio. El parser (`core.SVGParser`) NO voltea, y potrace/vtracer salen con la misma orientación que un
-SVG normal, así que el volteo era del render, no del calco.
-- **Arreglo:** en `loadDoc` (studio_ui.html) se **voltea la geometría sobre su propio centro**
-  (`y' = ymin+ymax − y`) una sola vez, para TODOS los imports. `loadProject` NO se toca (los proyectos
-  ya se guardan con la orientación corregida).
-- ⚠️ **PENDIENTE DE VERIFICAR EN HARDWARE:** el HPGL se genera de esa misma geometría, así que **cambió
-  la orientación del corte**. En el **primer corte real** hay que confirmar que la pieza sale derecha en
-  el material (no se pudo probar sin plotter — [[design-studio]] Fase 3). El original tkinter tiene el
-  mismo lienzo Y-arriba; si algún día se compara un mismo diseño en ambos, saldrán espejados en vertical.
+## Eje Y — historia en DOS actos (¡leer los dos!)
+**Acto 1 (21-jul):** los calcos y SVG salían boca abajo → se puso un **volteo ciego de TODOS los
+imports** en `loadDoc` (JS).
+**Acto 2 (22-jul): ese volteo ciego era un BUG.** Jose reportó que los diseños se volteaban "cuando
+antes no". Verificado con pruebas (triángulo asimétrico por formato): **cada parser entrega una
+orientación DISTINTA** —
+- **SVG** (`core.SVGParser`, `_root_mtx` sin Y negativa): entrega **Y-abajo** → SÍ hay que voltear.
+- **AI** (`core.AIParser`): **ya invierte la Y** al parsear (`page_h` en plotter_control) → NO tocar.
+- **DXF**: Y-arriba de nacimiento → NO tocar.
+- **Calcos** (potrace/vtracer): producen SVG → SÍ voltear.
+
+**Arreglo definitivo:** el volteo vive en el **backend, por formato** — `flip_paths_y()` en
+`studio_backend.py`, aplicado solo a `.svg` en `design_studio.open_design` y `studio_server
+/api/parse`, y siempre en `img_trace._svg_to_paths`. El JS **no voltea nada** (`loadDoc` tiene el
+comentario). **Convención firme: todo lo que llega a la UI ya viene Y-arriba.** El volteo es sobre
+el centro del conjunto → el bbox no cambia.
+- ⚠️ Sigue **pendiente verificar la orientación del corte en hardware** (plotter y, cuando llegue
+  la Fase B del CNC, también el .tap).
+- **Lección:** "todos los imports salen mal" era en realidad "solo los SVG salen mal". Antes de
+  corregir una orientación global, **probar CADA formato con una forma asimétrica** (un triángulo
+  punta-arriba delata el volteo al instante).
+
+## Bugs arreglados 22-jul-2026 (reportados por Jose tras la Fase A del CNC)
+1. **Calco: "No such file or directory: potrace"** — se invocaba `potrace` a secas y las apps
+   lanzadas desde Finder (ícono del Escritorio) o entornos recortados **no tienen /opt/homebrew/bin
+   en el PATH**. Arreglo: `_potrace_bin()` en img_trace.py resuelve ruta absoluta (which + rutas
+   Homebrew típicas). **Señal:** "funciona en terminal pero no desde el ícono" = problema de PATH.
+2. **Eje Y** (ver arriba, Acto 2).
+3. **En modo CNC, abrir un diseño pisaba el área con la del plotter** — `open_design`/`/api/parse`
+   devuelven el área del plotter y `loadDoc` la aplicaba sin mirar la máquina activa. Arreglo:
+   guardia `if(state.machine==='plotter')` en `loadDoc` y `loadProject`.
 
 ## Lecciones (señales)
 - **Bug del lienzo que "no funcionaba":** un bucle de retroalimentación inflaba el `<canvas>` (medía
