@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T16:29:51.904Z
+  modified: 2026-07-22T16:37:33.279Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -24,7 +24,9 @@ enchufa al handle y se procesa desde ahí. También se puede copiar al almacenam
 archivo cortos y ASCII.
 
 **Formatos que lee:** G-code (`.nc`, `.tap`, `.txt`, `.g`, `.u00`, `.mmg`), PLT, DXF, bitmap.
-Usaremos **`.nc`** (el estándar de facto, mismo que produce Aspire).
+Usaremos **`.tap`** — lo pidió Jose explícitamente (22-jul-2026): es lo que su flujo con Aspire
+producía (los posts de Vectric para RichAuto salen como `*.tap`). El contenido es G-code normal;
+solo cambia la extensión.
 
 **G-code soportado (lista oficial del manual, apéndice 9.4):** G00/G01/G02/G03, G04, G17-19,
 G20/**G21**, G40-44/G49, **G54**-59, ciclos de taladrado G73/G81/G82/G83, **G90**/G91,
@@ -77,7 +79,7 @@ M30
 - **A. Cimientos**: perfil de máquina "CNC 1220×2440" + material (grosor, cero Z) + biblioteca de
   herramientas. Design Studio gana un modo/pestaña "CNC".
 - **B. Perfil + G-code**: trayectoria de perfil (fuera/dentro/sobre) con shapely, pasadas
-  múltiples, generador `.nc` (solo G00/G01), guardar archivo. → **primer corte de prueba**.
+  múltiples, generador `.tap` (solo G00/G01), guardar archivo. → **primer corte de prueba**.
 - **C. Vaciado, taladrado, tabs, rampa de entrada.**
 - **D. Preview con orden de corte, estimación de tiempo, optimización de recorrido.**
 - **E. (futuro, decidir si vale)**: V-carve.
@@ -87,10 +89,17 @@ M30
 eje Y (misma duda pendiente que el plotter — [[design-studio]] "Eje Y"), luego corte real en
 material de sacrificio. Revisar en el handle: G Code Setup → F Read = "Read F".
 
-## Preguntas abiertas (hechas a Jose el 22-jul-2026, respuestas pendientes)
-- Qué trayectorias son prioridad (¿perfil solo, o también vaciado/taladro/V-carve?).
-- ¿El husillo lo controla el variador a mano o quiere S en el G-code?
-- Materiales y grosores típicos (para presets de herramienta).
-- Modelo exacto del controlador (A11/A11E/A15/A18 — está serigrafiado en el handle).
+## Alcance acordado con Jose (22-jul-2026)
+- **Trayectorias: Perfil + Vaciado (pocket) + Taladrado.** V-carve queda FUERA por ahora
+  (Fase E opcional futura) → se quita la parte matemáticamente más dura del proyecto.
+- **Husillo:** Jose no sabe cómo se controla (en Aspire ponía las RPM en la herramienta y ya).
+  → Emitir `M03 S<rpm>` en el G-code y **verificar en la máquina** si obedece la S (recordar la
+  trampa `S Read = Ign` del handle). Si no obedece, no rompe nada: el S se ignora y listo.
+- **Materiales para presets de fresas:** MDF/triplay, acrílico, PVC espumado/coroplast y madera
+  sólida. → La biblioteca de herramientas debe nacer con presets por material.
+
+## Pregunta aún abierta
+- Modelo exacto del controlador (A11/A11E/A15/A18 — está serigrafiado en el handle de la máquina).
+  No bloquea nada: toda la familia A1X comparte la misma lista de G-code del manual.
 
 Relacionado: [[design-studio]] (donde vivirá la función), [[estado]] (motor compartido).
