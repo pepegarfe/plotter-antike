@@ -9,3 +9,6 @@ dist/
 
 # Config local (contiene rutas y puertos específicos de cada PC)
 plotter_config.json
+
+# Spec auto-generado por PyInstaller (el comando de build está en .claude/memoria/design-studio.md)
+DesignStudio.spec
