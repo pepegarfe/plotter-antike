@@ -52,6 +52,24 @@ cd ~/plotter-antike && /opt/homebrew/bin/python3 -m PyInstaller --windowed --noc
   --collect-all webview design_studio.py    # → dist/DesignStudio.app
 ```
 
+## Conectar el plotter: Mac vs Windows (para probar la Fase 3)
+El motor usa `pyserial` → `serial.tools.list_ports.comports()`, que nombra el puerto distinto según el
+sistema. Es el MISMO dispositivo, distinto nombre:
+- **Windows:** `COM3`, `COM4`, … (el usuario elige el COM).
+- **Mac:** un archivo `/dev/cu.*`. El plotter aparece como **`/dev/cu.usbserial-…`** o
+  **`/dev/cu.usbmodem…`** (o con el nombre del chip: `SLAB_USBtoUART`, `wchusbserial`). Se usa `cu.`
+  (callout), no `tty.`. El panel de Design Studio ya lista estos nombres automáticamente.
+
+**Cómo identificar el puerto del plotter en Mac:** con el plotter desconectado solo salen puertos
+internos (`/dev/cu.debug-console`, `Bluetooth`, `Buds3…` — ninguno es el plotter). Se enchufa el
+plotter, se pulsa ↻, y **el nombre nuevo que aparece es el plotter**. Baud casi siempre **9600**.
+
+**Dos causas de "no aparece":**
+1. **Plotters viejos usan RS-232 (serial DB-9), no USB.** Necesitan un **adaptador USB-a-Serial**; ese
+   adaptador es el que se ve como `/dev/cu.usbserial-*`. Sin él no hay conexión con una Mac moderna.
+2. **Falta el driver del chip** (CH340 / CP210x / Prolific): si al enchufar y refrescar la lista NO
+   cambia, es esto — hay que instalar el driver del chip del cable.
+
 ## Lecciones (señales)
 - **Bug del lienzo que "no funcionaba":** un bucle de retroalimentación inflaba el `<canvas>` (medía
   su propio tamaño para fijarse el tamaño → crecía sin parar). Arreglo: `#cv{width:100%;height:100%}`.
