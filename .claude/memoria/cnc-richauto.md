@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T18:13:29.906Z
+  modified: 2026-07-22T20:43:46.886Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -134,7 +134,22 @@ M30
     cruz. Campo "Paso %Ø" en el modal de fresas.
   - **Ojo en pruebas de offsets:** medir holguras con distancia EUCLIDIANA al polígono (las
     esquinas se redondean con radio exacto); medir por ejes da falsos fallos en esquinas.
-- **D. Preview con orden de corte, estimación de tiempo, optimización de recorrido.**
+- **D. Orden de corte y puentes pro — ✅ CONSTRUIDA 22-jul-2026** (verificada con pruebas
+  unitarias + orden comprobado en un .tap real por la API; falta vistazo de Jose). Qué se hizo:
+  - **Huecos ANTES que el contorno exterior** de cada pieza (`_units_from`: interiores → exterior).
+    En "Sobre la línea" el anidado se calcula por contención (más profundo primero).
+  - **Vecino más próximo** entre piezas desde el origen (`_order_units`, greedy con muestreo) y
+    **cada anillo cerrado re-arranca en su vértice más cercano** a la posición actual
+    (`_rot_to_nearest`) → viajes mínimos en la cama de 2.4 m. Cajeado: NN entre zonas
+    (centro→pared intacto por zona). Taladro: NN entre puntos.
+  - **Puentes por distancia**: segmentado Nº/mm en la UI ("uno cada X mm", default 250; mínimo 2
+    por anillo); payload nuevo `tabs:{mode,v,w,h}` (el backend acepta el viejo `{n,...}`).
+  - **Puentes RAMPEADOS** (pendiente 2:1, `_RAMP_SLOPE`): la fresa sube/baja interpolando XYZ en
+    el mismo G01 (sin escalones verticales); en rectas la rampa es un solo segmento 3D, en curvas
+    se insertan los quiebres (`_ring_with_tabs`/`_z_on_ring`; los puentes pueden cruzar el
+    empalme del anillo — se maneja con corrimientos ±perímetro).
+  - ⚠️ **Lección de prueba:** en tramos RECTOS una rampa correcta NO tiene puntos intermedios
+    (un G01 interpola XYZ solo); lo que hay que asertar es "ningún cambio de Z sin avance XY".
 - **E. (futuro, decidir si vale)**: V-carve.
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
