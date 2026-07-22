@@ -1,0 +1,96 @@
+---
+name: cnc-richauto
+description: "CNC router 122×244cm (Asia Robotics, controlador RichAuto DSP) — investigación del dialecto G-code y plan para integrarla a Design Studio estilo Vectric Aspire"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 661c489b-f53b-4842-91af-46e807877393
+  modified: 2026-07-22T16:29:51.904Z
+---
+
+# CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
+
+Jose tiene, además del plotter de corte, una **máquina CNC de 122×244 cm** (cama 1220×2440 mm)
+comprada a **Asia Robotics**, con **controlador RichAuto DSP** (familia A1X — A11/A11E o similar,
+el modelo exacto está por confirmar mirando el handle). Antes la trabajaba con **Vectric Aspire**;
+quiere que Design Studio genere los **archivos G-code** con un flujo lo más parecido a Aspire.
+
+## Investigación verificada (manual oficial RichAuto A1X, leído completo el 22-jul-2026)
+
+**Cómo se trabaja:** el RichAuto es un controlador *offline* — NO se le manda el trabajo por cable
+desde la compu. Se guarda el archivo G-code en una **USB (FAT16/32, recomiendan 2–8 GB)**, se
+enchufa al handle y se procesa desde ahí. También se puede copiar al almacenamiento interno.
+⚠️ El manual advierte: caracteres ilegales o G-code no estándar → error de lectura. Nombres de
+archivo cortos y ASCII.
+
+**Formatos que lee:** G-code (`.nc`, `.tap`, `.txt`, `.g`, `.u00`, `.mmg`), PLT, DXF, bitmap.
+Usaremos **`.nc`** (el estándar de facto, mismo que produce Aspire).
+
+**G-code soportado (lista oficial del manual, apéndice 9.4):** G00/G01/G02/G03, G04, G17-19,
+G20/**G21**, G40-44/G49, **G54**-59, ciclos de taladrado G73/G81/G82/G83, **G90**/G91,
+**M03/M04/M05**, M06, M08/M09, **M30**, y palabras T/S/F/H.
+
+**⚠️ Trampas del controlador (menú "G Code Setup" del handle):**
+- **`F Read` viene en "Ign F" de fábrica** → el controlador IGNORA las velocidades del archivo y
+  usa su propia "Work Speed". Para que respete nuestras F hay que ponerlo en "Read F". Lo mismo
+  con `S Read` (velocidad de husillo). **Documentar esto en la UI** — es la 1ª causa de "la
+  máquina no hace caso a la velocidad que puse".
+- `AbsCntr Off/On`: centros de arco (I,J) incrementales por defecto. **Nos da igual**: no vamos a
+  emitir arcos (ver decisión abajo).
+- En muchas máquinas chinas el husillo se controla con la **perilla del variador (VFD)**, no con
+  la S del G-code — confirmar cómo está la de Jose.
+
+**Decisión técnica clave — solo G00/G01, sin arcos:** el motor de Design Studio ya representa TODO
+como polilíneas densamente muestreadas (styled paths = listas de puntos en mm). Emitir únicamente
+movimientos lineales G01 es lo natural, elimina de raíz los problemas de arcos G02/G03 que
+reportan los foros de Vectric con estos DSP, y el manual mismo usa ese estilo en sus ejemplos.
+
+**Esqueleto de archivo seguro (calcado del ejemplo del manual):**
+```
+G90 G54          (absoluto, sistema de coordenadas 1)
+G21              (milímetros)
+M03 S18000       (husillo ON)
+G00 Z<seguro>    (subir a altura segura)
+G00 X.. Y..      (viajar)
+G01 Z-<pasada> F<bajada>   (hundir)
+G01 X.. Y.. F<corte>       (cortar)
+...
+G00 Z<seguro>
+M05
+M30
+```
+
+## Qué se imita de Aspire (el flujo que Jose ya conoce)
+1. **Job Setup**: tamaño del material, **grosor**, cero de Z (cara superior o cama), datum XY.
+2. **Biblioteca de herramientas**: fresa con diámetro, profundidad por pasada, stepover, RPM,
+   avance de corte y de penetración (persistir en JSON junto a `plotter_config.json`).
+3. **Trayectorias (toolpaths)**: Perfil (por fuera / por dentro / sobre la línea, con pasadas
+   múltiples y puentes/tabs), Vaciado (pocket), Taladrado, y quizá V-carve (mucho más complejo).
+4. **Preview de trayectorias + tiempo estimado**, lista de trayectorias, guardar `.nc`.
+
+## Matemática nueva necesaria
+- **Offset de polígonos** (perfil por fuera/dentro, vaciado por anillos): **`shapely` 2.1.2**
+  (hay wheel cp314 arm64 para el Python de Homebrew — verificado con pip --dry-run el 22-jul).
+- Z entra al juego por primera vez (el plotter era 2D): pasadas múltiples, altura segura, rampa.
+
+## Plan por fases (borrador — pendiente de acordar alcance con Jose)
+- **A. Cimientos**: perfil de máquina "CNC 1220×2440" + material (grosor, cero Z) + biblioteca de
+  herramientas. Design Studio gana un modo/pestaña "CNC".
+- **B. Perfil + G-code**: trayectoria de perfil (fuera/dentro/sobre) con shapely, pasadas
+  múltiples, generador `.nc` (solo G00/G01), guardar archivo. → **primer corte de prueba**.
+- **C. Vaciado, taladrado, tabs, rampa de entrada.**
+- **D. Preview con orden de corte, estimación de tiempo, optimización de recorrido.**
+- **E. (futuro, decidir si vale)**: V-carve.
+
+**Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
+"corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
+eje Y (misma duda pendiente que el plotter — [[design-studio]] "Eje Y"), luego corte real en
+material de sacrificio. Revisar en el handle: G Code Setup → F Read = "Read F".
+
+## Preguntas abiertas (hechas a Jose el 22-jul-2026, respuestas pendientes)
+- Qué trayectorias son prioridad (¿perfil solo, o también vaciado/taladro/V-carve?).
+- ¿El husillo lo controla el variador a mano o quiere S en el G-code?
+- Materiales y grosores típicos (para presets de herramienta).
+- Modelo exacto del controlador (A11/A11E/A15/A18 — está serigrafiado en el handle).
+
+Relacionado: [[design-studio]] (donde vivirá la función), [[estado]] (motor compartido).
