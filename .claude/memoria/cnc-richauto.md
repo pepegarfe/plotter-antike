@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T17:00:43.692Z
+  modified: 2026-07-22T17:41:16.550Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -93,8 +93,26 @@ M30
   - **Gotcha de la sesión:** un `studio_server.py` viejo seguía corriendo de la sesión anterior
     (puerto 8765 ocupado) — servía el HTML nuevo pero sin las rutas nuevas (404). **Señal:** el
     HTML trae los cambios pero la API no existe → proceso viejo; `lsof -iTCP:8765` y matarlo.
-- **B. Perfil + G-code**: trayectoria de perfil (fuera/dentro/sobre) con shapely, pasadas
-  múltiples, generador `.tap` (solo G00/G01), guardar archivo. → **primer corte de prueba**.
+- **B. Perfil + G-code — ✅ CONSTRUIDA 22-jul-2026** (motor verificado con 6 pruebas unitarias +
+  punta a punta por el servidor; falta vistazo visual de Jose y el corte real). Qué se hizo:
+  - **`cnc_gcode.py`** (módulo nuevo): `make_toolpaths()` compensa la fresa con **shapely**
+    (instalada 2.1.2). **Anidado par-impar** con `symmetric_difference` + `buffer(±r)`: la letra
+    "O" por fuera expande el contorno Y contrae el hueco, como Aspire (verificado). Trazos
+    abiertos: solo "Sobre la línea"; en fuera/dentro se saltan y se avisa cuántos.
+    `build_gcode()` emite solo G00/G01, pasadas múltiples (techo de prof/pasada, la última exacta),
+    cero de Z 'top' o 'bed' (verificadas ambas escalas de Z), altura segura +5mm, `M03 S`,
+    `M05 / G00 X0 Y0 / M30`. **Comentarios normalizados a ASCII** (el manual advierte que
+    caracteres raros rompen la lectura del controlador).
+  - Backend: `cnc_toolpaths_preview()` / `cnc_build_tap()` en studio_backend; Api de escritorio
+    `cnc_toolpath`/`save_tap` (diálogo nativo, escribe con `newline='\n'`); servidor
+    `POST /api/cnc_toolpath` y `/api/tap` (descarga como blob).
+  - UI: **pestaña "CNC" propia en el sidebar** (Propiedades/Capas/CNC — pedida por Jose; el tab
+    solo aparece en modo CNC, se auto-enfoca al entrar y te saca de él al salir). Contiene
+    Material, Herramienta y "Corte · Perfil" (segmentado Fuera/Dentro/Línea, Prof. que
+    **sigue sola al grosor del material** mientras no la edites, contador de pasadas), botón
+    "◉ Ver trayectorias" (dibuja en azul el recorrido del CENTRO de la fresa; se invalida solo
+    al cambiar geometría/fresa/lado vía `killPrev()` en pushUndo/restore/loaders), y "Exportar
+    HPGL" se convierte en **"Exportar G-code"** en modo CNC (mismo botón, `btnSaveLbl`).
 - **C. Vaciado, taladrado, tabs, rampa de entrada.**
 - **D. Preview con orden de corte, estimación de tiempo, optimización de recorrido.**
 - **E. (futuro, decidir si vale)**: V-carve.
