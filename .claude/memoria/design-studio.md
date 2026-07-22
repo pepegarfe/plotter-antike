@@ -11,6 +11,10 @@ Construida el 21-jul-2026. Es un **programa nuevo** que reconstruye la cara de P
 aspecto pro, **reutilizando el motor** (`plotter_control.py`: parsers SVG/DXF/AI, `HPGLConverter`,
 `PlotterController`). El original tkinter **sigue intacto** (Plotter Antike no se tocó).
 
+> **Es la cara NUEVA del mismo plotter.** La cara vieja (app tkinter) está en [[estado]]. Ambas
+> comparten `plotter_control.py` y por eso viven en **un solo repo**: Design Studio lo importa;
+> separarlos obligaría a duplicar el motor y arreglar cada bug dos veces.
+
 ## Por qué existe
 El aspecto de la app tkinter tiene techo (no compite con Illustrator). Jose pidió reconstruir para un
 look profesional. Se eligió **web + backend Python** (pywebview) porque la maqueta aprobada es HTML/CSS

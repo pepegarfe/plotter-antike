@@ -15,6 +15,12 @@ Se **distribuye como .exe de Windows** (PyInstaller): `build.bat` compila, el us
 `instalar.bat` y queda en `%LOCALAPPDATA%\Antike\PlotterController\`. En Mac solo se desarrolla/lee;
 no se puede probar el envío real al plotter aquí (no hay hardware ni el puerto COM).
 
+> **Esta nota es la cara VIEJA (tkinter).** Hay una **segunda cara del mismo plotter**: **Design
+> Studio** ([[design-studio]]), una interfaz nueva (web/pywebview) con look pro que **reutiliza este
+> mismo motor** (`plotter_control.py`: parsers, HPGL, serial). Por eso viven en **un solo repo** —
+> Design Studio importa este código; separarlos obligaría a duplicar el motor. Esta app tkinter sigue
+> intacta.
+
 ## Estado al 21-jul-2026 (recién dado de alta en el sistema de conocimiento)
 - Repo `pepegarfe/plotter-antike` (público), rama `master`, 25 commits, último hace ~8 semanas.
 - Clonado en `~/plotter-antike`. **No es un proyecto activo** ahora mismo; se rescató del olvido.
