@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T22:04:02.621Z
+  modified: 2026-07-22T22:30:24.434Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -173,6 +173,24 @@ M30
     otras). Backend acepta payload viejo (plano) y nuevo (`jobs`).
   - **Gotcha emisión**: al encadenar pasadas, no re-emitir `G01 Z` a la altura donde ya está
     la fresa (movimiento nulo que ensucia el archivo) — se rastrea `z_now`.
+
+- **F. Formulario estilo Aspire — ✅ CONSTRUIDA 22-jul-2026** (Jose comparó contra Aspire y el
+  flujo estaba AL REVÉS; se rehizo tras cotejar el formulario "2D Profile Toolpath" de la doc
+  oficial V12 de Vectric). **El flujo correcto y actual**:
+  1. seleccionar vectores → 2. clic en la operación → 3. llenar el FORMULARIO →
+  4. **"⚙ Calcular trayectoria"** crea (o recalcula la seleccionada) + **auto-preview**.
+  ⚠️ **El formulario NO escribe en vivo** — sin Calcular no hay cambios (antes goteaba cada
+  keystroke a la trayectoria: eso era lo "incorrecto"). Cambiar de operación con una
+  trayectoria seleccionada = empezar una NUEVA (en Aspire no se cambia el tipo).
+  - **Campos nuevos**: Nombre; **P. inicial** (start depth — corta de start a start+prof);
+    **Dirección Concordante/Convencional** (se implementa orientando los anillos:
+    climb = material a la IZQUIERDA del avance con husillo horario → `orient()` de shapely,
+    fuera=CCW/huecos CW; dentro y cajeado invertido; verificado por área firmada);
+    **Holgura** (± mm sobre el offset; positiva deja material); en Material: **Z segura**
+    (clearance) y **checkbox "volver a 0,0"** (home_end) — van en `cnc_config.json` y
+    `cnc_get()` migra configs viejas completando llaves faltantes del material.
+  - Diferido consciente (existe en Aspire, es pulido): leads, edición de pasadas ±15%, rampas
+    zig-zag/espiral, última pasada separada, editor de tabs con clic, preview 3D.
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
