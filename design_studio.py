@@ -56,6 +56,38 @@ class Api:
     def cnc_set(self, patch):
         return _cnc_set(patch or {})
 
+    def tools_export(self):
+        """Guarda la biblioteca (materiales + fresas) como JSON con diálogo nativo."""
+        cfg = _cnc_get()
+        res = self.window.create_file_dialog(webview.SAVE_DIALOG,
+                                             save_filename='fresas-antike.json')
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res if isinstance(res, str) else res[0]
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump({'format': 'antike-tools', 'materials': cfg['materials'],
+                           'tools': cfg['tools']}, f, ensure_ascii=False, indent=1)
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo guardar: {e}'}
+        return {'ok': True, 'path': os.path.basename(path)}
+
+    def tools_import(self):
+        """Abre un JSON de biblioteca y REEMPLAZA materiales + fresas (validando)."""
+        res = self.window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=('Biblioteca de fresas (*.json)', 'Todos los archivos (*.*)'))
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        try:
+            d = json.loads(open(path, encoding='utf-8').read())
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo leer: {e}'}
+        if not d.get('tools'):
+            return {'ok': False, 'error': 'Ese archivo no trae fresas.'}
+        return _cnc_set({'materials': d.get('materials'), 'tools': d['tools']})
+
     def cnc_toolpath(self, data):
         """Trayectorias del centro de la fresa, para previsualizar en el lienzo."""
         return _cnc_preview(data or {})

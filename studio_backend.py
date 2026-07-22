@@ -63,36 +63,129 @@ def _cnc_path():
     return core._config_path().with_name('cnc_config.json')
 
 
-# Presets iniciales por material (puntos de partida sensatos para un router 1220×2440;
-# Jose los afina con su máquina). feed/plunge en mm/min, pass_depth = profundidad por pasada.
+# ESQUEMA v2 (estilo Aspire): la fresa es GEOMETRÍA (nombre, Ø, notas) y sus DATOS DE CORTE
+# van POR MATERIAL en `cut` — una fresa física, un juego de números por cada material.
+# El material activo (material.type) decide qué juego usa el formulario de trayectorias.
+# feed/plunge en mm/min; pass_depth = profundidad por pasada; stepover_pct = % del Ø.
+_CUT_FIELDS = ('pass_depth', 'feed', 'plunge', 'rpm', 'stepover_pct')
+
 CNC_DEFAULTS = {
     'machine': 'plotter',                              # máquina activa al abrir la app
+    'theme': 'light',                                  # tema de la interfaz (claro por default)
     'work': [1220.0, 2440.0],                          # cama de la CNC de Jose (122×244 cm)
     'material': {'thickness': 15.0, 'z_zero': 'top',   # z_zero: 'top' (cara superior) | 'bed' (cama)
-                 'clearance': 5.0, 'home_end': True},  # Z segura (mm) y "volver a X0 Y0 al terminar"
-    'tool_sel': 't6-mdf',
+                 'clearance': 5.0, 'home_end': True,   # Z segura (mm) y "volver a X0 Y0 al terminar"
+                 'type': 'mdf'},                       # material ACTIVO (id de `materials`)
+    'materials': [
+        {'id': 'mdf', 'name': 'MDF / triplay'},
+        {'id': 'acr', 'name': 'Acrílico'},
+        {'id': 'pvc', 'name': 'PVC espumado'},
+        {'id': 'mad', 'name': 'Madera sólida'},
+    ],
+    'tool_sel': 't6-2f',
+    # Las 5 fresas más comunes de un router de taller, con datos de ARRANQUE por material,
+    # basados en tablas de chip load publicadas (feed = RPM × filos × chip load) y práctica
+    # de rotulación: MDF ~0.10–0.25 mm/diente; acrílico SIEMPRE mejor con 1 filo (O-flute) y
+    # avance alto para no derretir; PVC espumado rápido (3.5–6.5 m/min publicado; aquí
+    # conservador) y con menos RPM; madera dura ~0.08–0.20. ⚠️ Son puntos de partida: cada
+    # máquina/fresa se afina cortando. Ver .claude/memoria/cnc-richauto.md (fuentes).
     'tools': [
-        {'id': 't6-mdf', 'name': 'Fresa 6 mm · MDF/triplay',        'dia': 6.0,   'pass_depth': 5.0, 'feed': 2500, 'plunge': 800,  'rpm': 18000, 'stepover_pct': 40},
-        {'id': 't6-acr', 'name': 'Fresa 6 mm · Acrílico',           'dia': 6.0,   'pass_depth': 4.0, 'feed': 1800, 'plunge': 500,  'rpm': 18000, 'stepover_pct': 40},
-        {'id': 't6-pvc', 'name': 'Fresa 6 mm · PVC espumado',       'dia': 6.0,   'pass_depth': 8.0, 'feed': 3000, 'plunge': 1000, 'rpm': 16000, 'stepover_pct': 45},
-        {'id': 't6-mad', 'name': 'Fresa 6 mm · Madera sólida',      'dia': 6.0,   'pass_depth': 4.0, 'feed': 2000, 'plunge': 600,  'rpm': 18000, 'stepover_pct': 40},
-        {'id': 't3-det', 'name': 'Fresa 3.175 mm (1/8″) · Detalle', 'dia': 3.175, 'pass_depth': 2.5, 'feed': 1500, 'plunge': 500,  'rpm': 20000, 'stepover_pct': 40},
+        {'id': 't6-1f', 'name': 'Fresa 6 mm · 1 filo (O-flute)', 'dia': 6.0,
+         'notes': 'La reina para acrílico y PVC: un solo filo expulsa la viruta caliente sin derretir el borde.',
+         'cut': {
+            'mdf': {'pass_depth': 5.0, 'feed': 3000, 'plunge': 900,  'rpm': 18000, 'stepover_pct': 40},
+            'acr': {'pass_depth': 3.0, 'feed': 2400, 'plunge': 500,  'rpm': 17000, 'stepover_pct': 40},
+            'pvc': {'pass_depth': 8.0, 'feed': 4000, 'plunge': 1200, 'rpm': 14000, 'stepover_pct': 45},
+            'mad': {'pass_depth': 4.0, 'feed': 2400, 'plunge': 700,  'rpm': 18000, 'stepover_pct': 40},
+         }},
+        {'id': 't6-2f', 'name': 'Fresa 6 mm · 2 filos (espiral)', 'dia': 6.0,
+         'notes': 'El caballo de batalla en MDF, triplay y madera. En acrílico tiende a derretir: mejor la de 1 filo.',
+         'cut': {
+            'mdf': {'pass_depth': 5.0, 'feed': 3600, 'plunge': 1000, 'rpm': 18000, 'stepover_pct': 40},
+            'acr': {'pass_depth': 2.5, 'feed': 1800, 'plunge': 450,  'rpm': 16000, 'stepover_pct': 35},
+            'pvc': {'pass_depth': 6.0, 'feed': 3000, 'plunge': 900,  'rpm': 14000, 'stepover_pct': 45},
+            'mad': {'pass_depth': 4.0, 'feed': 2800, 'plunge': 800,  'rpm': 18000, 'stepover_pct': 40},
+         }},
+        {'id': 't6-comp', 'name': 'Fresa 6 mm · compresión', 'dia': 6.0,
+         'notes': 'Para triplay y melamina: borde limpio por AMBAS caras. La primera pasada debe rebasar ~1×Ø de profundidad para que trabaje bien.',
+         'cut': {
+            'mdf': {'pass_depth': 6.0, 'feed': 3000, 'plunge': 800, 'rpm': 18000, 'stepover_pct': 40},
+            'acr': {'pass_depth': 2.5, 'feed': 1500, 'plunge': 400, 'rpm': 16000, 'stepover_pct': 35},
+            'pvc': {'pass_depth': 6.0, 'feed': 2500, 'plunge': 800, 'rpm': 14000, 'stepover_pct': 45},
+            'mad': {'pass_depth': 5.0, 'feed': 2500, 'plunge': 700, 'rpm': 18000, 'stepover_pct': 40},
+         }},
+        {'id': 't3-1f', 'name': 'Fresa 3.175 mm (1/8″) · 1 filo', 'dia': 3.175,
+         'notes': 'Detalle fino en plásticos y letras chicas. Frágil: no exagerar la pasada.',
+         'cut': {
+            'mdf': {'pass_depth': 2.5, 'feed': 2000, 'plunge': 600, 'rpm': 18000, 'stepover_pct': 40},
+            'acr': {'pass_depth': 1.5, 'feed': 1600, 'plunge': 400, 'rpm': 18000, 'stepover_pct': 40},
+            'pvc': {'pass_depth': 3.0, 'feed': 2600, 'plunge': 800, 'rpm': 15000, 'stepover_pct': 45},
+            'mad': {'pass_depth': 2.0, 'feed': 1600, 'plunge': 500, 'rpm': 18000, 'stepover_pct': 40},
+         }},
+        {'id': 't3-2f', 'name': 'Fresa 3.175 mm (1/8″) · 2 filos', 'dia': 3.175,
+         'notes': 'Detalle fino en maderas.',
+         'cut': {
+            'mdf': {'pass_depth': 2.0, 'feed': 2200, 'plunge': 600, 'rpm': 18000, 'stepover_pct': 40},
+            'acr': {'pass_depth': 1.2, 'feed': 1200, 'plunge': 350, 'rpm': 16000, 'stepover_pct': 35},
+            'pvc': {'pass_depth': 2.5, 'feed': 2200, 'plunge': 700, 'rpm': 15000, 'stepover_pct': 45},
+            'mad': {'pass_depth': 1.8, 'feed': 1800, 'plunge': 500, 'rpm': 18000, 'stepover_pct': 40},
+         }},
     ],
 }
 
+# Migración v1→v2: los presets viejos traían el material EN EL NOMBRE ("Fresa 6 mm · MDF")
+# y un solo juego de datos. Se agrupan por (nombre-base, Ø) y cada uno aporta el juego de
+# su material; sin palabra clave reconocible, sus datos se copian a TODOS los materiales.
+_MAT_KEYWORDS = (('mdf', 'mdf'), ('triplay', 'mdf'), ('acril', 'acr'), ('acríl', 'acr'),
+                 ('pvc', 'pvc'), ('espumado', 'pvc'), ('madera', 'mad'))
+
+
+def _migrate_tools_v1(old_tools, materials):
+    mat_ids = [m['id'] for m in materials]
+    groups = {}
+    for t in old_tools:
+        name = str(t.get('name') or 'Fresa')
+        low = name.lower()
+        mat = next((mid for kw, mid in _MAT_KEYWORDS if kw in low), None)
+        base = name
+        if mat and '·' in name:
+            base = name.rsplit('·', 1)[0].strip()     # "Fresa 6 mm · MDF/triplay" → "Fresa 6 mm"
+        cut = {k: float(t.get(k, d)) for k, d in
+               zip(_CUT_FIELDS, (3.0, 2000, 500, 18000, 40))}
+        key = (base, round(float(t.get('dia', 6.0)), 3))
+        g = groups.setdefault(key, {'id': str(t.get('id') or f't{len(groups)}'),
+                                    'name': base, 'dia': key[1], 'notes': '', 'cut': {}})
+        for mid in ([mat] if mat else mat_ids):       # sin material claro → a todos
+            g['cut'].setdefault(mid, dict(cut))
+    out = list(groups.values())
+    for g in out:                                     # completar materiales faltantes con el 1er juego
+        first = next(iter(g['cut'].values()), None)
+        for mid in mat_ids:
+            if first:
+                g['cut'].setdefault(mid, dict(first))
+    return out
+
 
 def cnc_get():
-    """Config del CNC completa (defaults + lo guardado encima)."""
+    """Config del CNC completa (defaults + lo guardado encima), migrando esquemas viejos."""
     data = json.loads(json.dumps(CNC_DEFAULTS))   # copia profunda de los defaults
     try:
         p = _cnc_path()
         if p.exists():
             saved = json.loads(p.read_text())
-            for k in ('machine', 'work', 'material', 'tool_sel', 'tools'):
+            for k in ('machine', 'theme', 'work', 'material', 'materials', 'tool_sel', 'tools'):
                 if k in saved:
                     data[k] = saved[k]
-            # config guardada por versiones viejas: completar llaves nuevas del material
             data['material'] = {**CNC_DEFAULTS['material'], **(data.get('material') or {})}
+            if data['tools'] and 'cut' not in data['tools'][0]:      # esquema v1 → migrar
+                data['tools'] = _migrate_tools_v1(data['tools'], data['materials'])
+                if not any(t['id'] == data['tool_sel'] for t in data['tools']):
+                    data['tool_sel'] = data['tools'][0]['id']
+                p.write_text(json.dumps({k: data[k] for k in
+                                         ('machine', 'theme', 'work', 'material', 'materials',
+                                          'tool_sel', 'tools')}, ensure_ascii=False, indent=1))
+            if not any(m['id'] == data['material'].get('type') for m in data['materials']):
+                data['material']['type'] = data['materials'][0]['id']
     except Exception:
         pass
     data['ok'] = True
@@ -109,11 +202,25 @@ def cnc_set(patch):
             if patch['machine'] not in ('plotter', 'cnc'):
                 return {'ok': False, 'error': 'Máquina desconocida.'}
             cur['machine'] = patch['machine']
+        if 'theme' in patch:
+            if patch['theme'] not in ('light', 'dark'):
+                return {'ok': False, 'error': 'Tema desconocido.'}
+            cur['theme'] = patch['theme']
         if 'work' in patch:
             w, h = float(patch['work'][0]), float(patch['work'][1])
             if w < 10 or h < 10:
                 return {'ok': False, 'error': 'El área mínima es 10 × 10 mm.'}
             cur['work'] = [w, h]
+        if 'materials' in patch:
+            mats = []
+            for m in (patch['materials'] or []):
+                nm = str(m.get('name') or '').strip()
+                if nm:
+                    mats.append({'id': str(m.get('id') or f'm{len(mats)}'), 'name': nm})
+            if not mats:
+                return {'ok': False, 'error': 'Debe quedar al menos un material.'}
+            cur['materials'] = mats
+        mat_ids = [m['id'] for m in cur['materials']]
         if 'material' in patch:
             m = patch['material'] or {}
             old = cur['material']
@@ -127,19 +234,33 @@ def cnc_set(patch):
             if not (1 <= cl <= 200):
                 return {'ok': False, 'error': 'La Z segura debe estar entre 1 y 200 mm.'}
             cur['material'] = {'thickness': t, 'z_zero': zz, 'clearance': cl,
-                               'home_end': bool(m.get('home_end', old.get('home_end', True)))}
+                               'home_end': bool(m.get('home_end', old.get('home_end', True))),
+                               'type': str(m.get('type', old.get('type', mat_ids[0])))}
+        if cur['material'].get('type') not in mat_ids:
+            cur['material']['type'] = mat_ids[0]
         if 'tools' in patch:
             tools = []
             for t in (patch['tools'] or []):
+                cut = {}
+                for mid, c in (t.get('cut') or {}).items():
+                    if mid not in mat_ids:
+                        continue                      # datos de un material borrado: se podan
+                    cut[mid] = {
+                        'pass_depth': max(0.1, float(c.get('pass_depth', 3.0))),
+                        'feed': max(1, float(c.get('feed', 2000))),
+                        'plunge': max(1, float(c.get('plunge', 500))),
+                        'rpm': max(0, float(c.get('rpm', 18000))),
+                        'stepover_pct': min(90, max(10, float(c.get('stepover_pct') or 40))),
+                    }
+                if not cut:
+                    cut = {mat_ids[0]: {'pass_depth': 3.0, 'feed': 2000, 'plunge': 500,
+                                        'rpm': 18000, 'stepover_pct': 40}}
                 tools.append({
                     'id': str(t.get('id') or f't{len(tools)}'),
                     'name': str(t.get('name') or 'Fresa'),
                     'dia': max(0.1, float(t.get('dia', 6.0))),
-                    'pass_depth': max(0.1, float(t.get('pass_depth', 3.0))),
-                    'feed': max(1, float(t.get('feed', 2000))),
-                    'plunge': max(1, float(t.get('plunge', 500))),
-                    'rpm': max(0, float(t.get('rpm', 18000))),
-                    'stepover_pct': min(90, max(10, float(t.get('stepover_pct') or 40))),
+                    'notes': str(t.get('notes') or ''),
+                    'cut': cut,
                 })
             if not tools:
                 return {'ok': False, 'error': 'Debe quedar al menos una fresa.'}
@@ -184,7 +305,9 @@ def _cnc_make(data):
     else:
         op = 'profile'
         side = data.get('side') if data.get('side') in ('outside', 'inside', 'on') else 'outside'
-        tps, skipped = cnc_gcode.make_toolpaths(paths, side, dia, direction, allowance)
+        tps, skipped = cnc_gcode.make_toolpaths(paths, side, dia, direction, allowance,
+                                                last_pass=float(data.get('last_pass') or 0),
+                                                last_rev=bool(data.get('last_rev')))
     if not tps and not drills:
         raise ValueError(_NO_CLOSED)
     tabs = data.get('tabs') or None
@@ -220,7 +343,8 @@ def cnc_toolpaths_preview(data):
     try:
         job, op, tps, drills, skipped, tool, material, name = _as_job(data)
         _, secs = cnc_gcode.build_jobs([job], material, name)
-        return {'ok': True, 'op': op, 'toolpaths': tps, 'drills': drills,
+        flat = [cnc_gcode._rpts(t) for t in tps]   # sin banderas de acabado: el lienzo solo pinta puntos
+        return {'ok': True, 'op': op, 'toolpaths': flat, 'drills': drills,
                 'dia': float(tool.get('dia', 6.0)), 'skipped': skipped, 'secs': round(secs)}
     except Exception as e:
         return {'ok': False, 'error': f'Trayectorias: {e}'}

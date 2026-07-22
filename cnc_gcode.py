@@ -50,16 +50,28 @@ def _d2(a, b):
 
 
 # ---------- orden de corte (Fase D) ----------
+# Un "anillo" es una lista de puntos, o una tupla (puntos, es_acabado) cuando la trayectoria
+# lleva "última pasada separada": los anillos de acabado se cortan en UNA pasada a fondo.
 
-def _rot_to_nearest(pts, cur):
+def _rpts(rg):
+    return rg[0] if isinstance(rg, tuple) else rg
+
+
+def _rfin(rg):
+    return rg[1] if isinstance(rg, tuple) else False
+
+
+def _rot_to_nearest(rg, cur):
     """Re-arranca un anillo cerrado en su vértice más cercano a `cur` (viaje mínimo)."""
+    pts = _rpts(rg)
     if not _is_closed(pts):
-        return pts
+        return rg
     core = pts[:-1]
     i = min(range(len(core)), key=lambda k: _d2(core[k], cur))
     if i:
         core = core[i:] + core[:i]
-    return core + [[core[0][0], core[0][1]]]
+    out = core + [[core[0][0], core[0][1]]]
+    return (out, _rfin(rg)) if isinstance(rg, tuple) else out
 
 
 def _order_units(units, start=(0.0, 0.0)):
@@ -68,14 +80,14 @@ def _order_units(units, start=(0.0, 0.0)):
     cur, out, rem = list(start), [], list(units)
     while rem:
         def entry_d(u):
-            ring = u[0]
+            ring = _rpts(u[0])
             step = max(1, len(ring) // 48)
             return min(_d2(cur, ring[k]) for k in range(0, len(ring), step))
         bi = min(range(len(rem)), key=lambda k: entry_d(rem[k]))
         for ring in rem.pop(bi):
             ring = _rot_to_nearest(ring, cur)
             out.append(ring)
-            cur = ring[-1]
+            cur = _rpts(ring)[-1]
     return out
 
 
@@ -114,10 +126,14 @@ def _closed_region(paths):
     return region, skipped
 
 
-def make_toolpaths(paths, side, tool_dia, direction='climb', allowance=0.0):
+def make_toolpaths(paths, side, tool_dia, direction='climb', allowance=0.0,
+                   last_pass=0.0, last_rev=False):
     """PERFIL: polilíneas del centro de la fresa, YA ORDENADAS. side: outside|inside|on.
     direction: 'climb' (concordante, el default de Aspire) | 'conv' (convencional).
-    allowance: holgura en mm — positiva DEJA material (para acabado), negativa sobrecorta."""
+    allowance: holgura en mm — positiva DEJA material (para acabado), negativa sobrecorta.
+    last_pass > 0 = ÚLTIMA PASADA SEPARADA (como Aspire): el desbaste corta dejando esa
+    cáscara extra y por cada pieza se añade un anillo de ACABADO a la medida exacta que se
+    corre en UNA sola pasada a profundidad completa (last_rev lo recorre al revés)."""
     if side == 'on':
         return _order_on(paths), 0
     region, skipped = _closed_region(paths)
@@ -126,10 +142,22 @@ def make_toolpaths(paths, side, tool_dia, direction='climb', allowance=0.0):
     dist = float(tool_dia) / 2.0 + float(allowance or 0)
     if dist <= 0.05:
         raise ValueError('La holgura negativa se come el radio de la fresa.')
-    offset = region.buffer(dist if side == 'outside' else -dist, quad_segs=16)
-    # husillo horario: climb = material a la IZQUIERDA del avance
     sign = 1.0 if ((side == 'outside') == (direction != 'conv')) else -1.0
-    return _order_units(_units_from(offset, sign)), skipped
+    out = 1 if side == 'outside' else -1
+    lp = max(0.0, float(last_pass or 0))
+    if lp <= 0:
+        offset = region.buffer(out * dist, quad_segs=16)
+        return _order_units(_units_from(offset, sign)), skipped
+    units = []
+    for poly in getattr(region, 'geoms', [region]):     # por pieza: desbaste y LUEGO su acabado
+        rough = poly.buffer(out * (dist + lp), quad_segs=16)
+        fin = poly.buffer(out * dist, quad_segs=16)
+        rings = [(r, False) for u in _units_from(rough, sign) for r in u]
+        fsign = -sign if last_rev else sign             # acabado opcionalmente en dirección contraria
+        rings += [(r, True) for u in _units_from(fin, fsign) for r in u]
+        if rings:
+            units.append(rings)
+    return _order_units(units), skipped
 
 
 def _order_on(paths):
@@ -346,9 +374,12 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
     z_tab = z_start - (depth - tab_h)             # techo del puente (desde el fondo real)
     tab_ramp = tab_h * _TAB_SLOPE
     secs = 0.0
-    for pts in toolpaths:
+    for rg in toolpaths:
+        pts = _rpts(rg)
         if len(pts) < 2:
             continue
+        finish = _rfin(rg)                # anillo de acabado: UNA pasada a profundidad completa
+        ring_depths = [depths[-1]] if finish else depths
         closed = _is_closed(pts)
         cum = _cum(pts)
         perim = cum[-1]
@@ -359,7 +390,7 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
                 zones = _tab_zones(perim, n, tab_w, tab_ramp)
         lines.append('G00 X%s Y%s' % (_f(pts[0][0]), _f(pts[0][1])))
         s_cur, z_prev, z_now = 0.0, z_start, None   # z_now = altura real de la fresa (None = arriba)
-        for d in depths:
+        for d in ring_depths:
             z_cut = z_start - d
             pass_zones = zones if (zones and z_cut < z_tab - 1e-9) else None
             entry = min(perim / 3.0, (z_prev - z_cut) * _ENTRY_SLOPE) if (ramp and closed) else 0.0
@@ -375,7 +406,7 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
                 lines.append('G01 Z%s F%s' % (_f(z_cut), _f(plunge)))
                 for p in pts[1:]:
                     lines.append('G01 X%s Y%s F%s' % (_f(p[0]), _f(p[1]), _f(feed)))
-                if not closed and d != depths[-1]:
+                if not closed and d != ring_depths[-1]:
                     lines.append('G00 Z%s' % _f(safe))
                     lines.append('G00 X%s Y%s' % (_f(pts[0][0]), _f(pts[0][1])))
                     z_now = None

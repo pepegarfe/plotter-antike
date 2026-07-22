@@ -69,6 +69,21 @@ def api_cnc_set():
     return _json(_cnc_set(request.json or {}))
 
 
+@app.get('/api/tools_export')
+def api_tools_export():
+    cfg = _cnc_get()
+    return _json({'ok': True, 'format': 'antike-tools',
+                  'materials': cfg['materials'], 'tools': cfg['tools']})
+
+
+@app.post('/api/tools_import')
+def api_tools_import():
+    d = request.json or {}
+    if not d.get('tools'):
+        return _json({'ok': False, 'error': 'Ese archivo no trae fresas.'})
+    return _json(_cnc_set({'materials': d.get('materials'), 'tools': d['tools']}))
+
+
 @app.post('/api/cnc_toolpath')
 def api_cnc_toolpath():
     return _json(_cnc_preview(request.json or {}))
