@@ -44,6 +44,41 @@ y así se convierte directo en la app; el motor Python se reusa por debajo.
   `plotter_config.json`, compatible con el original). **`dist/DesignStudio.app` compila y arranca** (97 MB).
   Falta: empaquetar Windows y probar visualmente la ventana compilada.
 
+## Novedades sesión 21–22 jul 2026 (LEER al retomar)
+Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `f02e918` (pusheado)**:
+- **Calco de imagen** (B/N + color) — ver sección "Calco de imagen" abajo.
+- **"Abrir" acepta imágenes** (PNG/JPG/…): las manda directo al calco (además de SVG/DXF/AI y .dstudio).
+  Arreglado el filtro de pywebview: **su validador NO admite comas** en la descripción del `file_type`.
+- **Arreglo del eje Y** — ver sección "Eje Y" abajo. ⚠️ Falta verificar el corte en hardware.
+- **Capas estilo Illustrator**: grupos como nodos plegables con hijos anidados (`buildLayers`/`layerRow`/
+  `groupHeader` en studio_ui.html; estado de plegado en `layerCollapsed`).
+- **Selección múltiple**: Shift / Cmd / Ctrl + clic suma/quita; Shift+arrastre = marco aditivo
+  (`mousedown`/`mouseup` del lienzo; respeta grupos como unidad).
+
+**SIN COMMIT todavía** (studio_ui.html modificado, verificado en vivo):
+- **Alinear-a**: el `<select>` de texto "Selección/Área de trabajo" ahora es un **segmentado con iconos**
+  (id `alignTo`, dos `<button data-to>`; estilo `.seg`). De regalo mejoró el resaltado del modo B/N/Color.
+
+### Pendientes al abrir la próxima sesión
+1. **Commit del segmentado de alinear** (studio_ui.html sin subir; Jose no ha pedido el commit aún).
+2. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
+3. Diferidas que Jose puede querer: organizar orden (z-order / orden de corte), texto, contorno/offset,
+   presets de material, optimizar orden de corte, snapping.
+
+## Lanzador de escritorio (Mac) — ícono "Design Studio.app"
+Igual que Plotter Antike, hay un **ícono en el Escritorio** que lanza la app con doble clic. Es una
+**mini-app de AppleScript** (`osacompile`) que por dentro solo corre:
+`/opt/homebrew/bin/python3 /Users/josegf/plotter-antike/design_studio.py`. **NO es la app compilada de
+97 MB** (`dist/DesignStudio.app`); es el atajo ligero de desarrollo — si mueves/borras la carpeta del
+código, deja de funcionar. Ícono propio: cuadro magenta de la marca + cursor blanco de selección.
+- ⚠️ **Gotcha que costó rato:** en macOS moderno (26.x) reemplazar `Contents/Resources/applet.icns`
+  **NO cambia el ícono** si la app trae un **`Assets.car`** (catálogo compilado) referenciado por
+  `CFBundleIconName` en el `Info.plist` — **ese catálogo manda sobre el .icns**. Arreglo: `plutil -remove
+  CFBundleIconName`, borrar `Assets.car`, `xattr -cr` (quitar detritus de Finder) y **re-firmar**
+  (`codesign --force --deep -s -`); luego reventar caché (borrar `com.apple.iconservices*` de
+  `$(getconf DARWIN_USER_CACHE_DIR)` + `killall Finder Dock`). **Señal:** cambiaste el .icns y Finder no
+  lo refleja → busca un `Assets.car`.
+
 ## Cómo correrla y compilarla (Mac, Python de Homebrew)
 ```bash
 # Escritorio (ventana nativa):
