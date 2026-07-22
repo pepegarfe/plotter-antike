@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T23:04:39.596Z
+  modified: 2026-07-22T23:25:14.630Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -189,8 +189,22 @@ M30
     **Holgura** (± mm sobre el offset; positiva deja material); en Material: **Z segura**
     (clearance) y **checkbox "volver a 0,0"** (home_end) — van en `cnc_config.json` y
     `cnc_get()` migra configs viejas completando llaves faltantes del material.
-  - Diferido consciente (existe en Aspire, es pulido): leads, edición de pasadas ±15%, rampas
-    zig-zag/espiral, última pasada separada, editor de tabs con clic, preview 3D.
+  - Diferido consciente (existe en Aspire, es pulido): leads, rampas zig-zag/espiral, editor
+    de tabs con clic, preview 3D.
+  - **Añadidos 22-jul tarde (pedidos de Jose tras comparar con Aspire)**:
+    · **Pasadas EDITABLES** (como "Edit Passes"): el campo se auto-calcula pero al escribir N
+      se reparte la profundidad en N pasadas parejas (`effPassDepth` ajusta el pass_depth del
+      snapshot; `passAuto` distingue auto vs forzado).
+    · **Última pasada separada** ("Do Separate Last Pass"): checkbox en Perfil con "Deja" (mm
+      de cáscara) e "Invertir dir.". En el motor: `make_toolpaths(last_pass, last_rev)` genera
+      por pieza anillos de DESBASTE (offset + cáscara, todas las pasadas) y de ACABADO (medida
+      exacta, UNA pasada a fondo, opcionalmente en dirección contraria). Anillos como tuplas
+      `(pts, es_acabado)` — `_rpts`/`_rfin`; el preview los aplana. El acabado también respeta
+      puentes. Verificado: offsets 103.5/103, orientación opuesta, 4+1 pasadas, banderas por
+      pieza en la "O".
+    · Puentes DESMARCADOS por default (como Aspire); Trayectorias al FINAL del panel con
+      **drag & drop** para el orden de corte (se quitaron ↑↓); **cero emojis/símbolos: todo
+      icono es SVG** (ojo/basura/engrane/pluma/flechas del jog/cierres de modal…).
 
 - **G. Fresas por material (Tool Database estilo Aspire) — ✅ CONSTRUIDA 22-jul-2026** (Jose pidió
   el careo contra la Tool Database de Aspire V12; el defecto era que el material iba PEGADO EN EL
