@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T18:08:57.171Z
+  modified: 2026-07-22T18:13:29.906Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -113,7 +113,7 @@ M30
     "◉ Ver trayectorias" (dibuja en azul el recorrido del CENTRO de la fresa; se invalida solo
     al cambiar geometría/fresa/lado vía `killPrev()` en pushUndo/restore/loaders), y "Exportar
     HPGL" se convierte en **"Exportar G-code"** en modo CNC (mismo botón, `btnSaveLbl`).
-- **C. Vaciado, taladro, puentes — ✅ CONSTRUIDA 22-jul-2026** (verificada con pruebas unitarias +
+- **C. Cajeado, taladro, puentes — ✅ CONSTRUIDA 22-jul-2026** (verificada con pruebas unitarias +
   punta a punta; falta vistazo de Jose). **La rampa de entrada quedó FUERA a propósito** (la
   bajada lenta de la fresa la suple en MDF/PVC; retomarla si el acrílico da guerra). Qué se hizo:
   - `cnc_gcode.py`: **`make_pocket()`** — anillos concéntricos hacia adentro por zona conexa
@@ -126,8 +126,10 @@ M30
     del puente con G01 y sigue. Anillos abiertos o pocket: sin puentes.
   - Backend: `_cnc_make()` despacha op profile/pocket/drill; preview devuelve también `drills`
     y `dia`. Fresas ganan `stepover_pct` (validado 10–90; las guardadas viejas caen a 40).
-  - UI: segmentado **Operación (Perfil/Vaciado/Taladro)** en la pestaña CNC; Perfil muestra
-    Fuera/Dentro/Línea + campos Puentes/Ancho/Alto (default 3×8×3, 0 = sin puentes); Vaciado y
+  - UI: segmentado **Operación (Perfil/Cajeado/Taladro)** en la pestaña CNC — **con ICONOS svg y
+    tooltip, no texto** (pedido de Jose 22-jul; y el pocket se llama **"cajeado"**, el término de
+    Aspire en español — no volver a "vaciado" en textos de cara al usuario). Perfil muestra
+    Fuera/Dentro/Línea + campos Puentes/Ancho/Alto (default 3×8×3, 0 = sin puentes); Cajeado y
     Taladro muestran nota explicativa. Taladros se previsualizan como círculo (Ø de la fresa) con
     cruz. Campo "Paso %Ø" en el modal de fresas.
   - **Ojo en pruebas de offsets:** medir holguras con distancia EUCLIDIANA al polígono (las
