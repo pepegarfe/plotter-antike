@@ -17,6 +17,7 @@ from bottle import Bottle, static_file, request, response, HTTPResponse
 
 import plotter_control as core
 from studio_backend import SERVICE, set_workarea as _set_workarea
+import img_trace as tracer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8765
@@ -53,6 +54,23 @@ def api_workarea():
 def api_set_workarea():
     d = request.json or {}
     return _json(_set_workarea(d.get('w'), d.get('h')))
+
+
+@app.post('/api/trace_upload')
+def api_trace_upload():
+    up = request.files.get('file')
+    if up is None:
+        return _json({'ok': False, 'error': 'No llegó ninguna imagen.'}, 400)
+    ext = os.path.splitext(up.filename or 'img')[1].lower() or '.png'
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+    tmp.close()
+    up.save(tmp.name, overwrite=True)
+    return _json(tracer.set_source(tmp.name))
+
+
+@app.post('/api/trace')
+def api_trace():
+    return _json(tracer.trace(request.json or {}))
 
 
 @app.post('/api/parse')

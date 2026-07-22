@@ -13,6 +13,7 @@ import webview
 
 import plotter_control as core   # el motor existente (parsers, HPGL, controlador)
 from studio_backend import SERVICE, set_workarea as _set_workarea
+import img_trace as tracer
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -46,15 +47,36 @@ class Api:
     def set_workarea(self, w, h):
         return _set_workarea(w, h)
 
-    def open_design(self):
-        """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI) o un proyecto (.dstudio)."""
+    # --- Calco de imagen ---
+    def trace_pick(self):
         res = self.window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
-            file_types=('Diseños y proyectos (*.svg;*.dxf;*.ai;*.dstudio)', 'Todos los archivos (*.*)'))
+            file_types=('Imágenes (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)', 'Todos los archivos (*.*)'))
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        return tracer.set_source(path)
+
+    def trace_apply(self, options):
+        return tracer.trace(options or {})
+
+    def open_design(self):
+        """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI), un proyecto (.dstudio)
+        o una imagen (PNG/JPG…) que se manda directo al calco."""
+        res = self.window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=('Diseños imágenes y proyectos '
+                        '(*.svg;*.dxf;*.ai;*.dstudio;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff)',
+                        'Todos los archivos (*.*)'))
         if not res:
             return {'ok': False, 'cancelled': True}
         path = res[0] if isinstance(res, (list, tuple)) else res
         ext = os.path.splitext(path)[1].lower()
+        if ext in ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.tif', '.tiff'):
+            r = tracer.set_source(path)
+            if isinstance(r, dict) and r.get('ok'):
+                r['kind'] = 'image'
+            return r
         if ext == '.dstudio':
             try:
                 proj = json.loads(open(path, encoding='utf-8').read())

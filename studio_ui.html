@@ -138,6 +138,22 @@
   .layer .mt{font-size:11px;color:var(--faint);font-family:var(--mono);}
   .layer .on-dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:0;}
   .layer.on .on-dot{opacity:1;}
+  /* Grupos anidados (estilo Illustrator) */
+  .grp{display:flex;flex-direction:column;}
+  .grp-hdr{display:flex;align-items:center;gap:8px;padding:6px;border-radius:8px;cursor:pointer;}
+  .grp-hdr:hover{background:var(--hover);}
+  .grp-hdr.on{background:var(--accent-soft);}
+  .grp-tri{width:14px;height:14px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--faint);transition:transform .12s;}
+  .grp-tri.col{transform:rotate(-90deg);}
+  .grp-ico{width:32px;height:32px;border-radius:6px;background:var(--input);border:1px solid var(--line-2);flex:none;display:flex;align-items:center;justify-content:center;color:var(--faint);}
+  .grp-hdr.on .grp-ico{border-color:var(--accent);color:var(--accent);}
+  .grp-nm{font-size:13px;font-weight:600;}
+  .grp-mt{font-size:11px;color:var(--faint);font-family:var(--mono);}
+  .grp-dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:0;}
+  .grp-hdr.on .grp-dot{opacity:1;}
+  .grp-kids{display:flex;flex-direction:column;gap:2px;margin:2px 0 2px 15px;padding-left:8px;border-left:1px solid var(--line-2);}
+  .grp-kids .layer{padding:4px 6px;}
+  .grp-kids .layer .th{width:26px;height:26px;}
   .muted-note{color:var(--faint);font-size:12.5px;padding:2px 2px 0;}
   .slab{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 6px;}
   .slab span{font-size:12.5px;color:var(--muted);}.slab b{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-weight:600;}
@@ -171,6 +187,9 @@
   .sheet select{flex:1;} .pbtn{padding:0 12px;font-weight:600;} .pbtn:hover{border-color:var(--accent);}
   .pbtn.acc{background:var(--accent);color:#fff;border-color:var(--accent);} .pbtn.acc:hover{background:var(--accent-dim);}
   .pbtn:disabled{opacity:.45;cursor:default;}
+  .rng{width:100%;accent-color:var(--accent);margin:2px 0 6px;cursor:pointer;height:4px;}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer;}
+  .chk input{accent-color:var(--accent);cursor:pointer;width:15px;height:15px;}
   .jogpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,38px);gap:6px;width:156px;margin:2px auto 10px;justify-content:center;}
   .jogpad button{border-radius:8px;background:var(--input);border:1px solid var(--line-2);color:var(--ink);cursor:pointer;font-size:13px;}
   .jogpad button:hover{border-color:var(--accent);}
@@ -207,6 +226,7 @@
     <div class="sep"></div>
     <div class="tool" id="toolCut" title="Ver vectores de corte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg></div>
     <div class="tool" id="toolMirror" title="Espejo horizontal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 8 4 12l4 4M16 8l4 4-4 4" opacity=".6"/></svg></div>
+    <div class="tool" id="toolTrace" title="Calcar imagen (vectorizar foto)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>
     <div class="grow"></div>
     <div class="tool" id="toolFit" title="Ajustar vista"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></div>
   </nav>
@@ -301,7 +321,7 @@
     <span class="r">Design Studio</span>
   </footer>
 </div>
-<input type="file" id="fileInput" accept=".svg,.dxf,.ai,.dstudio" style="display:none">
+<input type="file" id="fileInput" accept=".svg,.dxf,.ai,.dstudio,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" style="display:none">
 <div class="modal" id="plotterModal" style="display:none">
   <div class="sheet">
     <div class="sheet-h"><h3>Plotter</h3><button id="plotterClose">✕</button></div>
@@ -356,6 +376,30 @@
         <div class="field" style="flex:1"><label>Vert.</label><input id="gGapY" value="10"><span class="u">mm</span></div></div>
       <div class="mrow"><button class="pbtn acc" id="gridApply" style="flex:1">Crear copias</button></div>
       <div class="cstat">Se copian los objetos seleccionados (o todos) en rejilla.</div>
+    </div>
+  </div>
+</div>
+<input type="file" id="imgInput" accept="image/*" style="display:none">
+<div class="modal" id="traceModal" style="display:none">
+  <div class="sheet" style="width:340px">
+    <div class="sheet-h"><h3>Calcar imagen</h3><button id="traceClose">✕</button></div>
+    <div class="grp">
+      <div class="seg" id="traceMode"><button class="on" data-m="bw">Silueta B/N</button><button data-m="color">Color</button></div>
+      <div id="traceBW" style="margin-top:12px">
+        <div class="slab"><span>Umbral</span><b id="thrVal">128</b></div>
+        <input type="range" id="thr" class="rng" min="1" max="254" value="128">
+        <div class="slab"><span>Suavizado</span><b id="smVal">1.0</b></div>
+        <input type="range" id="sm" class="rng" min="0" max="1.34" step="0.02" value="1.0">
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="inv"> Invertir (traza lo claro)</label>
+      </div>
+      <div id="traceColor" style="display:none;margin-top:12px">
+        <div class="slab"><span>Colores</span><b id="colVal">6</b></div>
+        <input type="range" id="col" class="rng" min="2" max="16" value="6">
+      </div>
+      <div class="slab" style="margin-top:6px"><span>Ignorar manchas</span><b id="spkVal">2</b></div>
+      <input type="range" id="spk" class="rng" min="0" max="12" value="2">
+      <div class="mrow" style="margin-top:14px;gap:8px"><button class="pbtn" id="traceNew">Otra imagen</button><button class="pbtn acc" id="traceApply" style="flex:1">Calcar</button></div>
+      <div class="cstat">La fidelidad depende de la calidad de la imagen: mejor si es nítida y de alto contraste.</div>
     </div>
   </div>
 </div>
@@ -620,23 +664,59 @@
   el('rotPreset').addEventListener('change',function(){ var v=this.value; this.value=''; if(v!=='' && hasDoc()){ el('fr').value=v; commitField('fr'); } });
 
   // ===== Capas =====
+  var layerCollapsed={};   // gid -> true si el grupo está plegado en el panel de Capas
+  function layerRow(i, isChild){
+    var m=mode();
+    var row=document.createElement('div'); row.className='layer'+(( (m==='ind'&&sel.idx===i)||(m==='grp'&&sel.set.has(i)) )?' on':'');
+    var th=document.createElement('canvas'); th.className='th'; th.width=64; th.height=64; drawThumb(th,i);
+    var info=document.createElement('div'); info.innerHTML='<div class="nm">Objeto '+(i+1)+'</div><div class="mt">'+doc.paths[i].pts.length+' pts</div>';
+    var dot=document.createElement('span'); dot.className='on-dot';
+    row.appendChild(th); row.appendChild(info); row.appendChild(dot);
+    row.addEventListener('click',function(e){ e.stopPropagation();
+      if(e.shiftKey){ sel.idx=-1; if(sel.set.has(i)) sel.set.delete(i); else sel.set.add(i); }   // hijo: sumar/quitar 1
+      else if(isChild){ sel.set=new Set(); sel.idx=(sel.idx===i?-1:i); }                          // hijo: seleccionar ESE objeto (entrar al grupo)
+      else { var mem=groupMembers(i); if(mem.length>1){ sel.idx=-1; sel.set=new Set(mem); } else { sel.set=new Set(); sel.idx=(sel.idx===i?-1:i); } }
+      refreshUI(); });
+    return row;
+  }
+  function groupHeader(gid, members){
+    var m=mode();
+    var isOn = (m==='grp' && members.length===sel.set.size && members.every(function(x){return sel.set.has(x);}));
+    var collapsed=!!layerCollapsed[gid];
+    var hdr=document.createElement('div'); hdr.className='grp-hdr'+(isOn?' on':'');
+    var tri=document.createElement('span'); tri.className='grp-tri'+(collapsed?' col':'');
+    tri.innerHTML='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    var ico=document.createElement('span'); ico.className='grp-ico';
+    ico.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M13 6h5a3 3 0 0 1 3 3v0M6 13v0a3 3 0 0 0 3 3h0"/></svg>';
+    var info=document.createElement('div'); info.innerHTML='<div class="grp-nm">Grupo</div><div class="grp-mt">'+members.length+' objetos</div>';
+    var dot=document.createElement('span'); dot.className='grp-dot';
+    hdr.appendChild(tri); hdr.appendChild(ico); hdr.appendChild(info); hdr.appendChild(dot);
+    tri.addEventListener('click',function(e){ e.stopPropagation(); layerCollapsed[gid]=!layerCollapsed[gid]; buildLayers(); });
+    hdr.addEventListener('click',function(){ sel.idx=-1; sel.set=new Set(members); refreshUI(); });
+    return hdr;
+  }
   function buildLayers(){
     var list=el('layersList'); list.innerHTML='';
     el('layerEmpty').style.display=hasDoc()?'none':'block';
     el('layersCount').textContent=hasDoc()?(doc.paths.length+''):'';
-    var m=mode();
-    for(var i=0;i<doc.paths.length;i++){ (function(i){
-      var row=document.createElement('div'); row.className='layer'+(( (m==='ind'&&sel.idx===i)||(m==='grp'&&sel.set.has(i)) )?' on':'');
-      var th=document.createElement('canvas'); th.className='th'; th.width=64; th.height=64; drawThumb(th,i);
-      var info=document.createElement('div'); info.innerHTML='<div class="nm">Objeto '+(i+1)+'</div><div class="mt">'+doc.paths[i].pts.length+' pts</div>';
-      var dot=document.createElement('span'); dot.className='on-dot';
-      row.appendChild(th); row.appendChild(info); row.appendChild(dot);
-      row.addEventListener('click',function(e){ if(e.shiftKey){ // agregar/quitar del grupo
-          sel.idx=-1; if(sel.set.has(i)) sel.set.delete(i); else sel.set.add(i); sel.set=expandGroups(sel.set);
-        } else { var mem=groupMembers(i); if(mem.length>1){ sel.idx=-1; sel.set=new Set(mem); } else { sel.set=new Set(); sel.idx=(sel.idx===i?-1:i); } }
-        refreshUI(); });
-      list.appendChild(row);
-    })(i); }
+    var doneG={};
+    for(var i=doc.paths.length-1;i>=0;i--){    // de arriba (encima) hacia abajo, como Illustrator
+      var g=doc.grp[i];
+      if(g){
+        if(doneG[g]) continue; doneG[g]=true;
+        var members=groupMembers(i);           // índices ascendentes del grupo
+        var block=document.createElement('div'); block.className='grp';
+        block.appendChild(groupHeader(g, members));
+        if(!layerCollapsed[g]){
+          var kids=document.createElement('div'); kids.className='grp-kids';
+          for(var n=members.length-1;n>=0;n--){ kids.appendChild(layerRow(members[n], true)); }
+          block.appendChild(kids);
+        }
+        list.appendChild(block);
+      } else {
+        list.appendChild(layerRow(i, false));
+      }
+    }
   }
   function drawThumb(c,i){ var x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height); var e=effPts(i); var b=bboxOfPts(e); var w=b[2]-b[0]||1,h=b[3]-b[1]||1; var pad=8; var s=Math.min((c.width-pad)/w,(c.height-pad)/h); var ox=(c.width-w*s)/2-b[0]*s, oy=(c.height-h*s)/2+b[3]*s;
     x.strokeStyle=cvar('--accent'); x.lineWidth=1.2; x.lineJoin='round'; x.beginPath(); x.moveTo(e[0][0]*s+ox, oy-e[0][1]*s); for(var k=1;k<e.length;k++){x.lineTo(e[k][0]*s+ox, oy-e[k][1]*s);} x.stroke(); }
@@ -658,12 +738,20 @@
     var panMode = (tool==='pan') || spaceDown || e.button===1;
     if(panMode){ pan={x:e.clientX,y:e.clientY,ox:view.ox,oy:view.oy}; cv.style.cursor='grabbing'; userZoomed=true; return; }
     if(!hasDoc()) return;
+    var addMode = e.shiftKey || e.metaKey || e.ctrlKey;   // Shift / Cmd / Ctrl = sumar a la selección
     var hit=hitPath(sx,sy);
     if(hit>=0){
+      if(addMode){   // sumar/quitar la unidad (objeto o grupo entero) sin moverla
+        var unit=groupMembers(hit);
+        if(sel.idx>=0){ sel.set=new Set([sel.idx]); sel.idx=-1; }   // pasar de selección individual a múltiple
+        var allIn=unit.every(function(x){return sel.set.has(x);});
+        if(allIn) unit.forEach(function(x){sel.set.delete(x);}); else unit.forEach(function(x){sel.set.add(x);});
+        refreshUI(); return;
+      }
       if(!activeContains(hit)){ selectHit(hit); refreshUI(); }
       pushUndo(); moving={x:e.clientX,y:e.clientY,moved:false}; cv.style.cursor='grabbing';
     } else {
-      marquee={x0:sx,y0:sy,x1:sx,y1:sy};
+      marquee={x0:sx,y0:sy,x1:sx,y1:sy,add:addMode};   // Shift+arrastre = marco aditivo
     }
   });
   window.addEventListener('mousemove',function(e){
@@ -676,8 +764,10 @@
     if(moving){ if(!moving.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; } moving=null; cv.style.cursor=(tool==='pan')?'grab':'default'; refreshUI(); return; }
     if(marquee){ var mnx=Math.min(marquee.x0,marquee.x1),mny=Math.min(marquee.y0,marquee.y1),mxx=Math.max(marquee.x0,marquee.x1),mxy=Math.max(marquee.y0,marquee.y1);
       var moved=Math.abs(marquee.x1-marquee.x0)>3||Math.abs(marquee.y1-marquee.y0)>3;
-      if(moved){ var s=new Set(); for(var i=0;i<doc.paths.length;i++){ var e=effPts(i); for(var k=0;k<e.length;k++){ var pp=tp(e[k][0],e[k][1]); if(pp[0]>=mnx&&pp[0]<=mxx&&pp[1]>=mny&&pp[1]<=mxy){ s.add(i); break; } } } sel.idx=-1; sel.set=expandGroups(s); }
-      else { sel.idx=-1; sel.set=new Set(); } // clic en vacío = deseleccionar
+      if(moved){ var s=new Set(); for(var i=0;i<doc.paths.length;i++){ var e=effPts(i); for(var k=0;k<e.length;k++){ var pp=tp(e[k][0],e[k][1]); if(pp[0]>=mnx&&pp[0]<=mxx&&pp[1]>=mny&&pp[1]<=mxy){ s.add(i); break; } } }
+        if(marquee.add){ if(sel.idx>=0) s.add(sel.idx); sel.set.forEach(function(x){s.add(x);}); }   // aditivo: conservar lo ya seleccionado
+        sel.idx=-1; sel.set=expandGroups(s); }
+      else if(!marquee.add){ sel.idx=-1; sel.set=new Set(); } // clic en vacío (sin modificador) = deseleccionar
       marquee=null; refreshUI(); }
   });
   cv.addEventListener('wheel',function(e){e.preventDefault();var r=cv.getBoundingClientRect(); zoomAt(e.deltaY<0?1.1:0.9, e.clientX-r.left, e.clientY-r.top);},{passive:false});
@@ -731,7 +821,14 @@
   // ===== Abrir diseño (dual: pywebview o servidor) =====
   function api(){ return (window.pywebview && window.pywebview.api) || null; }
   function loadDoc(res){
-    doc.paths=(res.paths||[]).map(function(p){return {pts:p.pts};});
+    doc.paths=(res.paths||[]).map(function(p){return {pts:p.pts.map(function(q){return [q[0],q[1]];})};});
+    // Los archivos (SVG/DXF/AI) e imágenes usan Y hacia ABAJO; el lienzo dibuja Y hacia ARRIBA.
+    // Sin corregir, todo import saldría boca abajo. Volteamos la geometría sobre su propio centro
+    // (mismo lugar, orientación correcta) para que se vea igual que el original.
+    (function flipY(){ var ymin=Infinity,ymax=-Infinity;
+      for(var a=0;a<doc.paths.length;a++){var P=doc.paths[a].pts; for(var b=0;b<P.length;b++){if(P[b][1]<ymin)ymin=P[b][1]; if(P[b][1]>ymax)ymax=P[b][1];}}
+      if(ymin===Infinity) return; var m=ymin+ymax;
+      for(var a2=0;a2<doc.paths.length;a2++){var P2=doc.paths[a2].pts; for(var b2=0;b2<P2.length;b2++){P2[b2][1]=m-P2[b2][1];}} })();
     doc.off=[]; doc.sx=[]; doc.sy=[]; doc.rot=[]; doc.oc=[]; doc.grp=[];
     var gid=doc.paths.length>1?(++groupSeq):0;   // import agrupado por defecto (un diseño = un grupo)
     for(var i=0;i<doc.paths.length;i++){ doc.off.push([0,0]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0); var bb=bboxOfPts(doc.paths[i].pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]); doc.grp.push(gid); }
@@ -768,12 +865,13 @@
     else { var blob=new Blob([JSON.stringify(data)],{type:'application/json'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(state.name||'proyecto').replace(/\.[^.]+$/,'')+'.dstudio'; a.click(); toast('Proyecto guardado'); } }
 
   function openDesign(){
-    if(api()){ api().open_design().then(function(res){ if(!res||!res.ok){ if(res&&res.error) toast(res.error); return;} if(res.kind==='project') loadProject(res.project); else loadDoc(res); }).catch(function(e){toast('Error: '+e);}); }
+    if(api()){ api().open_design().then(function(res){ if(!res||!res.ok){ if(res&&res.error) toast(res.error); return;} if(res.kind==='image') openTrace(res); else if(res.kind==='project') loadProject(res.project); else loadDoc(res); }).catch(function(e){toast('Error: '+e);}); }
     else { el('fileInput').click(); }
   }
   el('fileInput').addEventListener('change',function(){ var f=this.files&&this.files[0]; if(!f){ this.value=''; return; }
     var ext=(f.name.split('.').pop()||'').toLowerCase();
     if(ext==='dstudio'){ var rd=new FileReader(); rd.onload=function(){ try{ loadProject(JSON.parse(rd.result)); }catch(e){ toast('Proyecto inválido'); } }; rd.readAsText(f); this.value=''; return; }
+    if(['png','jpg','jpeg','bmp','gif','webp','tif','tiff'].indexOf(ext)>=0){ var ifd=new FormData(); ifd.append('file',f); toast('Cargando '+f.name+'…'); fetch('/api/trace_upload',{method:'POST',body:ifd}).then(function(r){return r.json();}).then(openTrace).catch(function(e){toast('Error: '+e);}); this.value=''; return; }
     var fd=new FormData(); fd.append('file',f); toast('Leyendo '+f.name+'…');
     fetch('/api/parse',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){ if(!res||!res.ok){toast(res&&res.error?res.error:'No se pudo leer');return;} loadDoc(res); }).catch(function(e){toast('Error: '+e);}); this.value=''; });
   el('btnOpen').addEventListener('click',openDesign);
@@ -852,6 +950,28 @@
     var save = api()? api().set_workarea(w,h) : postJSON('/api/set_workarea',{w:w,h:h});
     save.then(function(r){ if(r&&r.ok){ state.work=r.work; el('waModal').style.display='none'; userZoomed=false; view.ready=false; fitView(); toast('Área guardada: '+Math.round(r.work[0])+' × '+Math.round(r.work[1])+' mm'); } else toast((r&&r.error)||'No se pudo guardar'); }).catch(function(e){toast('Error: '+e);});
   });
+
+  // ===== Calco de imagen (Image Trace): B/N con potrace · color con vtracer =====
+  var imgLoaded=false;
+  function openTrace(res){ if(!res){ return; } if(!res.ok){ if(res.error) toast(res.error); return; } imgLoaded=true; el('traceModal').style.display='flex'; }
+  function pickImage(){
+    if(imgLoaded){ el('traceModal').style.display='flex'; return; }   // ya hay imagen: reabrir para ajustar
+    if(api()){ api().trace_pick().then(function(r){ if(r&&r.cancelled) return; openTrace(r); }).catch(function(e){toast('Error: '+e);}); }
+    else { el('imgInput').click(); }
+  }
+  el('imgInput').addEventListener('change',function(){ var f=this.files&&this.files[0]; if(!f){this.value='';return;} var fd=new FormData(); fd.append('file',f); toast('Cargando '+f.name+'…'); fetch('/api/trace_upload',{method:'POST',body:fd}).then(function(r){return r.json();}).then(openTrace).catch(function(e){toast('Error: '+e);}); this.value=''; });
+  el('toolTrace').addEventListener('click',pickImage);
+  el('traceNew').addEventListener('click',function(){ imgLoaded=false; if(api()){ api().trace_pick().then(function(r){ if(r&&r.cancelled) return; openTrace(r); }); } else { el('imgInput').click(); } });
+  el('traceClose').addEventListener('click',function(){ el('traceModal').style.display='none'; });
+  el('traceModal').addEventListener('click',function(e){ if(e.target===el('traceModal')) el('traceModal').style.display='none'; });
+  el('traceMode').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; el('traceMode').querySelectorAll('button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); var m=b.getAttribute('data-m'); el('traceBW').style.display=m==='bw'?'block':'none'; el('traceColor').style.display=m==='color'?'block':'none'; });
+  [['thr','thrVal'],['sm','smVal'],['spk','spkVal'],['col','colVal']].forEach(function(p){ el(p[0]).addEventListener('input',function(){ el(p[1]).textContent=el(p[0]).value; }); });
+  function traceOptions(){ var m=el('traceMode').querySelector('.on').getAttribute('data-m'); return { mode:m, threshold:parseInt(el('thr').value,10), smooth:parseFloat(el('sm').value), invert:el('inv').checked, colors:parseInt(el('col').value,10), speckle:parseInt(el('spk').value,10) }; }
+  function doTrace(){ var o=traceOptions(); el('traceApply').textContent='Calcando…'; el('traceApply').disabled=true;
+    var call = api()? api().trace_apply(o) : postJSON('/api/trace',o);
+    call.then(function(r){ el('traceApply').textContent='Calcar'; el('traceApply').disabled=false; if(!r||!r.ok){ toast(r&&r.error?r.error:'No se pudo calcar'); return; } loadDoc(r); el('traceModal').style.display='none'; toast('Imagen calcada: '+((r.paths&&r.paths.length)||0)+' trazos'); }).catch(function(e){ el('traceApply').textContent='Calcar'; el('traceApply').disabled=false; toast('Error: '+e); });
+  }
+  el('traceApply').addEventListener('click',doTrace);
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
   window.__DS={ load:loadDoc, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject };
