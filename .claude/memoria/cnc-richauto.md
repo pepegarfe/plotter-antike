@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T16:37:33.279Z
+  modified: 2026-07-22T17:00:43.692Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -75,9 +75,24 @@ M30
   (hay wheel cp314 arm64 para el Python de Homebrew — verificado con pip --dry-run el 22-jul).
 - Z entra al juego por primera vez (el plotter era 2D): pasadas múltiples, altura segura, rampa.
 
-## Plan por fases (borrador — pendiente de acordar alcance con Jose)
-- **A. Cimientos**: perfil de máquina "CNC 1220×2440" + material (grosor, cero Z) + biblioteca de
-  herramientas. Design Studio gana un modo/pestaña "CNC".
+## Plan por fases
+- **A. Cimientos — ✅ CONSTRUIDA 22-jul-2026** (backend y API verificados con pruebas; falta el
+  vistazo visual de Jose). Qué se hizo:
+  - **`cnc_config.json`** (junto a `plotter_config.json`, vía `_cnc_path()` en `studio_backend.py`).
+    ⚠️ **Archivo APARTE a propósito**: `_save_config()` de la app tkinter sobrescribe
+    `plotter_config.json` con solo sus 6 llaves y habría borrado lo del CNC en silencio.
+  - `cnc_get()`/`cnc_set()` en `studio_backend.py` (defaults + merge parcial + validación),
+    expuestos en `design_studio.py` (Api) y `studio_server.py` (`GET/POST /api/cnc`).
+  - **UI** (`studio_ui.html`): segmentado **Plotter | CNC** en la barra superior (persiste la
+    elección); en modo CNC se ocultan "Exportar HPGL", "Enviar al plotter" y la píldora de
+    conexión (la CNC es offline); aparece sección **Material** (grosor + cero de Z arriba/cama +
+    Ø de la fresa activa) y **Herramienta** (selector + resumen + modal "Gestionar fresas…" con
+    alta/baja/edición). El área de trabajo del modal de Configuración edita la máquina activa.
+    Tiempo estimado en modo CNC usa el avance de la fresa (mm/min), no la velocidad del plotter.
+  - 5 fresas preset (MDF, acrílico, PVC espumado, madera, 1/8" detalle) como punto de partida.
+  - **Gotcha de la sesión:** un `studio_server.py` viejo seguía corriendo de la sesión anterior
+    (puerto 8765 ocupado) — servía el HTML nuevo pero sin las rutas nuevas (404). **Señal:** el
+    HTML trae los cambios pero la API no existe → proceso viejo; `lsof -iTCP:8765` y matarlo.
 - **B. Perfil + G-code**: trayectoria de perfil (fuera/dentro/sobre) con shapely, pasadas
   múltiples, generador `.tap` (solo G00/G01), guardar archivo. → **primer corte de prueba**.
 - **C. Vaciado, taladrado, tabs, rampa de entrada.**
