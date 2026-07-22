@@ -84,6 +84,20 @@ plotter, se pulsa ↻, y **el nombre nuevo que aparece es el plotter**. Baud cas
 2. **Falta el driver del chip** (CH340 / CP210x / Prolific): si al enchufar y refrescar la lista NO
    cambia, es esto — hay que instalar el driver del chip del cable.
 
+## Eje Y: los imports salían boca abajo (arreglado 21-jul-2026)
+Los archivos (SVG/DXF/AI) y las imágenes usan **Y hacia ABAJO** (origen arriba-izquierda). El lienzo
+de Design Studio dibuja **Y hacia ARRIBA** (`tp()`: `oy - y*scale`). Sin corregir, **TODO import salía
+verticalmente volteado** — no solo el calco; solo saltó a la vista con una foto porque tiene un "arriba"
+obvio. El parser (`core.SVGParser`) NO voltea, y potrace/vtracer salen con la misma orientación que un
+SVG normal, así que el volteo era del render, no del calco.
+- **Arreglo:** en `loadDoc` (studio_ui.html) se **voltea la geometría sobre su propio centro**
+  (`y' = ymin+ymax − y`) una sola vez, para TODOS los imports. `loadProject` NO se toca (los proyectos
+  ya se guardan con la orientación corregida).
+- ⚠️ **PENDIENTE DE VERIFICAR EN HARDWARE:** el HPGL se genera de esa misma geometría, así que **cambió
+  la orientación del corte**. En el **primer corte real** hay que confirmar que la pieza sale derecha en
+  el material (no se pudo probar sin plotter — [[design-studio]] Fase 3). El original tkinter tiene el
+  mismo lienzo Y-arriba; si algún día se compara un mismo diseño en ambos, saldrán espejados en vertical.
+
 ## Lecciones (señales)
 - **Bug del lienzo que "no funcionaba":** un bucle de retroalimentación inflaba el `<canvas>` (medía
   su propio tamaño para fijarse el tamaño → crecía sin parar). Arreglo: `#cv{width:100%;height:100%}`.
