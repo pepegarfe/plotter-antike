@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T17:17:31.901Z
+  modified: 2026-07-23T00:49:25.758Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -46,6 +46,14 @@ y así se convierte directo en la app; el motor Python se reusa por debajo.
 - **Fase 4: ✅ config verificada + app de Mac compilada** — editar/guardar área de trabajo (persiste en
   `plotter_config.json`, compatible con el original). **`dist/DesignStudio.app` compila y arranca** (97 MB).
   Falta: empaquetar Windows y probar visualmente la ventana compilada.
+
+## 22-jul-2026: Design Studio ahora también es el CAM de la CNC
+Toda la épica CNC (fases A–H: pestañas Diseño|CNC, trayectorias estilo Aspire, fresas por
+material, G-code .tap) vive en [[cnc-richauto]] — leer ESA nota antes de tocar nada del CNC.
+Cambios de UI GENERAL que vinieron con ella (aplican a toda la app): **tema claro por default
+y persistente** (clave `theme` en cnc_config.json), toggle de tema al final del riel izquierdo,
+botón de área de trabajo junto al zoom (píldora propia, contenedor flex), iconos 100% SVG
+(cero emojis/glifos), atajos Cmd+G/Cmd+Shift+G por `e.code`.
 
 ## Novedades sesión 21–22 jul 2026 (LEER al retomar)
 Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `f02e918` (pusheado)**:

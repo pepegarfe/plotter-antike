@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T00:11:15.671Z
+  modified: 2026-07-23T00:49:13.891Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -203,6 +203,41 @@ M30
     Vectric: lo resuelven editando el archivo). Las fresas estándar son de mano derecha (M03);
     la decisión real giro-vs-avance es Concordante/Convencional, que ya existe. RichAuto sí
     soporta M04 si algún día hay fresa zurda.
+
+- **H. Flujo de dos pasos + pulido de interacción — ✅ COMMIT dba4178 (22-jul noche)**:
+  - **Toggle primario Diseño|CNC** en el sidebar (solo visible con la CNC activa): Diseño =
+    Propiedades/Capas; CNC = **Configuración/Corte**. Entrar al paso CNC aterriza SIEMPRE en
+    **Configuración** (material+fresa, como el Job Setup de Aspire) y "Continuar a Corte →"
+    avanza; volver = la pestaña (Jose pidió quitar el botón de regreso). `setSideMode()`,
+    panes `paneCncCfg`/`paneCncCut`; `applyMachine` muestra/oculta `modeBar`.
+  - **Candado del diseño en el paso CNC** (`cncStep()`/`cncLock()`): no arrastrar/mover/borrar/
+    pegar/duplicar/agrupar (aviso claro); la SELECCIÓN sigue viva y es **INDIVIDUAL dentro de
+    grupos sin desagrupar** (clic/Shift/marco por trazado — en Diseño el clic sigue tomando el
+    grupo entero).
+  - **Dirección re-etiquetada "A favor / Contra"** (concordante/climb vs convencional en los
+    tooltips) — pedido de Jose al no entender "Concord./Convenc.".
+  - **Flechas de SENTIDO de corte** en la vista previa (cada ~90px de pantalla, ocultas en
+    Render): verificar A favor/Contra de un vistazo.
+  - **Fallback fantasma ELIMINADO**: sin trayectorias calculadas, Vista previa/Render/Exportar
+    avisan ("configura y pulsa Calcular") en vez de inventar una trayectoria con el formulario
+    sobre todo el diseño — eso hacía creer a Jose que "el diseño cambiaba".
+  - **Ojo con retroalimentación real**: toast al incluir/excluir, fila tachada+punteada, y la
+    vista previa se ACTUALIZA en vivo (`refreshPrev`). ⚠️ **Fix del "no vuelve"**: decidir el
+    re-preview por la INTENCIÓN del usuario (`prevOn`) y no por `!!cncPrev` — al excluir la
+    única trayectoria la vista moría y `!!cncPrev` mentía. Lección: estado momentáneo ≠
+    intención; los toggles que otros eventos pueden vaciar necesitan bandera propia.
+  - **Renombrar trayectorias con doble clic** en la fila (Enter/Escape/blur; sincroniza el
+    campo Nombre del formulario). Panel de Corte reordenado: formulario → Calcular →
+    Trayectorias → Vista previa/Render AL FINAL.
+  - **Semántica ojo vs Vista previa** (explicada a Jose): el OJO decide qué entra al CORTE
+    (afecta el .tap); VISTA PREVIA solo enciende/apaga la capa visual (no afecta el export).
+
+- **UI general de Design Studio (commit 4035c5e, misma noche)**: tema **CLARO por default y
+  RECORDADO entre sesiones** (clave `theme` en cnc_config.json — localStorage no es fiable en
+  pywebview); toggle de tema al FINAL del riel izquierdo; botón de tamaño de hoja movido junto
+  al zoom en **píldora propia** con icono de hoja con línea de cota, ambas dentro de un
+  **contenedor flex** (lección: dos elementos que deben ir juntos se agrupan en un contenedor,
+  no se posicionan por separado con coordenadas a ojo — así se desalinearon dos veces).
   - **Añadidos 22-jul tarde (pedidos de Jose tras comparar con Aspire)**:
     · **Pasadas EDITABLES** (como "Edit Passes"): el campo se auto-calcula pero al escribir N
       se reparte la profundidad en N pasadas parejas (`effPassDepth` ajusta el pass_depth del
