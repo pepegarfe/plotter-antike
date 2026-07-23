@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T21:57:31.290Z
+  modified: 2026-07-23T22:20:39.053Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -373,12 +373,13 @@ movimientos" y el hueco tiene 5 puntos vs 69 del exterior) — verificar el orde
   del archivo "no hacía ninguna diferencia" porque el handle ignoraba ambos mecanismos; los
   ~4s que sí esperaba eran el Spindle delay de fábrica (4000ms).
 - ⚠️ **`S Read` debe quedarse en `Ign S` en la máquina de Jose** (verificado 24-jul en la
-  máquina real): con `Read S` el husillo NUNCA ARRANCA — el controlador intenta comandar las
-  RPM del archivo por una salida que esta máquina no tiene cableada (las RPM van por el
-  variador/perilla). La combinación correcta del A11E de Jose: **`F Read = Read F` +
-  `S Read = Ign S`** + `Spindle delay = 10000` ms. El `S18000` que emite el G-code es
-  inofensivo con Ign S (se ignora; el M03 enciende normal). NO "arreglar" esto emitiendo
-  S distinto — es cableado, no archivo.
+  máquina real): la máquina es **multi-speed por MARCHAS S1–S9** (se cambian desde el handle;
+  encendido manual con ON/OFF funciona). Con `Read S`, el `S18000` del archivo (RPM) se
+  interpreta como MARCHA — "marcha 18000" no existe → **el husillo nunca arranca**. Con
+  `Ign S`, M03 enciende con la marcha puesta en el handle (el flujo de siempre de Jose).
+  Combinación correcta del A11E: **`F Read = Read F` + `S Read = Ign S`** +
+  `Spindle delay = 10000` ms. Opción futura si Jose la pide: emitir `S1`–`S9` (marcha por
+  material/trayectoria) en vez de RPM — requiere conocer las RPM de cada marcha (variador).
 - El manual completo quedó descargable: forsuncnc.com → DSP-A11-User's-Manual.pdf (86 págs;
   G Code Setup en pág 22 del PDF, Spindle Setup en pág 18).
 
