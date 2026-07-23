@@ -471,6 +471,7 @@
         <button class="gbtn" id="btnTpPrev" title="Pintar en azul el recorrido del centro de la fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg> Vista previa</button>
         <button class="gbtn" id="btnRender" title="Simular el corte con el ancho real de la fresa (más profundo = más oscuro)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8.5" y="8.5" width="7" height="7" rx="1" fill="currentColor" stroke="none"/></svg> Render</button>
       </div>
+      <button class="pbtn acc" id="btnSaveTap" style="width:100%;margin-top:10px;height:36px;font-weight:700" title="Generar el G-code (.tap) de las trayectorias activas, en el orden de la lista — pásalo a la CNC en una USB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 20h16"/></svg>Guardar G-code (.tap)</button>
     </div>
 
     <div class="send">
@@ -622,6 +623,18 @@
   <div class="r"><b id="sendLabel">Enviando al plotter…</b><button class="pbtn" id="sendCancel" style="height:26px;padding:0 10px">Cancelar</button></div>
   <div class="pb"><i id="sendFill"></i></div>
   <div class="r"><span id="sendPct">0 %</span><span id="sendLines"></span></div>
+</div>
+<div class="modal" id="confirmModal" style="display:none">
+  <div class="sheet" style="width:350px">
+    <div class="sheet-h"><h3 id="cfTitle">Confirmar</h3><button id="cfClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="grp">
+      <div id="cfMsg" style="font-size:13px;line-height:1.55;color:var(--ink)"></div>
+      <div class="mrow" style="margin-top:14px">
+        <button class="pbtn" id="cfNo" style="flex:1">Cancelar</button>
+        <button class="pbtn acc" id="cfYes" style="flex:1">Sí, continuar</button>
+      </div>
+    </div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -835,7 +848,7 @@
           var deep=Math.min(1,(G.depth||thick)/thick);
           ctx.strokeStyle='rgba('+(150-90*deep)+','+(110-70*deep)+','+(70-45*deep)+',0.92)';   // madera fresada: más hondo, más oscuro
           ctx.lineWidth=Math.max(1.5, G.dia*view.scale); ctx.lineJoin='round'; ctx.lineCap='round';
-        } else { ctx.strokeStyle=grpC; ctx.lineWidth=1.6; }
+        } else { ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.6; }   // trayectorias en magenta de marca
         for(var t=0;t<G.tps.length;t++){ var tpts=G.tps[t]; if(tpts.length<2) continue;
           var sp=new Array(tpts.length);
           for(var u=0;u<tpts.length;u++) sp[u]=tp(tpts[u][0],tpts[u][1]);
@@ -1510,7 +1523,7 @@
       var ic=opIconSvg(t.op); if(ic) row.appendChild(ic);
       var nm=document.createElement('span'); nm.className='tpnm'; nm.textContent=t.name;
       nm.title='Doble clic para renombrar'; row.appendChild(nm);
-      nm.addEventListener('dblclick',function(e){ e.stopPropagation();
+      nm.addEventListener('dblclick',function(e){ e.stopPropagation(); clearTimeout(clickT);
         var inp=document.createElement('input'); inp.className='tpnm-edit'; inp.value=t.name;
         row.replaceChild(inp,nm); inp.focus(); inp.select();
         var closed=false;
@@ -1527,10 +1540,11 @@
         b.addEventListener('click',function(e){ e.stopPropagation(); fn(); }); row.appendChild(b); }
       mkb(t.enabled?TP_EYE:TP_EYEOFF, t.enabled?'Activa (clic para excluirla del corte)':'Excluida (clic para activarla)', function(){ t.enabled=!t.enabled; paintTps(); refreshPrev(); toast(t.enabled?('«'+t.name+'» incluida en el corte'):('«'+t.name+'» excluida — no saldrá en el G-code')); });
       mkb(TP_TRASH,'Eliminar trayectoria', function(){ tpaths.splice(i,1); if(tpSel===i)tpSel=-1; else if(tpSel>i)tpSel--; paintTps(); refreshPrev(); });
-      row.addEventListener('click',function(){
-        if(tpSel===i){ tpSel=-1; }                 // clic en la activa = deseleccionar (formulario en modo "nueva")
+      var clickT=null;
+      row.addEventListener('click',function(){ clearTimeout(clickT); clickT=setTimeout(function(){
+        if(tpSel===i){ tpSel=-1; el('tpName').value=''; }   // deseleccionar = formulario "nueva" con nombre limpio
         else { tpSel=i; loadEditor(t); }
-        paintTps(); });
+        paintTps(); },230); });
       // arrastrar para reordenar (el orden de la lista ES el orden de corte)
       row.addEventListener('dragstart',function(e){ dragIdx=i; e.dataTransfer.effectAllowed='move'; });
       row.addEventListener('dragover',function(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; row.classList.add('dragover'); });
@@ -1548,7 +1562,7 @@
   // controles del formulario: SOLO refrescan la vista del formulario (nada se aplica sin Calcular)
   el('opSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     var o=b.getAttribute('data-o');
-    if(tpSel>=0 && tpaths[tpSel] && tpaths[tpSel].op!==o){ tpSel=-1; paintTps(); }   // otra operación = trayectoria NUEVA (como Aspire)
+    if(tpSel>=0 && tpaths[tpSel] && tpaths[tpSel].op!==o){ tpSel=-1; el('tpName').value=''; paintTps(); }   // otra operación = trayectoria NUEVA (como Aspire)
     setSeg('opSeg','data-o',o); paintOp(); });
   el('sideSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; setSeg('sideSeg','data-s',b.getAttribute('data-s')); });
   el('dirSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; setSeg('dirSeg','data-d',b.getAttribute('data-d')); });
@@ -1571,11 +1585,30 @@
     el('rampVU').textContent=m==='angle'?'°':'mm'; });
   el('cutDepth').addEventListener('input',paintPasses);
   paintTabMode(); paintOp();
+  // confirmación en-app (los confirm() del navegador no son fiables en pywebview)
+  var cfCb=null;
+  function askConfirm(title,msg,cb){ el('cfTitle').textContent=title; el('cfMsg').innerHTML=msg; cfCb=cb; el('confirmModal').style.display='flex'; }
+  function cfDone(ok){ el('confirmModal').style.display='none'; var cb=cfCb; cfCb=null; if(cb) cb(ok); }
+  el('cfYes').addEventListener('click',function(){ cfDone(true); });
+  el('cfNo').addEventListener('click',function(){ cfDone(false); });
+  el('cfClose').addEventListener('click',function(){ cfDone(false); });
+  el('confirmModal').addEventListener('click',function(e){ if(e.target===el('confirmModal')) cfDone(false); });
+
   // --- CALCULAR: crea (o recalcula) la trayectoria y auto-previsualiza ---
   function calcTp(){
     if(!hasDoc()){ toast('Abre un diseño primero'); return; }
     if(!state.cnc) return;
     var s=editorState();
+    var th=state.cnc.material.thickness, total=(s.start||0)+s.depth;
+    if(s.op!=='' && total > th + 1e-9){
+      askConfirm('Corte más profundo que el material',
+        'La profundidad total (<b>'+(Math.round(total*100)/100)+' mm</b>) supera el grosor del material (<b>'+th+' mm</b>): la fresa lo atravesará y bajará <b>'+(Math.round((total-th)*100)/100)+' mm de más</b>.<br><br>Confirma solo si tienes <b>cama de sacrificio</b> bajo la pieza — sin ella, la fresa muerde la mesa de la máquina.',
+        function(ok){ if(ok) _calcApply(s); });
+      return;
+    }
+    _calcApply(s);
+  }
+  function _calcApply(s){
     var snap=cncTool();   // SNAPSHOT (como Aspire): la trayectoria congela los datos de la fresa
     if(snap) snap.pass_depth=effPassDepth(s.depth);   // respeta el N de pasadas forzado
     if(tpSel>=0 && tpaths[tpSel]){
@@ -1591,9 +1624,10 @@
       tpaths.push({id:num, num:num, name:s.name||OPLBL[s.op]+' '+num, enabled:true, uids:uids,
                    op:s.op, side:s.side, direction:s.direction, tabs:s.tabs, ramp:s.ramp,
                    start:s.start, allowance:s.allowance, last_pass:s.last_pass, last_rev:s.last_rev, depth:s.depth, toolId:s.toolId, tool:snap});
-      tpSel=tpaths.length-1;
+      tpSel=-1; el('tpName').value='';   // como Aspire: Calcular guarda y CIERRA — formulario listo para la siguiente
       toast('Trayectoria creada · '+uids.length+' objeto(s)');
     }
+    if(tpSel>=0&&tpaths[tpSel]) el('tpName').value=tpaths[tpSel].name;   // (recalcular: sigue seleccionada)
     paintTps(); killPrev(); prevOn=true; computePreview();     // como Aspire: Calculate → preview automática
   }
   el('btnCalc').addEventListener('click',calcTp);
@@ -1635,6 +1669,7 @@
   el('btnRender').addEventListener('click',function(){ renderMode=!renderMode;
     el('btnRender').classList.toggle('on',renderMode);
     if(renderMode && !cncPrev){ prevOn=true; computePreview(); } else draw(); });
+  el('btnSaveTap').addEventListener('click',function(){ saveTap(); });
   el('btnTpPrev').addEventListener('click',function(){
     if(cncPrev){ prevOn=false; killPrev(); draw(); return; }   // toggle: apagar (y recordar que se apagó)
     prevOn=true; computePreview(); });
