@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T21:16:56.444Z
+  modified: 2026-07-23T21:33:21.650Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -324,6 +324,43 @@ M30
   CSS `.simsheet` perdía contra `.sheet` por orden en el archivo → selector `.sheet.simsheet`;
   (2) probar las funciones de la UI extrayéndolas del HTML con node (`node --check` + eval
   por marcadores) — permitió verificar sim/malla/colores/anim sin abrir la app.
+
+- **R2. Vista 3D — pulido tras el uso real de Jose (23-jul, commits d46dd35 + 5c89b7b + 94868b2)**:
+  - **Materiales de verdad**: Triplay SEPARADO del MDF; las paredes casi verticales las pinta un
+    **injerto de shader** (Lambert `onBeforeCompile`, uniforms por look) según la ALTURA real —
+    chapas alternadas ~1.6mm en triplay, cosa imposible con colores por vértice (interpolan en
+    degradado). Fondos por `matFloor()` a la chapa de su profundidad.
+  - **La hoja = área de trabajo configurada** (se amplía solo si una trayectoria se sale).
+  - **Doble clic quita el sobrante** (delete-waste de Aspire): inundación 4-vecinos, y la cámara
+    se reenfoca a lo que queda. ⚠️ **Gotcha que cazó la prueba**: la inundación cruzaba POR
+    ENCIMA de los puentes (3mm de material sí conectan) y se comía la pieza → la conexión solo
+    cuenta a través de material de **más de medio grosor** (los puentes "se rompen", como en la
+    vida). El pedazo quitado deja de tener GEOMETRÍA (índices reconstruibles `simTopIndex`/
+    `simBotIndex`) — se ve la cuadrícula, no un bloque a nivel de cama.
+  - **Pasante visible arriba y abajo**: el fondo del canal que atraviesa no se dibuja (cuadrícula
+    a través) y la hoja tiene cara de abajo propia (rejilla paso 2, MeshBasic) con agujeros donde
+    perforó. **Sobrecorte ≤0.5mm (SIM_OVER) = pasante normal de taller, SIN rojo**; el rojo es
+    solo para mordidas mayores (la 1ª versión pintaba rojo el margen intencional y Jose preguntó
+    por "la línea roja"). La animación arranca viendo la hoja sólida (0%) ~700ms.
+- **S. Espera de arranque del husillo — ⚠️ SIN COMMIT, pendiente de probar en máquina (24-jul)**:
+  Jose reportó que la máquina corta antes de que el husillo llegue a sus RPM. Campo **"Husillo"
+  (segundos, default 5, 0=off)** en Material (id `matSpin`, llave `spinup` en material). Tras el
+  M03 se emite **cinturón y tirantes**: `G04 P<seg>` **y** 4mm de viaje EN EL AIRE (sobre Z
+  segura) a F calculada para durar exactamente la espera (240/seg) — porque la unidad del P de
+  G04 **varía por controlador** (seg vs ms) y no hay doc del A11E; el respaldo aéreo funciona en
+  cualquier control con "Read F". Al probar en máquina: si tras M03 espera ~10s, su G04 es de
+  segundos (bajar el campo a 2-3s); si ~5s, el G04 fue inocuo y manda el respiro.
+
+## Auditoría pre-corte (`auditar_gcode.py`, en el repo — 24-jul-2026)
+**Correrla antes de cualquier corte real si se tocó el motor**: `/opt/homebrew/bin/python3
+auditar_gcode.py` (necesita shapely → el Python de Homebrew). **79 verificaciones, 0 fallas**:
+gramática estricta línea por línea, física de seguridad (nada de G00 con fresa enterrada, F solo
+feed/plunge bajo la Z segura, Z jamás más honda que lo pedido, pasadas ≤ pass_depth), geometría
+exacta a ±0.01mm (compensación fuera/dentro/holgura, cajeado, taladro, anidado hueco-primero),
+ambos ceros de Z, multi-trabajo, rechazo de fresas mezcladas, y el bloque de espera de husillo.
+Además se midió sobre la simulación 3D (mismo .tap): pieza 100.09mm, kerf 5.96≈6, 3 puentes.
+⚠️ El primer hallazgo de la batería fue un bug DEL PROPIO TEST (medía "el primer cuarto de
+movimientos" y el hueco tiene 5 puntos vs 69 del exterior) — verificar el orden por ANILLOS.
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del

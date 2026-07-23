@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T01:41:44.675Z
+  modified: 2026-07-23T21:33:45.470Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -109,10 +109,36 @@ Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `
 - **Alinear-a**: el `<select>` de texto "Selección/Área de trabajo" ahora es un **segmentado con iconos**
   (id `alignTo`, dos `<button data-to>`; estilo `.seg`). De regalo mejoró el resaltado del modo B/N/Color.
 
-### Pendientes al 22-jul-2026 (árbol limpio, todo pusheado)
-1. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
+## Novedades 23–24 jul 2026
+- **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
+  el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
+  curvas sobrevivientes. Causa: `AIParser._items_to_subpaths` asumía formato estilo SVG para los
+  items de pymupdf; el formato REAL trae TODOS los puntos por segmento (`('c', inicio, c1, c2,
+  fin)`) y NO existen items 'm'/'h'. **Señal para la próxima**: si la librería cruda ve más
+  elementos que la app, el que pierde es nuestro código.
+- **Vista 3D del corte** (fases R en [[cnc-richauto]]) y **auditoría del G-code** (ídem).
+- **Botón "Importar" — ⚠️ SIN COMMIT, pendiente vistazo de Jose (24-jul)**: suma otro archivo
+  (SVG/DXF/AI/.dstudio) a la mesa SIN reemplazar. `addDoc`/`addProject` en studio_ui.html +
+  `import_design`/`_load_vector` en design_studio.py (refactor: open_design usa el mismo helper).
+  Reglas: lo existente intacto (uids viejos NO cambian → las trayectorias CNC calculadas
+  sobreviven), lo nuevo entra como grupo propio a la derecha (+10mm, alineado abajo) y queda
+  seleccionado; deshacible; mesa vacía → importar=abrir; de un .dstudio entran objetos con sus
+  transformaciones pero **sus trayectorias NO** (uids ajenos, se avisa); grupos re-mapeados.
+  Imágenes solo por Abrir (el calco reemplaza).
+- **Técnica de prueba nueva que funcionó muy bien**: ejecutar el `<script>` COMPLETO de
+  studio_ui.html en node con un **DOM falso mínimo** (Proxy con getElementById/addEventListener
+  de mentira + getComputedStyle) y manejar la app por el gancho `window.__DS` (se le añadió
+  `add`/`addProject`). Así se probó el flujo real de importar (9 checks) sin abrir la app.
+  El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
+  el módulo 3D.
+
+### Pendientes al 24-jul-2026
+1. **SIN COMMIT** (probados en terminal, falta vistazo/uso de Jose): botón **Importar** y la
+   **espera de husillo** (campo "Husillo" — ver [[cnc-richauto]] fase S).
+2. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
    Necesita hardware; nadie puede cerrarlo desde la Mac.
-2. Diferidas que Jose puede querer: organizar orden (z-order / orden de corte), texto, contorno/offset,
+3. **Primer corte real de la CNC** — protocolo y checklist en [[cnc-richauto]] (auditoría ya pasada).
+4. Diferidas que Jose puede querer: organizar orden (z-order / orden de corte), texto, contorno/offset,
    presets de material, optimizar orden de corte, snapping.
 
 ## Lanzador de escritorio (Mac) — ícono "Design Studio.app"
