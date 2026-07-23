@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T01:26:49.127Z
+  modified: 2026-07-23T01:41:44.675Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -78,6 +78,21 @@ primero y fija `self._tol = 0.01mm/escala`. Verificado idéntico (0.0099mm) en m
 por el programa que lo exportó (Illustrator suele hacerlo) — eso ya no lo arregla ninguna
 tolerancia; la solución sería re-ajuste de arcos/Béziers sobre polilíneas (el "curve fitting"
 de Vectric), no construido.
+**Ronda 3 — calibración contra caso REAL (commits be75891 + e06f2f7, cierre del 22-jul)**:
+Jose seguía viendo "exactamente lo mismo" tras relanzar. Diagnóstico con SU archivo
+(`vaquero salchichon.dxf`, Drive Cantarito/CORTE METAL: 17 SPLINEs reales, $INSUNITS=5=cm):
+(a) para archivos en CM el fix de escala no cambiaba nada (0.001 unidades-cm ya eran 0.01mm) —
+por eso viejo≈nuevo; (b) el flujo real de Jose es importar 81×205mm → **escalar ×10 en la
+app** → inspeccionar a **5924% de zoom**, y la tolerancia relativa de 0.015% daba ~0.3mm
+post-escala = 17px de quiebre a ese zoom. **Calibración final medida contra la spline exacta:
+relativa 0.001% (1e-5) + pisos 0.001mm reales + _simplify_mm 0.001** → 0.0019mm al importar,
+0.019mm tras ×10 = **1.1px a 5924%** (invisible), 3186 pts en todo el archivo.
+**Lecciones**: (1) calibrar tolerancias contra el CASO DE USO real (escala máxima × zoom de
+inspección), no contra "se ve bien al 100%"; (2) "sigue exactamente igual" tras un fix = o el
+proceso corre código viejo, o el fix no toca ese camino — DIAGNOSTICAR CON EL ARCHIVO DEL
+USUARIO (mdfind lo encontró en su Drive) antes de otra vuelta de tuerca a ciegas; (3) re-abrir
+la app no basta: un diseño YA CARGADO (o un .dstudio) conserva los puntos horneados — hay que
+RE-IMPORTAR el archivo fuente.
 
 ## Novedades sesión 21–22 jul 2026 (LEER al retomar)
 Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `f02e918` (pusheado)**:
