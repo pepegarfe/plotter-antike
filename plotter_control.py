@@ -390,12 +390,109 @@ class HPGLConverter:
 # Todos los parsers devuelven List[dict]:
 #   {"pts": [(x,y)…], "fill": (r,g,b)|None, "stroke": (r,g,b)|None}
 
+def _simplify_mm(pts, tol=0.01):
+    """Douglas-Peucker iterativo en MILÍMETROS (post-matriz): quita los puntos que no
+    aportan (desviación < tol). Es la pasada de limpieza estándar de los importadores CAM
+    y atrapa TODAS las fuentes de sobre-muestreo (transforms anidados incluidos)."""
+    n = len(pts)
+    if n < 3:
+        return pts
+    keep = [False] * n
+    keep[0] = keep[-1] = True
+    stack = [(0, n - 1)]
+    while stack:
+        i0, i1 = stack.pop()
+        if i1 <= i0 + 1:
+            continue
+        ax, ay = pts[i0]; bx, by = pts[i1]
+        dx, dy = bx - ax, by - ay
+        L = math.hypot(dx, dy)
+        worst, wi = -1.0, -1
+        for i in range(i0 + 1, i1):
+            px, py = pts[i]
+            if L < 1e-12:
+                d = math.hypot(px - ax, py - ay)
+            else:
+                d = abs((px - ax) * dy - (py - ay) * dx) / L
+            if d > worst:
+                worst, wi = d, i
+        if worst > tol:
+            keep[wi] = True
+            stack.append((i0, wi))
+            stack.append((wi, i1))
+    return [pts[i] for i in range(n) if keep[i]]
+
+
+def _simplify_styled(styled, tol=0.01):
+    for d in styled:
+        p = d.get('pts')
+        if p and len(p) > 3:
+            d['pts'] = _simplify_mm(p, tol)
+    return styled
+
+
+def _curve_tol(pts, floor=0.0):
+    """Tolerancia RELATIVA al tamaño de la curva (~0.015% de su diagonal), con un PISO
+    absoluto (en unidades del archivo, ≈0.01mm reales vía la escala de la matriz raíz).
+    Relativa: escalar el diseño después conserva la suavidad visual. El piso evita que los
+    trazos hechos de CIENTOS de mini-curvas (potrace, tipografías) exijan precisión
+    microscópica por tramo y exploten en puntos."""
+    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+    diag = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+    return max(diag * 1.5e-4, floor, 1e-9)
+
+
+def _flat_cubic(p0, p1, p2, p3, floor=0.0):
+    """Aplana una Bézier cúbica por subdivisión adaptativa (De Casteljau), como los motores
+    de los programas de diseño: puntos SOLO donde la curva lo pide, con desviación acotada.
+    Devuelve los puntos SIN incluir p0."""
+    tol = _curve_tol((p0, p1, p2, p3), floor)
+    out = []
+
+    def rec(a, b, c, d, depth):
+        dx, dy = d[0] - a[0], d[1] - a[1]
+        L = math.hypot(dx, dy)
+        if L < 1e-12:
+            d1 = math.hypot(b[0] - a[0], b[1] - a[1])
+            d2 = math.hypot(c[0] - a[0], c[1] - a[1])
+        else:
+            d1 = abs((b[0] - a[0]) * dy - (b[1] - a[1]) * dx) / L
+            d2 = abs((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) / L
+        if depth >= 16 or (d1 + d2) <= tol:
+            out.append(d)
+            return
+        ab  = ((a[0]+b[0])/2, (a[1]+b[1])/2); bc  = ((b[0]+c[0])/2, (b[1]+c[1])/2)
+        cd  = ((c[0]+d[0])/2, (c[1]+d[1])/2)
+        abc = ((ab[0]+bc[0])/2, (ab[1]+bc[1])/2); bcd = ((bc[0]+cd[0])/2, (bc[1]+cd[1])/2)
+        mid = ((abc[0]+bcd[0])/2, (abc[1]+bcd[1])/2)
+        rec(a, ab, abc, mid, depth + 1)
+        rec(mid, bcd, cd, d, depth + 1)
+
+    rec(p0, p1, p2, p3, 0)
+    return out
+
+
+def _flat_quad(p0, q, p1, floor=0.0):
+    """Bézier cuadrática → cúbica equivalente → aplanado adaptativo."""
+    c1 = (p0[0] + 2.0/3.0 * (q[0] - p0[0]), p0[1] + 2.0/3.0 * (q[1] - p0[1]))
+    c2 = (p1[0] + 2.0/3.0 * (q[0] - p1[0]), p1[1] + 2.0/3.0 * (q[1] - p1[1]))
+    return _flat_cubic(p0, c1, c2, p1, floor)
+
+
+def _arc_steps(r, dtheta, floor=0.0):
+    """Pasos para un arco con desviación (sagita) ≤ tolerancia relativa al radio."""
+    tol = max(r * 1.5e-4, floor, 1e-9)
+    arg = max(-1.0, min(1.0, 1.0 - tol / max(r, 1e-9)))
+    step = 2 * math.acos(arg) or 0.05
+    return max(8, min(720, int(math.ceil(abs(dtheta) / step))))
+
+
 class SVGParser:
     PX_TO_MM = 0.264583  # 96 DPI
     _SKIP_TAGS = {'defs', 'clipPath', 'mask', 'symbol', 'pattern', 'marker'}
 
     def parse(self, filepath):
-        return self._parse_basic(filepath)
+        return _simplify_styled(self._parse_basic(filepath))
 
     # ── deduplication ──────────────────────────────────────────────────────────
 
@@ -498,6 +595,8 @@ class SVGParser:
         import xml.etree.ElementTree as ET
         root = ET.parse(filepath).getroot()
         mtx = self._root_mtx(root)
+        # piso de aplanado: 0.01 mm reales convertidos a user-units con la escala raíz
+        self._flat_floor = 0.01 / max(abs(mtx[0]), abs(mtx[3]), 1e-9)
         result = []
         self._walk(root, result, (0, 0, 0), None, mtx)
         return self._dedup(result)
@@ -549,8 +648,7 @@ class SVGParser:
         for child in elem:
             self._walk(child, result, fill, stroke, cur_mtx)
 
-    @staticmethod
-    def _arc_pts(x1, y1, rx, ry, phi_deg, large_arc, sweep, x2, y2):
+    def _arc_pts(self, x1, y1, rx, ry, phi_deg, large_arc, sweep, x2, y2):
         """SVG arc endpoint params → list of (x,y) sample points (excluding start, px units)."""
         if rx == 0 or ry == 0 or (x1 == x2 and y1 == y2):
             return [(x2, y2)]
@@ -589,7 +687,7 @@ class SVGParser:
         elif sweep and dtheta < 0:
             dtheta += 2 * math.pi
 
-        n = max(32, int(abs(dtheta) * max(rx, ry) * 4))
+        n = _arc_steps(max(rx, ry), dtheta, getattr(self, '_flat_floor', 0.0))
         result = []
         for k in range(1, n + 1):
             th = theta1 + dtheta * k / n
@@ -679,14 +777,7 @@ class SVGParser:
                         x1 += cx; y1 += cy
                         x2 += cx; y2 += cy
                         x  += cx; y  += cy
-                    _poly = (math.hypot(x1 - cx, y1 - cy) + math.hypot(x2 - x1, y2 - y1) +
-                             math.hypot(x - x2, y - y2))
-                    _n = max(16, int(_poly * 4))
-                    for s in range(1, _n + 1):
-                        tt = s / _n
-                        bx = (1-tt)**3*cx + 3*(1-tt)**2*tt*x1 + 3*(1-tt)*tt**2*x2 + tt**3*x
-                        by = (1-tt)**3*cy + 3*(1-tt)**2*tt*y1 + 3*(1-tt)*tt**2*y2 + tt**3*y
-                        current.append((bx, by))
+                    current.extend(_flat_cubic((cx, cy), (x1, y1), (x2, y2), (x, y), self._flat_floor))
                     pcx, pcy = x2, y2
                     pqx = pqy = None
                     cx, cy = x, y
@@ -700,14 +791,7 @@ class SVGParser:
                         x  += cx; y  += cy
                     x1 = 2 * cx - pcx if pcx is not None else cx
                     y1 = 2 * cy - pcy if pcy is not None else cy
-                    _poly = (math.hypot(x1 - cx, y1 - cy) + math.hypot(x2 - x1, y2 - y1) +
-                             math.hypot(x - x2, y - y2))
-                    _n = max(16, int(_poly * 4))
-                    for s in range(1, _n + 1):
-                        tt = s / _n
-                        bx = (1-tt)**3*cx + 3*(1-tt)**2*tt*x1 + 3*(1-tt)*tt**2*x2 + tt**3*x
-                        by = (1-tt)**3*cy + 3*(1-tt)**2*tt*y1 + 3*(1-tt)*tt**2*y2 + tt**3*y
-                        current.append((bx, by))
+                    current.extend(_flat_cubic((cx, cy), (x1, y1), (x2, y2), (x, y), self._flat_floor))
                     pcx, pcy = x2, y2
                     pqx = pqy = None
                     cx, cy = x, y
@@ -719,13 +803,7 @@ class SVGParser:
                     if cmd == 'q':
                         x1 += cx; y1 += cy
                         x  += cx; y  += cy
-                    _poly = math.hypot(x1 - cx, y1 - cy) + math.hypot(x - x1, y - y1)
-                    _n = max(16, int(_poly * 4))
-                    for s in range(1, _n + 1):
-                        tt = s / _n
-                        bx = (1-tt)**2*cx + 2*(1-tt)*tt*x1 + tt**2*x
-                        by = (1-tt)**2*cy + 2*(1-tt)*tt*y1 + tt**2*y
-                        current.append((bx, by))
+                    current.extend(_flat_quad((cx, cy), (x1, y1), (x, y), self._flat_floor))
                     pqx, pqy = x1, y1
                     pcx = pcy = None
                     cx, cy = x, y
@@ -737,13 +815,7 @@ class SVGParser:
                         x += cx; y += cy
                     x1 = 2 * cx - pqx if pqx is not None else cx
                     y1 = 2 * cy - pqy if pqy is not None else cy
-                    _poly = math.hypot(x1 - cx, y1 - cy) + math.hypot(x - x1, y - y1)
-                    _n = max(16, int(_poly * 4))
-                    for s in range(1, _n + 1):
-                        tt = s / _n
-                        bx = (1-tt)**2*cx + 2*(1-tt)*tt*x1 + tt**2*x
-                        by = (1-tt)**2*cy + 2*(1-tt)*tt*y1 + tt**2*y
-                        current.append((bx, by))
+                    current.extend(_flat_quad((cx, cy), (x1, y1), (x, y), self._flat_floor))
                     pqx, pqy = x1, y1
                     pcx = pcy = None
                     cx, cy = x, y
@@ -788,9 +860,10 @@ class SVGParser:
             cy = float(elem.get('cy', 0))
             rx = float(elem.get('r', elem.get('rx', 0)))
             ry = float(elem.get('ry', elem.get('r', 0)))
+            n = _arc_steps(max(rx, ry), 2 * math.pi, getattr(self, '_flat_floor', 0.0))
             pts = []
-            for i in range(73):
-                a = 2 * math.pi * i / 72
+            for i in range(n + 1):
+                a = 2 * math.pi * i / n
                 pts.append((cx + rx * math.cos(a), cy + ry * math.sin(a)))
             return pts
         except Exception:
@@ -1052,7 +1125,7 @@ class DXFParser:
             for d in chained:
                 d['pts'] = [(x * scale, y * scale) for x, y in d['pts']]
 
-        return chained
+        return _simplify_styled(chained)
 
 
 # ── AI Parser (pymupdf) ────────────────────────────────────────────────────────
@@ -1096,7 +1169,7 @@ class AIParser:
             raise ValueError(f"Error al leer AI: {e}")
         finally:
             doc.close()
-        return all_paths
+        return _simplify_styled(all_paths)
 
     def _extract_page(self, page, all_paths, seen):
         page_h = page.rect.height          # altura en puntos PDF para invertir Y
@@ -1170,16 +1243,7 @@ class AIParser:
                     p1 = pt(item[1])
                     p2 = pt(item[2])
                     p3 = pt(item[3])
-                    _poly = (math.hypot(p1[0]-p0[0], p1[1]-p0[1]) +
-                             math.hypot(p2[0]-p1[0], p2[1]-p1[1]) +
-                             math.hypot(p3[0]-p2[0], p3[1]-p2[1]))
-                    _n = max(16, int(_poly * 4))
-                    for s in range(1, _n + 1):
-                        t  = s / _n
-                        mt = 1 - t
-                        bx = mt**3*p0[0] + 3*mt**2*t*p1[0] + 3*mt*t**2*p2[0] + t**3*p3[0]
-                        by = mt**3*p0[1] + 3*mt**2*t*p1[1] + 3*mt*t**2*p2[1] + t**3*p3[1]
-                        current.append((bx, by))
+                    current.extend([(px, py) for (px, py) in _flat_cubic(p0, p1, p2, p3, 0.01)])
 
             elif kind == "h":                        # closepath explícito
                 flush(force_close=True)

@@ -69,7 +69,11 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   original) y luego el offset, devolviendo dicts nuevos sin mutar el original.
 - **Los `create_line` usan `smooth=False`** (con `joinstyle=MITER`, `capstyle=BUTT`). ⚠️ **No poner
   `smooth=True`**: fue eliminado a propósito para arreglar la fidelidad visual del corte. La
-  suavidad de las curvas hoy viene del **muestreo denso de arcos**, no del spline de tkinter.
+  suavidad de las curvas viene del **aplanado ADAPTATIVO por tolerancia** (desde 22-jul-2026):
+  `_flat_cubic`/`_flat_quad`/`_arc_steps` (tolerancia relativa ~0.015% + piso 0.01 mm) y una
+  pasada final `_simplify_mm` (Douglas-Peucker a 0.01 mm, en mm reales, a la salida de los TRES
+  parsers). ⚠️ **No volver a muestrear curvas con N fijo de segmentos** — eso cuadriculaba los
+  imports al escalarlos.
 - **Tres modos de selección/transformación** según estado: **individual** (`_sel_idx >= 0`, escala y
   rotación ABSOLUTAS), **grupo manual** (`_sel_set` no vacío, RELATIVAS) y **todos** (ambos vacíos,
   RELATIVAS). Toda transformación debe respetar los tres.
