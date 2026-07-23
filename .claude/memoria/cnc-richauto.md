@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T22:20:39.053Z
+  modified: 2026-07-23T22:52:48.967Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -372,7 +372,18 @@ movimientos" y el hueco tiene 5 puntos vs 69 del exterior) — verificar el orde
   A11E y los movimientos lentos en aire dependen de Read F. **Historia**: la espera de 5→10s
   del archivo "no hacía ninguna diferencia" porque el handle ignoraba ambos mecanismos; los
   ~4s que sí esperaba eran el Spindle delay de fábrica (4000ms).
-- ⚠️ **`S Read` debe quedarse en `Ign S` en la máquina de Jose** (verificado 24-jul en la
+- **Tabla REAL de marchas del A11E (leída del handle por Jose, 24-jul)**: `MACHINE SETUP →
+  Spindle Setup → Spindle speed` — **8 marchas, S1=18000 DESCENDIENDO 1000 por marcha hasta
+  S8=11000** (¡S1 es la más rápida!). `SpdlCnt = 3` (cableado multi-speed Count 3 — no tocar).
+  La app la trae capturada (material.gears) y elige marcha por CERCANÍA de RPM del preset:
+  mdf 18000→S1, acr 16000→S3, pvc 14000→S5. ⚠️ **Tabla del handle y modal "Marchas…" de la
+  app son PAREJA ESPEJO**: si alguien cambia una, actualizar la otra el mismo día (la app
+  compara contra SU copia — desincronizadas mandan marcha equivocada sin aviso). Jose preguntó
+  si convenía cambiar las velocidades del handle: NO — el rango 11k-18k cubre los presets;
+  la afinación de cortes va por avance/pasada en "Fresas…", no por reprogramar marchas. El "Spindle state con flechas" es el mapa de
+  señales por marcha — no tocar. Con la tabla en el archivo, `S Read = Read S` SÍ funciona
+  (el problema anterior era mandar RPM como S; ver siguiente punto, que queda como HISTORIA).
+- ⚠️ (HISTORIA — resuelto con la tabla de marchas) **`S Read` en `Ign S`** (verificado 24-jul en la
   máquina real): la máquina es **multi-speed por MARCHAS S1–S9** (se cambian desde el handle;
   encendido manual con ON/OFF funciona). Con `Read S`, el `S18000` del archivo (RPM) se
   interpreta como MARCHA — "marcha 18000" no existe → **el husillo nunca arranca**. Con
