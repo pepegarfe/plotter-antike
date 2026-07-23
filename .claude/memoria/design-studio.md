@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T01:17:16.799Z
+  modified: 2026-07-23T01:26:49.127Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -70,6 +70,14 @@ mini-curvas (potrace: 25k puntos en un círculo) → por eso el piso + la simpli
 (2) potrace mete un `<g transform="scale(0.1)">` que el piso calculado solo con la matriz raíz
 no ve → por eso la limpieza final se hace en MM REALES post-matriz, que atrapa todo.
 ⚠️ No volver a muestrear curvas con N fijo (ver CLAUDE.md).
+**Ronda 2 (commit 0f53cd2)**: el DXF seguía cuadriculado — su tolerancia era fija en UNIDADES
+DEL DIBUJO y la escala $INSUNITS→mm se aplica DESPUÉS: un DXF declarado en metros (×1000) o
+pulgadas (×25.4) quedaba con desviación real de hasta 1mm. Fix: `parse()` calcula la escala
+primero y fija `self._tol = 0.01mm/escala`. Verificado idéntico (0.0099mm) en m/in/mm.
+**Si un DXF sigue facetado tras esto**: el ARCHIVO trae las curvas ya trozadas en polilíneas
+por el programa que lo exportó (Illustrator suele hacerlo) — eso ya no lo arregla ninguna
+tolerancia; la solución sería re-ajuste de arcos/Béziers sobre polilíneas (el "curve fitting"
+de Vectric), no construido.
 
 ## Novedades sesión 21–22 jul 2026 (LEER al retomar)
 Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `f02e918` (pusheado)**:
