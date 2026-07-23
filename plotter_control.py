@@ -1221,6 +1221,16 @@ class AIParser:
                     })
 
     def _items_to_subpaths(self, items, close_path, page_h, sc):
+        """Items de pymupdf → subpaths en mm.
+
+        Formato REAL de get_drawings(): cada item trae TODOS sus puntos —
+        ('l', inicio, fin) y ('c', inicio, ctrl1, ctrl2, fin). NO existen items
+        'm'/'h': cada segmento carga su propio inicio, y un subpath nuevo se
+        detecta porque el inicio NO empalma con el punto anterior. El cierre
+        viene en el flag 'closePath' del drawing. ⚠️ Asumir formato estilo SVG
+        aquí (item 'm' + segmentos que continúan del punto previo) fue el bug
+        que tragaba EN SILENCIO todo path que empezara con curva.
+        """
         def pt(p):
             return (p.x * sc, (page_h - p.y) * sc)
 
@@ -1228,10 +1238,10 @@ class AIParser:
         current  = []
         first_pt = None
 
-        def flush(force_close=False):
+        def flush():
             nonlocal current, first_pt
             if len(current) >= 2:
-                if (close_path or force_close) and first_pt is not None:
+                if close_path and first_pt is not None:
                     lx, ly = current[-1]
                     fx, fy = first_pt
                     if abs(lx - fx) > 1e-9 or abs(ly - fy) > 1e-9:
@@ -1240,28 +1250,27 @@ class AIParser:
             current  = []
             first_pt = None
 
+        def begin(p0):
+            nonlocal current, first_pt
+            if not current:
+                current  = [p0]
+                first_pt = p0
+            elif abs(current[-1][0] - p0[0]) > 1e-6 or abs(current[-1][1] - p0[1]) > 1e-6:
+                flush()
+                current  = [p0]
+                first_pt = p0
+
         for item in items:
             kind = item[0]
 
-            if kind == "m":
-                flush()
-                p        = pt(item[1])
-                current  = [p]
-                first_pt = p
+            if kind == "l":                          # ('l', inicio, fin)
+                begin(pt(item[1]))
+                current.append(pt(item[2]))
 
-            elif kind == "l":
-                current.append(pt(item[1]))
-
-            elif kind == "c":                        # cubic bezier: cp1, cp2, end
-                if current:
-                    p0 = current[-1]
-                    p1 = pt(item[1])
-                    p2 = pt(item[2])
-                    p3 = pt(item[3])
-                    current.extend([(px, py) for (px, py) in _flat_cubic(p0, p1, p2, p3, 0.001)])
-
-            elif kind == "h":                        # closepath explícito
-                flush(force_close=True)
+            elif kind == "c":                        # ('c', inicio, ctrl1, ctrl2, fin)
+                p0 = pt(item[1])
+                begin(p0)
+                current.extend(_flat_cubic(p0, pt(item[2]), pt(item[3]), pt(item[4]), 0.001))
 
             elif kind == "re":                       # rectángulo inline
                 flush()
