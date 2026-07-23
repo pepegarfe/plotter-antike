@@ -1775,8 +1775,9 @@
     var nx=Math.max(2,Math.round(W/cell)), ny=Math.max(2,Math.round(H/cell));
     var hm=new Float32Array(nx*ny); hm.fill(thick);
     var owner=new Uint8Array(nx*ny); owner.fill(255);       // qué trayectoria cortó cada celda
-    return {hm:hm,owner:owner,nx:nx,ny:ny,cell:cell,minx:minx,miny:miny,w:W,h:H,
-            thick:thick,ztop:ztop};
+    var removed=new Uint8Array(nx*ny);                      // sobrantes quitados con doble clic
+    return {hm:hm,owner:owner,removed:removed,nx:nx,ny:ny,cell:cell,minx:minx,miny:miny,
+            w:W,h:H,thick:thick,ztop:ztop};
   }
   function stampMove(r,rad,jobIdx,v){
     // estampa un movimiento (o un pedazo) en el mapa; devuelve [fila0,fila1] tocadas o null
@@ -1901,21 +1902,21 @@
     var r=S3.res, mode=simModeV, look=el('simLook').value;
     var sd=(mode==='mat')?(SIMSIDE[look]||SIMSIDE.plain):{mode:0,a:[0,0,0]};
     S3.sideCfg={mode:sd.mode, a:sd.a, b:sd.b||sd.a, ply:plyT(r.thick)};
-    var sh=S3.mesh.material.userData.sh;
+    var sh=S3.surf.material.userData.sh;
     if(sh){ sh.uniforms.uSideMode.value=S3.sideCfg.mode;
       sh.uniforms.uSideA.value.set(S3.sideCfg.a[0],S3.sideCfg.a[1],S3.sideCfg.a[2]);
       sh.uniforms.uSideB.value.set(S3.sideCfg.b[0],S3.sideCfg.b[1],S3.sideCfg.b[2]);
       sh.uniforms.uPlyT.value=S3.sideCfg.ply; }
-    var col=S3.mesh.geometry.attributes.color, arr=col.array, ud=S3.mesh.userData;
+    var col=S3.surf.geometry.attributes.color, arr=col.array, ud=S3.surf.userData;
     for(var i=0;i<r.nx*r.ny;i++){
       var c=simVColor(r,i,mode,look);
       arr[3*i]=c[0]; arr[3*i+1]=c[1]; arr[3*i+2]=c[2];
     }
     ud.wallSrc.forEach(function(vi,k){ var w=ud.wallStart+k;          // paredes: su celda de orilla, sombreada
       arr[3*w]=arr[3*vi]*0.8; arr[3*w+1]=arr[3*vi+1]*0.8; arr[3*w+2]=arr[3*vi+2]*0.8; });
-    for(var k=0;k<4;k++){ var b=ud.bottomStart+k;
-      arr[3*b]=SIM_BED[0]*0.8; arr[3*b+1]=SIM_BED[1]*0.8; arr[3*b+2]=SIM_BED[2]*0.8; }
     col.needsUpdate=true;
+    if(S3.bot){ var ba=(SIMSIDE[look]||SIMSIDE.plain).a;              // cara de abajo: tono del material
+      S3.bot.material.color.setRGB(ba[0]*0.75,ba[1]*0.75,ba[2]*0.75); }
   }
   function simGridNormals(r,nrm,y0,y1){
     // normal por gradiente del mapa (rápido y actualizable por filas, a diferencia
@@ -1929,9 +1930,45 @@
       nrm[3*i]=vx/L; nrm[3*i+1]=vy/L; nrm[3*i+2]=1/L;
     }
   }
+  function simEmpty(r,i){
+    // celda SIN geometría: sobrante quitado, o corte pasante limpio (se ve la
+    // cuadrícula a través — así "atravesó" se distingue de un cajeado hondo).
+    // El sobrecorte (rojo) SÍ se dibuja: es una advertencia, no debe desaparecer.
+    return r.removed[i]===1 || (r.hm[i]<=0.02 && r.hm[i]>=-0.01);
+  }
+  function simTopIndex(r){
+    // triángulos de la superficie + paredes de la orilla, saltándose los huecos
+    var nx=r.nx, ny=r.ny, idx=[], gx, gy;
+    for(gy=0;gy<ny-1;gy++) for(gx=0;gx<nx-1;gx++){
+      var a=gy*nx+gx, b=a+1, cc=a+nx, dd=cc+1;
+      if(simEmpty(r,a)&&simEmpty(r,b)&&simEmpty(r,cc)&&simEmpty(r,dd)) continue;
+      idx.push(a,b,dd, a,dd,cc);
+    }
+    var W=S3.wallIds;                                        // [ids orilla, base en el buffer] por pared
+    for(var w=0;w<W.length;w++){
+      var ids=W[w][0], st=W[w][1];
+      for(var k=0;k<ids.length-1;k++){
+        if(r.removed[ids[k]]||r.removed[ids[k+1]]) continue;
+        idx.push(ids[k],ids[k+1],st+k+1, ids[k],st+k+1,st+k);
+      }
+    }
+    return idx;
+  }
+  function simBotIndex(r){
+    // cara de abajo de la hoja (rejilla a paso 2): con AGUJERO donde el corte
+    // atraviesa o el sobrante se quitó — visto por abajo se ve dónde perforó
+    var nx=r.nx, S=2, nbx=Math.floor((nx-1)/S)+1, nby=Math.floor((r.ny-1)/S)+1, idx=[];
+    function solid(bx,by){ var i=(by*S)*nx+(bx*S); return r.hm[i]>0.02&&!r.removed[i]; }
+    for(var by=0;by<nby-1;by++) for(var bx=0;bx<nbx-1;bx++){
+      if(!solid(bx,by)||!solid(bx+1,by)||!solid(bx,by+1)||!solid(bx+1,by+1)) continue;
+      var a=by*nbx+bx, b=a+1, cc=a+nbx, dd=cc+1;
+      idx.push(a,dd,b, a,cc,dd);                             // mirando hacia abajo
+    }
+    return idx;
+  }
   function simMesh(r){
     var nx=r.nx, ny=r.ny, cell=r.cell, hm=r.hm;
-    var nv=nx*ny, extra=2*nx+2*ny+4;
+    var nv=nx*ny, extra=2*nx+2*ny;
     var pos=new Float32Array((nv+extra)*3), col=new Float32Array((nv+extra)*3),
         nrm=new Float32Array((nv+extra)*3);
     var gx,gy,i;
@@ -1939,41 +1976,43 @@
       i=gy*nx+gx;
       pos[3*i]=r.minx+(gx+0.5)*cell; pos[3*i+1]=r.miny+(gy+0.5)*cell; pos[3*i+2]=hm[i];
     }
-    var idx=[];
-    for(gy=0;gy<ny-1;gy++) for(gx=0;gx<nx-1;gx++){
-      var a=gy*nx+gx, b=a+1, cc=a+nx, dd=cc+1;
-      idx.push(a,b,dd, a,dd,cc);
-    }
     var vcur=nv, wallSrc=[], wallStart=nv;
+    S3.wallIds=[];
     function wall(ids,n){                                    // orilla → cortina hasta la cama
-      var st=vcur;
+      S3.wallIds.push([ids,vcur]);
       ids.forEach(function(vi,k){
         pos[3*(vcur+k)]=pos[3*vi]; pos[3*(vcur+k)+1]=pos[3*vi+1]; pos[3*(vcur+k)+2]=0;
         nrm[3*(vcur+k)]=n[0]; nrm[3*(vcur+k)+1]=n[1]; nrm[3*(vcur+k)+2]=n[2];
         wallSrc.push(vi);
       });
-      for(var k=0;k<ids.length-1;k++) idx.push(ids[k],ids[k+1],st+k+1, ids[k],st+k+1,st+k);
       vcur+=ids.length;
     }
     var e1=[],e2=[],e3=[],e4=[];
     for(gx=0;gx<nx;gx++){ e1.push(gx); e2.push((ny-1)*nx+gx); }
     for(gy=0;gy<ny;gy++){ e3.push(gy*nx); e4.push(gy*nx+nx-1); }
     wall(e1,[0,-1,0]); wall(e2,[0,1,0]); wall(e3,[-1,0,0]); wall(e4,[1,0,0]);
-    var f=vcur, corners=[[0,0],[nx-1,0],[nx-1,ny-1],[0,ny-1]];
-    corners.forEach(function(q,k){
-      pos[3*(f+k)]=r.minx+(q[0]+0.5)*cell; pos[3*(f+k)+1]=r.miny+(q[1]+0.5)*cell; pos[3*(f+k)+2]=0;
-      nrm[3*(f+k)+2]=-1;
-    });
-    idx.push(f,f+1,f+2, f,f+2,f+3);
     simGridNormals(r,nrm,0,ny-1);
     var g=new THREE.BufferGeometry();
     g.setAttribute('position',new THREE.BufferAttribute(pos,3));
     g.setAttribute('color',new THREE.BufferAttribute(col,3));
     g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
-    g.setIndex(idx);
-    var m=new THREE.Mesh(g,simMaterial());
-    m.userData={wallStart:wallStart,wallSrc:wallSrc,bottomStart:f};
-    return m;
+    g.setIndex(simTopIndex(r));
+    var surf=new THREE.Mesh(g,simMaterial());
+    surf.userData={wallStart:wallStart,wallSrc:wallSrc};
+    // cara de abajo: rejilla a paso 2 (sin luces — un tono plano del material basta)
+    var S=2, nbx=Math.floor((nx-1)/S)+1, nby=Math.floor((ny-1)/S)+1;
+    var bpos=new Float32Array(nbx*nby*3);
+    for(gy=0;gy<nby;gy++) for(gx=0;gx<nbx;gx++){
+      var bi=gy*nbx+gx;
+      bpos[3*bi]=r.minx+(gx*S+0.5)*cell; bpos[3*bi+1]=r.miny+(gy*S+0.5)*cell; bpos[3*bi+2]=0;
+    }
+    var bg=new THREE.BufferGeometry();
+    bg.setAttribute('position',new THREE.BufferAttribute(bpos,3));
+    bg.setIndex(simBotIndex(r));
+    var bot=new THREE.Mesh(bg,new THREE.MeshBasicMaterial({color:0x8a7a5c,side:THREE.DoubleSide}));
+    var grp=new THREE.Group(); grp.add(surf); grp.add(bot);
+    S3.surf=surf; S3.bot=bot;
+    return grp;
   }
   function simPick(ev){
     // del clic a una celda del mapa: se recorre el RAYO de la cámara por el mapa de
@@ -2001,26 +2040,46 @@
   }
   function simDeleteWaste(i){
     // como el "delete waste" de Aspire: quita el PEDAZO conectado de material donde
-    // se hizo doble clic (inundación 4-vecinos limitada por los cortes pasantes)
-    var r=S3.res, nx=r.nx, hm=r.hm;
-    if(hm[i]<=0.05){ toast('Ahí ya no queda material'); return; }
+    // se hizo doble clic. La conexión solo cuenta a través de material de MÁS de
+    // medio grosor: los PUENTES (3mm de 15) sí conectan físicamente, pero al sacar
+    // el sobrante se rompen — la inundación no debe cruzarlos.
+    var r=S3.res, nx=r.nx, hm=r.hm, solid=r.thick*0.5;
+    if(hm[i]<solid){ toast('Ahí no hay material sólido que quitar'); return; }
     var stack=[i], seen=new Uint8Array(hm.length), n=0;
     seen[i]=1;
     while(stack.length){
       var c=stack.pop(); n++; hm[c]=0;
       var cx=c%nx, cy=(c/nx)|0;
-      if(cx>0     &&!seen[c-1]  &&hm[c-1]>0.05){ seen[c-1]=1;  stack.push(c-1); }
-      if(cx<nx-1  &&!seen[c+1]  &&hm[c+1]>0.05){ seen[c+1]=1;  stack.push(c+1); }
-      if(cy>0     &&!seen[c-nx] &&hm[c-nx]>0.05){ seen[c-nx]=1; stack.push(c-nx); }
-      if(cy<r.ny-1&&!seen[c+nx] &&hm[c+nx]>0.05){ seen[c+nx]=1; stack.push(c+nx); }
+      if(cx>0     &&!seen[c-1]  &&hm[c-1]>=solid){ seen[c-1]=1;  stack.push(c-1); }
+      if(cx<nx-1  &&!seen[c+1]  &&hm[c+1]>=solid){ seen[c+1]=1;  stack.push(c+1); }
+      if(cy>0     &&!seen[c-nx] &&hm[c-nx]>=solid){ seen[c-nx]=1; stack.push(c-nx); }
+      if(cy<r.ny-1&&!seen[c+nx] &&hm[c+nx]>=solid){ seen[c+nx]=1; stack.push(c+nx); }
     }
-    var g=S3.mesh.geometry, pos=g.attributes.position.array;
-    for(var k=0;k<r.nx*r.ny;k++) pos[3*k+2]=hm[k];
+    for(var k=0;k<seen.length;k++) if(seen[k]) r.removed[k]=1;
+    var g=S3.surf.geometry;
+    g.setIndex(simTopIndex(r));                              // el pedazo quitado deja de EXISTIR (se ve la cuadrícula)
+    S3.bot.geometry.setIndex(simBotIndex(r));
     simGridNormals(r,g.attributes.normal.array,0,r.ny-1);
     simRecolor();
-    ['position','normal'].forEach(function(kk){ var a=g.attributes[kk];
-      a.updateRange={offset:0,count:-1}; a.needsUpdate=true; });
+    g.attributes.normal.updateRange={offset:0,count:-1}; g.attributes.normal.needsUpdate=true;
+    // reenfocar sobre lo que quedó
+    var bx0=1/0,by0=1/0,bx1=-1/0,by1=-1/0;
+    for(var q=0;q<hm.length;q++){
+      if(hm[q]<=0.02||r.removed[q]) continue;
+      var qx=q%nx, qy=(q/nx)|0;
+      if(qx<bx0)bx0=qx; if(qx>bx1)bx1=qx; if(qy<by0)by0=qy; if(qy>by1)by1=qy;
+    }
+    if(isFinite(bx0))
+      simFrame(r.minx+bx0*r.cell, r.miny+by0*r.cell, (bx1-bx0+1)*r.cell, (by1-by0+1)*r.cell);
     toast('Sobrante quitado — el bloque se restaura al reabrir o al animar');
+  }
+  function simFrame(x0,y0,w,h){
+    // encuadre isométrico sobre un rectángulo de la hoja (en mm)
+    var r=S3.res, cx=x0+w/2, cy=y0+h/2, D=Math.max(w,h,r.thick*4)*1.15;
+    S3.controls.target.set(cx,cy,r.thick/2);
+    S3.camera.position.set(cx-D*0.55,cy-D*0.75,D*0.8);
+    S3.camera.near=Math.max(D/500,0.5); S3.camera.far=D*30; S3.camera.updateProjectionMatrix();
+    S3.controls.update();
   }
   function simScene(){
     if(S3.renderer) return;
@@ -2059,7 +2118,9 @@
     var res=simulate(jobs,state.cnc.material,state.work);
     if(!res){ simStat('Ninguna trayectoria baja al material'); return; }
     S3.res=res; S3.anim=null; animBtn(false);
-    if(S3.mesh){ S3.scene.remove(S3.mesh); S3.mesh.geometry.dispose(); S3.mesh.material.dispose(); S3.mesh=null; }
+    if(S3.mesh){ S3.scene.remove(S3.mesh);
+      S3.mesh.children.forEach(function(c){ c.geometry.dispose(); c.material.dispose(); });
+      S3.mesh=null; S3.surf=null; S3.bot=null; }
     if(S3.aux){ S3.scene.remove(S3.aux); S3.aux=null; }
     if(S3.tool){ S3.scene.remove(S3.tool); S3.tool=null; }
     S3.mesh=simMesh(res); S3.scene.add(S3.mesh);
@@ -2070,11 +2131,7 @@
     grid.rotation.x=Math.PI/2;                               // GridHelper nace horizontal en XZ; aquí el piso es XY
     grid.position.set(res.minx+res.w/2,res.miny+res.h/2,-0.15);
     S3.aux=new THREE.Group(); S3.aux.add(grid); S3.aux.add(new THREE.AxesHelper(25)); S3.scene.add(S3.aux);
-    var cx=res.minx+res.w/2, cy=res.miny+res.h/2, D=Math.max(res.w,res.h,res.thick*4);
-    S3.controls.target.set(cx,cy,res.thick/2);
-    S3.camera.position.set(cx-D*0.55,cy-D*0.75,D*0.8);
-    S3.camera.near=Math.max(D/500,0.5); S3.camera.far=D*30; S3.camera.updateProjectionMatrix();
-    S3.controls.update();
+    simFrame(res.minx,res.miny,res.w,res.h);
     simStat('hoja '+Math.round(res.w)+'×'+Math.round(res.h)+' mm · '+res.nx+'×'+res.ny+' celdas ('+(Math.round(res.cell*100)/100)+' mm) · '+Math.round(performance.now()-t0)+' ms');
   }
   // --- R4: animación — reinicia el bloque y estampa los movimientos al paso elegido ---
@@ -2091,12 +2148,14 @@
   }
   function animStart(){
     var r=S3.res; if(!r||!S3.jobs) return;
-    r.hm.fill(r.thick); r.owner.fill(255);
-    var pos=S3.mesh.geometry.attributes.position.array;
+    r.hm.fill(r.thick); r.owner.fill(255); r.removed.fill(0);
+    S3.surf.geometry.setIndex(simTopIndex(r));               // hoja completa otra vez
+    S3.bot.geometry.setIndex(simBotIndex(r));
+    var pos=S3.surf.geometry.attributes.position.array;
     for(var i=0;i<r.nx*r.ny;i++) pos[3*i+2]=r.thick;
-    S3.mesh.geometry.attributes.position.needsUpdate=true;
-    simGridNormals(r,S3.mesh.geometry.attributes.normal.array,0,r.ny-1);
-    S3.mesh.geometry.attributes.normal.needsUpdate=true;
+    S3.surf.geometry.attributes.position.needsUpdate=true;
+    simGridNormals(r,S3.surf.geometry.attributes.normal.array,0,r.ny-1);
+    S3.surf.geometry.attributes.normal.needsUpdate=true;
     simRecolor();
     var total=0;
     S3.jobs.forEach(function(j){ j.moves.forEach(function(v){ total+=Math.max(Math.hypot(v[3]-v[0],v[4]-v[1]),Math.abs(v[5]-v[2])); }); });
@@ -2128,7 +2187,7 @@
     }
     if(ry1>=ry0){
       // subir a la GPU SOLO las filas tocadas (updateRange): la malla es de ~1.4M vértices
-      var g=S3.mesh.geometry, pos=g.attributes.position, col=g.attributes.color, nr=g.attributes.normal;
+      var g=S3.surf.geometry, pos=g.attributes.position, col=g.attributes.color, nr=g.attributes.normal;
       var mode=simModeV, look=el('simLook').value;
       var yA=Math.max(0,ry0-1), yB=Math.min(r.ny-1,ry1+1);
       for(var gy=yA;gy<=yB;gy++) for(var gx=0;gx<r.nx;gx++){
@@ -2146,10 +2205,12 @@
     simStat('cortando… '+Math.min(100,Math.round(A.done/A.total*100))+' %');
     if(A.ji>=S3.jobs.length){                                // terminó: refresco completo (paredes incluidas)
       A.playing=false; animBtn(false);
+      S3.surf.geometry.setIndex(simTopIndex(r));             // al final aparecen los huecos pasantes
+      S3.bot.geometry.setIndex(simBotIndex(r));
       simRecolor();
-      simGridNormals(r,S3.mesh.geometry.attributes.normal.array,0,r.ny-1);
+      simGridNormals(r,S3.surf.geometry.attributes.normal.array,0,r.ny-1);
       ['position','color','normal'].forEach(function(k){    // anular el updateRange parcial de este
-        var a=S3.mesh.geometry.attributes[k];                // mismo frame: el refresco final va COMPLETO
+        var a=S3.surf.geometry.attributes[k];                // mismo frame: el refresco final va COMPLETO
         a.updateRange={offset:0,count:-1}; a.needsUpdate=true; });
       simStat('corte terminado · '+r.nx+'×'+r.ny+' celdas');
     }
