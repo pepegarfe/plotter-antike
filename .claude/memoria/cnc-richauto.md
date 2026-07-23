@@ -5,15 +5,16 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T18:16:35.210Z
+  modified: 2026-07-23T21:16:56.444Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
 
 Jose tiene, además del plotter de corte, una **máquina CNC de 122×244 cm** (cama 1220×2440 mm)
-comprada a **Asia Robotics**, con **controlador RichAuto DSP** (familia A1X — A11/A11E o similar,
-el modelo exacto está por confirmar mirando el handle). Antes la trabajaba con **Vectric Aspire**;
-quiere que Design Studio genere los **archivos G-code** con un flujo lo más parecido a Aspire.
+comprada a **Asia Robotics**, con **controlador RichAuto (AutoNow) A11E** (confirmado por Jose
+el 24-jul-2026 leyendo el handle; "AutoNow" es la marca que serigrafían junto a RichAuto). Antes
+la trabajaba con **Vectric Aspire**; quiere que Design Studio genere los **archivos G-code** con
+un flujo lo más parecido a Aspire.
 
 ## Investigación verificada (manual oficial RichAuto A1X, leído completo el 22-jul-2026)
 
@@ -338,8 +339,10 @@ material de sacrificio. Revisar en el handle: G Code Setup → F Read = "Read F"
 - **Materiales para presets de fresas:** MDF/triplay, acrílico, PVC espumado/coroplast y madera
   sólida. → La biblioteca de herramientas debe nacer con presets por material.
 
-## Pregunta aún abierta
-- Modelo exacto del controlador (A11/A11E/A15/A18 — está serigrafiado en el handle de la máquina).
-  No bloquea nada: toda la familia A1X comparte la misma lista de G-code del manual.
+## Pregunta resuelta (24-jul-2026)
+- ~~Modelo exacto del controlador~~ → **RichAuto (AutoNow) A11E**, confirmado por Jose en el
+  handle. Toda la familia A1X comparte la lista de G-code del manual, así que nada de lo
+  construido cambia; útil para buscar manuales/firmware específicos (p.ej. la unidad del P
+  en G04, aún sin documentar).
 
 Relacionado: [[design-studio]] (donde vivirá la función), [[estado]] (motor compartido).
