@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T00:49:25.758Z
+  modified: 2026-07-23T01:17:16.799Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -54,6 +54,22 @@ Cambios de UI GENERAL que vinieron con ella (aplican a toda la app): **tema clar
 y persistente** (clave `theme` en cnc_config.json), toggle de tema al final del riel izquierdo,
 botón de área de trabajo junto al zoom (píldora propia, contenedor flex), iconos 100% SVG
 (cero emojis/glifos), atajos Cmd+G/Cmd+Shift+G por `e.code`.
+
+## 22-jul-2026: fidelidad de CURVAS arreglada en el MOTOR (plotter_control.py — ambas apps)
+Jose reportó curvas "cuadriculadas" en imports. Causa: los 4 muestreadores (Béziers SVG C/S/Q/T,
+arco A, círculo/elipse a 72 lados FIJOS, Béziers del AI) troceaban con densidad FIJA por unidad
+interna del archivo — un viewBox chico escalado quedaba facetado. **Solución (la de los
+programas pro): aplanado ADAPTATIVO por tolerancia** — `_flat_cubic`/`_flat_quad` (De Casteljau
+recursivo) y `_arc_steps` (sagita), con tolerancia **RELATIVA** (~0.015% del tamaño de la curva
+→ a prueba de escalados posteriores) + **piso absoluto 0.01 mm** (vía escala de la matriz raíz)
++ **pasada final `_simplify_mm`** (Douglas-Peucker a 0.01 mm, en mm, a la salida de SVG/AI/DXF).
+Números verificados: círculo Ø90 → desviación 0.0099 mm (antes 0.048); Bézier de logo viewBox-24
+a 200 mm → 0.0075 mm; escalar ×5 conserva 0.02% del radio; rectas intactas.
+**Gotchas que costaron**: (1) tolerancia relativa POR TRAMO explota en trazos de cientos de
+mini-curvas (potrace: 25k puntos en un círculo) → por eso el piso + la simplificación en mm;
+(2) potrace mete un `<g transform="scale(0.1)">` que el piso calculado solo con la matriz raíz
+no ve → por eso la limpieza final se hace en MM REALES post-matriz, que atrapa todo.
+⚠️ No volver a muestrear curvas con N fijo (ver CLAUDE.md).
 
 ## Novedades sesión 21–22 jul 2026 (LEER al retomar)
 Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `f02e918` (pusheado)**:
