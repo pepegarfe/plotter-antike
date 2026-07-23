@@ -48,6 +48,11 @@ def index():
     return static_file('studio_ui.html', root=HERE)
 
 
+@app.get('/three.bundle.js')
+def three_bundle():
+    return static_file('three.bundle.js', root=HERE)
+
+
 @app.get('/api/workarea')
 def api_workarea():
     return _json({'work': _workarea()})

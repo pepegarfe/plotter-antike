@@ -92,6 +92,11 @@ class Api:
         """Trayectorias del centro de la fresa, para previsualizar en el lienzo."""
         return _cnc_preview(data or {})
 
+    def cnc_tap_text(self, data):
+        """El G-code como TEXTO (sin diálogo): lo consume la Vista 3D, que simula
+        el corte comiéndose el mismo .tap que se llevaría la máquina."""
+        return _cnc_tap(data or {})
+
     def save_tap(self, data):
         """Genera el G-code y lo guarda como .tap con diálogo nativo."""
         r = _cnc_tap(data or {})
