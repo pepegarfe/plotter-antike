@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T01:06:31.822Z
+  modified: 2026-07-23T18:16:35.210Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -305,6 +305,24 @@ M30
     verificadas (acr 1F > 2F en avance). Fuentes: toolstoday.com/learn/understanding-cnc-feeds-
     and-speeds, workshopcalc.com/reference/cnc-feeds-speeds-chart, woodweb.com (PVC foam),
     cncrouterstore.ca chip load chart. ⚠️ Son puntos de partida — se afinan cortando.
+
+- **R. Vista 3D estilo Aspire — ✅ COMMITS 853cb8f (R1+R2) y 9506659 (R3+R4), 23-jul-2026**
+  (Jose validó R1/R2 en pantalla; R3/R4 verificadas en node con el .tap real de chalecos).
+  Botón "3D" junto a Vista previa/Render en el paso CNC. **Decisión clave: la simulación NO
+  reimplementa la lógica de corte — parsea el MISMO .tap que se exporta** (un .tap por
+  trayectoria vía Api `cnc_tap_text`, así cada una usa su fresa; solo hay G00/G01, límite
+  RichAuto), sobre un **mapa de alturas** (rejilla adaptativa, tope ~1.4M celdas): pasadas,
+  rampas y puentes salen solos del G-code. Three.js r128 **local** (`three.bundle.js`, UMD,
+  en el .spec y con ruta propia en studio_server). La textura va **horneada en color por
+  vértice** (la rejilla es más fina que un pixel — sin archivos de imagen): MDF/madera/
+  acrílico/PVC/liso + modos Material/Relleno/Por trayectoria (el mapa guarda el "dueño" de
+  cada celda), pasante = cama gris, **bajo la cama = rojo**. "Guardar imagen…" (Api
+  `save_png`). Animación con fresa a escala, pausa y 4 velocidades; normales por gradiente
+  del mapa (NO `computeVertexNormals`: por filas para `updateRange` parcial por frame; el
+  frame final debe anular el rango y subir completo). **Gotchas de la sesión:** (1) la regla
+  CSS `.simsheet` perdía contra `.sheet` por orden en el archivo → selector `.sheet.simsheet`;
+  (2) probar las funciones de la UI extrayéndolas del HTML con node (`node --check` + eval
+  por marcadores) — permitió verificar sim/malla/colores/anim sin abrir la app.
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
