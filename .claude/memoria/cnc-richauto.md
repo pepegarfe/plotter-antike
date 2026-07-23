@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T00:49:13.891Z
+  modified: 2026-07-23T01:06:31.822Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -231,6 +231,30 @@ M30
     Trayectorias → Vista previa/Render AL FINAL.
   - **Semántica ojo vs Vista previa** (explicada a Jose): el OJO decide qué entra al CORTE
     (afecta el .tap); VISTA PREVIA solo enciende/apaga la capa visual (no afecta el export).
+
+- **I. Seguridad y flujo fino del panel de Corte — ✅ COMMIT caa5092 (22-jul, cierre)**:
+  - **Alerta de TRASPASO**: si `start+depth > grosor`, modal de confirmación antes de Calcular
+    con los mm de exceso y aviso de cama de sacrificio (atravesar 0.2–0.5 es práctica normal —
+    el diálogo confirma, no bloquea). Modal propio `askConfirm()`: **`confirm()` nativo no es
+    fiable dentro de pywebview**.
+  - **Calcular guarda y CIERRA** (como Aspire): crear NO deja la trayectoria seleccionada; el
+    formulario queda limpio para encadenar. "Recalcular" solo al abrir una fila (esa sí
+    permanece seleccionada). Jose tropezó con el comportamiento anterior.
+  - **Fix nombres duplicados "Perfil 1"**: el campo Nombre ESPEJA la selección y se limpia al
+    deseleccionar/cambiar de op (antes heredaba el texto viejo a las nuevas).
+  - **Fix renombrar muerto**: clic de fila con retardo 230ms que el dblclick cancela — cada
+    clic reconstruía la lista y el dblclick aterrizaba en un nodo DESECHADO (editor fantasma).
+    Lección: clic-que-re-renderiza + doble-clic = conflicto; retardo cancelable o no rebuildear.
+  - **"Guardar G-code (.tap)" como paso final del panel** (equivale al Save Toolpaths de
+    Aspire; el botón de la barra superior sigue). Vista previa/Render movidos al final;
+    orden del panel: formulario → Calcular → Trayectorias → vista → guardar.
+  - **Trayectorias y flechas en MAGENTA de marca** (cvar --accent, tema-aware; Render conserva
+    tonos madera). Brecha restante vs Save Toolpaths de Aspire: export automático POR FRESA
+    cuando hay mezcladas (hoy: aviso + apagar ojos a mano) — ofrecido, sin construir.
+  - **Preguntas de Jose respondidas** (dejar explicado, volverá a salir): clic en fila =
+    abrir para editar (2º clic cierra); ojo = qué entra al CORTE vs Vista previa = solo
+    pantalla; la INVERSIÓN de sentido fuera/dentro es física (climb = material a la
+    izquierda del avance → geometría espejeada, sentido espejeado; Aspire igual).
 
 - **UI general de Design Studio (commit 4035c5e, misma noche)**: tema **CLARO por default y
   RECORDADO entre sesiones** (clave `theme` en cnc_config.json — localStorage no es fiable en
