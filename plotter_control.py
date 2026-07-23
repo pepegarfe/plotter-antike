@@ -897,7 +897,9 @@ _ACI = {1:(1,0,0),2:(1,1,0),3:(0,1,0),4:(0,1,1),5:(0,0,1),
         6:(1,0,1),7:(1,1,1),8:(.416,.416,.416),9:(.753,.753,.753)}
 
 class DXFParser:
-    # Max chord-to-arc deviation for DISPLAY (dense sampling for visual smoothness)
+    # Tolerancia de aplanado en UNIDADES DEL DIBUJO. ⚠️ Se recalcula en parse() con la
+    # escala $INSUNITS: un DXF declarado en metros o pulgadas escala DESPUÉS del muestreo,
+    # y una tolerancia fija de 0.001 unidades se volvía 1 mm reales (curvas cuadriculadas).
     _TOL = 0.001
     # Endpoint-matching tolerance for path chaining (two points are "same" if closer than this)
     _CHAIN_TOL = 0.01
@@ -920,8 +922,9 @@ class DXFParser:
         if ea <= sa:
             ea += 2 * math.pi
         span = ea - sa
-        arg = max(-1.0, min(1.0, 1.0 - self._TOL / r))
-        n_full = max(96, math.ceil(math.pi / math.acos(arg)))
+        tol = max(getattr(self, '_tol', self._TOL), r * 1.5e-4)
+        arg = max(-1.0, min(1.0, 1.0 - tol / r))
+        n_full = max(48, math.ceil(math.pi / math.acos(arg)))
         n = max(12, math.ceil(n_full * span / (2 * math.pi)))
         return [(cx + r * math.cos(sa + span * k / n),
                  cy + r * math.sin(sa + span * k / n))
@@ -931,8 +934,9 @@ class DXFParser:
         """Sample a full circle → closed point list with deviation ≤ _TOL."""
         if r <= 0:
             return []
-        arg = max(-1.0, min(1.0, 1.0 - self._TOL / r))
-        n = max(96, math.ceil(math.pi / math.acos(arg)))
+        tol = max(getattr(self, '_tol', self._TOL), r * 1.5e-4)
+        arg = max(-1.0, min(1.0, 1.0 - tol / r))
+        n = max(48, math.ceil(math.pi / math.acos(arg)))
         pts = [(cx + r * math.cos(2 * math.pi * k / n),
                 cy + r * math.sin(2 * math.pi * k / n))
                for k in range(n)]
@@ -1003,7 +1007,7 @@ class DXFParser:
                     result.append(self._wrap(pts, color))
 
             elif t in ('ELLIPSE', 'SPLINE'):
-                pts = [(p[0], p[1]) for p in entity.flattening(self._TOL)]
+                pts = [(p[0], p[1]) for p in entity.flattening(getattr(self, '_tol', self._TOL))]
                 if len(pts) >= 2:
                     result.append(self._wrap(pts, color))
 
@@ -1114,6 +1118,8 @@ class DXFParser:
         # Determinar factor de escala unidades DXF → mm
         insunits = doc.header.get('$INSUNITS', 4)
         scale = self._INSUNITS_TO_MM.get(insunits, 1.0)
+        # tolerancia de muestreo = 0.01 mm REALES expresados en unidades del dibujo
+        self._tol = 0.01 / max(scale, 1e-9)
 
         result = []
         for entity in doc.modelspace():
