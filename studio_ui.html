@@ -664,7 +664,7 @@
       <button class="pbtn" id="simShot" title="Guardar lo que se ve como imagen PNG (prueba para el cliente)">Guardar imagen…</button>
     </div>
     <div id="simView"></div>
-    <div id="simFoot"><span>Arrastrar = orbitar · rueda = zoom · clic derecho = mover · <b>doble clic = quitar el sobrante</b> · rojo = la fresa pasa DEBAJO de la cama</span><span id="simStat"></span></div>
+    <div id="simFoot"><span>Arrastrar = orbitar · rueda = zoom · clic derecho = mover · <b>doble clic = quitar el sobrante</b> · rojo = muerde la cama más de 0.5 mm</span><span id="simStat"></span></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -1860,7 +1860,7 @@
     // mat = solo material (más hondo, más sombra) · fill = zonas cortadas en un color ·
     // tp = un color por trayectoria. Pasante = cama; bajo la cama = ROJO (mordida).
     var h=r.hm[i], tex=SIMLOOKS[look]||SIMLOOKS.plain;
-    if(h<-0.01) return SIM_BAD;
+    if(h<-SIM_OVER) return SIM_BAD;                          // mordida GRAVE a la cama
     if(h<=0.02) return SIM_BED;
     var x=r.minx+(i%r.nx+0.5)*r.cell, y=r.miny+((i/r.nx|0)+0.5)*r.cell, c=tex(x,y);
     if(h>=r.thick-1e-3) return c;
@@ -1930,11 +1930,14 @@
       nrm[3*i]=vx/L; nrm[3*i+1]=vy/L; nrm[3*i+2]=1/L;
     }
   }
+  var SIM_OVER=0.5;   // mm de mordida a la cama que se consideran NORMALES (el margen
+                      // de taller para garantizar el pasante, con cama de sacrificio)
   function simEmpty(r,i){
-    // celda SIN geometría: sobrante quitado, o corte pasante limpio (se ve la
-    // cuadrícula a través — así "atravesó" se distingue de un cajeado hondo).
-    // El sobrecorte (rojo) SÍ se dibuja: es una advertencia, no debe desaparecer.
-    return r.removed[i]===1 || (r.hm[i]<=0.02 && r.hm[i]>=-0.01);
+    // celda SIN geometría: sobrante quitado, o corte pasante (se ve la cuadrícula
+    // a través — así "atravesó" se distingue de un cajeado hondo). El margen típico
+    // de sobrecorte (≤0.5mm) cuenta como pasante limpio; SOLO una mordida mayor se
+    // queda dibujada en rojo como advertencia.
+    return r.removed[i]===1 || (r.hm[i]<=0.02 && r.hm[i]>=-SIM_OVER);
   }
   function simTopIndex(r){
     // triángulos de la superficie + paredes de la orilla, saltándose los huecos
@@ -2132,7 +2135,10 @@
     grid.position.set(res.minx+res.w/2,res.miny+res.h/2,-0.15);
     S3.aux=new THREE.Group(); S3.aux.add(grid); S3.aux.add(new THREE.AxesHelper(25)); S3.scene.add(S3.aux);
     simFrame(res.minx,res.miny,res.w,res.h);
-    simStat('hoja '+Math.round(res.w)+'×'+Math.round(res.h)+' mm · '+res.nx+'×'+res.ny+' celdas ('+(Math.round(res.cell*100)/100)+' mm) · '+Math.round(performance.now()-t0)+' ms');
+    var hmin=1/0;
+    for(var hq=0;hq<res.hm.length;hq++) if(res.hm[hq]<hmin) hmin=res.hm[hq];
+    var over=(hmin<-0.01)? ' · pasa la cama '+(Math.round(-hmin*100)/100)+' mm'+(hmin<-SIM_OVER?' ⚠':'') : '';
+    simStat('hoja '+Math.round(res.w)+'×'+Math.round(res.h)+' mm · '+res.nx+'×'+res.ny+' celdas ('+(Math.round(res.cell*100)/100)+' mm)'+over);
   }
   // --- R4: animación — reinicia el bloque y estampa los movimientos al paso elegido ---
   function animBtn(on){ el('simPlay').innerHTML=on?'&#10073;&#10073; Pausa':'&#9654; Animar'; }
