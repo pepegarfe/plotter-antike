@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T22:59:28.811Z
+  modified: 2026-07-23T23:38:49.633Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -306,6 +306,11 @@ M30
     verificadas (acr 1F > 2F en avance). Fuentes: toolstoday.com/learn/understanding-cnc-feeds-
     and-speeds, workshopcalc.com/reference/cnc-feeds-speeds-chart, woodweb.com (PVC foam),
     cncrouterstore.ca chip load chart. ⚠️ Son puntos de partida — se afinan cortando.
+  - **Re-validada contra tablas publicadas el 24-jul** (workshopcalc, toolgrit, shopbot):
+    todos los presets caen dentro/centro de los rangos. Dos ajustes aplicados (código Y
+    config): 6mm-2F/mdf avance 3600→4000 (más mordida, contra la rebaba por frotado) y
+    3.175-2F/madera 1800→1600 (entrar al rango; las 1/8" son frágiles). ⚠️ Las tablas
+    difieren entre sí hasta 50% — el árbitro es el borde cortado.
 
 - **R. Vista 3D estilo Aspire — ✅ COMMITS 853cb8f (R1+R2) y 9506659 (R3+R4), 23-jul-2026**
   (Jose validó R1/R2 en pantalla; R3/R4 verificadas en node con el .tap real de chalecos).
