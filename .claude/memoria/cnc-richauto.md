@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-22T23:25:14.630Z
+  modified: 2026-07-23T00:11:15.671Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -189,8 +189,20 @@ M30
     **Holgura** (± mm sobre el offset; positiva deja material); en Material: **Z segura**
     (clearance) y **checkbox "volver a 0,0"** (home_end) — van en `cnc_config.json` y
     `cnc_get()` migra configs viejas completando llaves faltantes del material.
-  - Diferido consciente (existe en Aspire, es pulido): leads, rampas zig-zag/espiral, editor
-    de tabs con clic, preview 3D.
+  - Diferido consciente (existe en Aspire, es pulido): leads, editor de tabs con clic,
+    preview 3D.
+  - **Rampas COMPLETAS estilo Aspire (22-jul noche)**: tipos Suave/Zigzag/Espiral + definir
+    por Ángulo o Distancia (`ramp={'type','mode','v'}`; bool legado sigue valiendo).
+    Espiral = bajada repartida en toda la vuelta (overlap=False en `_ring_pass`) + vuelta
+    plana final; Zigzag = `_zigzag_pass` (vaivén con reversa) + vuelta a fondo. Verificadas
+    pendientes exactas por ángulo y distancia, reversa del zigzag, espiral+puentes.
+    ⚠️ **Gotcha**: `build_jobs` hacía `bool(j.get('ramp'))` (legado) y colapsaba el dict de
+    configuración a True — la señal fue "pendiente clavada en la constante vieja pese a pedir
+    5°". Al extender un parámetro de bool a dict, cazar TODOS los casts intermedios.
+  - **Husillo antihorario (M04)**: NO se expone — Aspire tampoco lo tiene (verificado en foros
+    Vectric: lo resuelven editando el archivo). Las fresas estándar son de mano derecha (M03);
+    la decisión real giro-vs-avance es Concordante/Convencional, que ya existe. RichAuto sí
+    soporta M04 si algún día hay fresa zurda.
   - **Añadidos 22-jul tarde (pedidos de Jose tras comparar con Aspire)**:
     · **Pasadas EDITABLES** (como "Edit Passes"): el campo se auto-calcula pero al escribir N
       se reparte la profundidad en N pasadas parejas (`effPassDepth` ajusta el pass_depth del
