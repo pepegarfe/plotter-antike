@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T22:52:48.967Z
+  modified: 2026-07-23T22:59:28.811Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -372,9 +372,14 @@ movimientos" y el hueco tiene 5 puntos vs 69 del exterior) — verificar el orde
   A11E y los movimientos lentos en aire dependen de Read F. **Historia**: la espera de 5→10s
   del archivo "no hacía ninguna diferencia" porque el handle ignoraba ambos mecanismos; los
   ~4s que sí esperaba eran el Spindle delay de fábrica (4000ms).
-- **Tabla REAL de marchas del A11E (leída del handle por Jose, 24-jul)**: `MACHINE SETUP →
-  Spindle Setup → Spindle speed` — **8 marchas, S1=18000 DESCENDIENDO 1000 por marcha hasta
-  S8=11000** (¡S1 es la más rápida!). `SpdlCnt = 3` (cableado multi-speed Count 3 — no tocar).
+- **Marchas del A11E — LA FÍSICA CONTRADIJO AL MENÚ (24-jul, lección importante)**: el menú
+  `MACHINE SETUP → Spindle Setup → Spindle speed` listaba "1..8 desde 18000 bajando 1000",
+  pero al PROBAR girando el husillo: **S1 = PARADO** (combinación muerta del cableado
+  Count 3) y **S2→S8 ASCENDENTE**. La tabla leída del menú habría mandado el MDF a S1 =
+  fresa hundiéndose SIN GIRAR. **Tabla en la app (PROVISIONAL, pendiente de leer los Hz del
+  variador por marcha): [100(S1 bloqueada), 12000, 13000, 14000, 15000, 16000, 17000, 18000]**
+  → mdf S8, acr S6, pvc S4. Para calibrarla exacta: husillo a mano, recorrer S2..S8 leyendo
+  el display del variador (RPM = Hz × 60) y capturar en "Marchas…". `SpdlCnt = 3` (no tocar).
   La app la trae capturada (material.gears) y elige marcha por CERCANÍA de RPM del preset:
   mdf 18000→S1, acr 16000→S3, pvc 14000→S5. ⚠️ **Tabla del handle y modal "Marchas…" de la
   app son PAREJA ESPEJO**: si alguien cambia una, actualizar la otra el mismo día (la app
