@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T21:33:21.650Z
+  modified: 2026-07-23T21:47:59.502Z
 ---
 
 # CNC RichAuto — integración a Design Studio (planeada 22-jul-2026)
@@ -361,6 +361,21 @@ ambos ceros de Z, multi-trabajo, rechazo de fresas mezcladas, y el bloque de esp
 Además se midió sobre la simulación 3D (mismo .tap): pieza 100.09mm, kerf 5.96≈6, 3 puentes.
 ⚠️ El primer hallazgo de la batería fue un bug DEL PROPIO TEST (medía "el primer cuarto de
 movimientos" y el hueco tiene 5 puntos vs 69 del exterior) — verificar el orden por ANILLOS.
+
+## Configuración del handle A11E (rutas EXACTAS del manual oficial, leído 24-jul-2026)
+- **Velocidades del archivo**: `MENU → AUTO PRO SETUP → G Code Setup` → **`F Read = Read F`**
+  y **`S Read = Read S`** (fábrica: `Ign F`/`Ign S` — ignora TODAS las F/S del G-code y usa su
+  "Work Speed"; así trabajó siempre con Aspire sin saberlo).
+- **Espera de husillo NATIVA**: `MENU → MACHINE SETUP → Spindle Setup → Spindle delay`, en
+  **MILISEGUNDOS** (incluye arranque y paro). Jose la necesita ~**10000** (su husillo tarda en
+  llegar a RPM). Este es EL mecanismo correcto — el G04 del archivo resultó inocuo en su
+  A11E y los movimientos lentos en aire dependen de Read F. **Historia**: la espera de 5→10s
+  del archivo "no hacía ninguna diferencia" porque el handle ignoraba ambos mecanismos; los
+  ~4s que sí esperaba eran el Spindle delay de fábrica (4000ms).
+- `Spindle state` (mismo menú): multi-speed vs on/off — si el husillo va por perilla del
+  variador, el S no aplica. (Pendiente: ver cómo está el de Jose.)
+- El manual completo quedó descargable: forsuncnc.com → DSP-A11-User's-Manual.pdf (86 págs;
+  G Code Setup en pág 22 del PDF, Spindle Setup en pág 18).
 
 **Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
