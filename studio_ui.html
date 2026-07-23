@@ -650,9 +650,9 @@
   <div class="sheet simsheet">
     <div class="sheet-h"><h3>Vista 3D — simulación del corte</h3><button id="simClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     <div id="simBar">
-      <div class="seg" id="simMode" title="Cómo pintar las zonas maquinadas"><button class="on" data-m="mat">Material</button><button data-m="fill">Relleno</button><button data-m="tp">Por trayectoria</button></div>
+      <div class="seg" id="simMode"><button class="on" data-m="mat" title="Todo con el aspecto real del material (los cortes muestran su interior: chapas del triplay, fibra del MDF…)">Material</button><button data-m="fill" title="Lo maquinado en UN color gris — para revisar de un vistazo qué se corta y qué no">Relleno</button><button data-m="tp" title="Cada trayectoria pinta lo suyo de un color distinto — para ver qué corte hizo qué zona">Por trayectoria</button></div>
       <select class="selfield" id="simLook" title="Aspecto del material del bloque" style="flex:none;width:auto">
-        <option value="mdf">MDF / triplay</option><option value="mad">Madera</option>
+        <option value="mdf">MDF</option><option value="tri">Triplay</option><option value="mad">Madera</option>
         <option value="acr">Acrílico</option><option value="pvc">PVC</option><option value="plain">Liso</option>
       </select>
       <span style="flex:1"></span>
@@ -664,7 +664,7 @@
       <button class="pbtn" id="simShot" title="Guardar lo que se ve como imagen PNG (prueba para el cliente)">Guardar imagen…</button>
     </div>
     <div id="simView"></div>
-    <div id="simFoot"><span>Arrastrar = orbitar · rueda = zoom · clic derecho = mover · rojo = la fresa pasa DEBAJO de la cama</span><span id="simStat"></span></div>
+    <div id="simFoot"><span>Arrastrar = orbitar · rueda = zoom · clic derecho = mover · <b>doble clic = quitar el sobrante</b> · rojo = la fresa pasa DEBAJO de la cama</span><span id="simStat"></span></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -1752,20 +1752,26 @@
     });
     return mv;
   }
-  function simGrid(jobs,mat){
-    // el bloque: bbox de los movimientos que tocan material + radio de fresa + margen
+  function simGrid(jobs,mat,work){
+    // la hoja = el ÁREA DE TRABAJO configurada (como el bloque de material de Aspire),
+    // ampliada solo si alguna trayectoria se sale de ella (mejor ver el error que taparlo)
     var thick=parseFloat(mat.thickness)||15, ztop=(mat.z_zero==='bed')?thick:0;
-    var minx=1/0,miny=1/0,maxx=-1/0,maxy=-1/0;
+    var minx=1/0,miny=1/0,maxx=-1/0,maxy=-1/0, any=false;
     jobs.forEach(function(j){ j.moves.forEach(function(v){
-      if(v[2]>=ztop-1e-9&&v[5]>=ztop-1e-9) return;          // vuelo en el aire: no define el bloque
+      if(v[2]>=ztop-1e-9&&v[5]>=ztop-1e-9) return;          // vuelo en el aire: no cuenta
+      any=true;
       minx=Math.min(minx,v[0],v[3]); maxx=Math.max(maxx,v[0],v[3]);
       miny=Math.min(miny,v[1],v[4]); maxy=Math.max(maxy,v[1],v[4]); }); });
-    if(!isFinite(minx)) return null;
-    var marg=Math.max.apply(null,jobs.map(function(j){return j.rad;}))+6;
+    if(!any) return null;
+    var marg=Math.max.apply(null,jobs.map(function(j){return j.rad;}))+2;
     minx-=marg; miny-=marg; maxx+=marg; maxy+=marg;
+    if(work&&work[0]>0&&work[1]>0){
+      minx=Math.min(minx,0); miny=Math.min(miny,0);
+      maxx=Math.max(maxx,work[0]); maxy=Math.max(maxy,work[1]);
+    }
     var W=maxx-minx, H=maxy-miny;
-    // resolución adaptativa: celdas finas en trabajos chicos, tope de ~1.4M celdas en grandes
-    var cell=Math.max(0.15, Math.sqrt(W*H/1.4e6));
+    // resolución adaptativa: celdas finas en trabajos chicos, tope de ~2.4M celdas en la cama completa
+    var cell=Math.max(0.15, Math.sqrt(W*H/2.4e6));
     var nx=Math.max(2,Math.round(W/cell)), ny=Math.max(2,Math.round(H/cell));
     var hm=new Float32Array(nx*ny); hm.fill(thick);
     var owner=new Uint8Array(nx*ny); owner.fill(255);       // qué trayectoria cortó cada celda
@@ -1793,8 +1799,8 @@
     }
     return ry1>=ry0? [ry0,ry1] : null;
   }
-  function simulate(jobs,mat){
-    var r=simGrid(jobs,mat);
+  function simulate(jobs,mat,work){
+    var r=simGrid(jobs,mat,work);
     if(!r) return null;
     jobs.forEach(function(j,ji){ j.moves.forEach(function(v){ stampMove(r,j.rad,ji,v); }); });
     return r;
@@ -1808,9 +1814,15 @@
     return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
   }
   var SIMLOOKS={
-    mdf:  function(x,y){ var n=0.94+0.09*noise2(x*3.1,y*3.1);
-      if(hash2(Math.floor(x*4),Math.floor(y*4))>0.986) n*=0.82;      // motitas de fibra prensada
-      return [0.85*n,0.78*n,0.62*n]; },
+    // caras vistas DESDE ARRIBA (la superficie de la hoja). El MDF real es liso y
+    // parejo (fibra prensada, casi sin dibujo); el triplay lleva chapa con veta fina.
+    mdf:  function(x,y){ var n=0.965+0.05*noise2(x*3.1,y*3.1);
+      if(hash2(Math.floor(x*4),Math.floor(y*4))>0.99) n*=0.88;       // motitas escasas de fibra
+      return [0.78*n,0.70*n,0.54*n]; },
+    tri:  function(x,y){ var g=noise2(x*0.05,y*1.3), s=Math.sin(y*0.9+g*11)*0.5+0.5;
+      var t=s*0.30+0.25*noise2(x*0.7,y*2.5);
+      var st=noise2(x*0.02,y*0.35); if(st>0.72) t+=0.9*(st-0.72);    // vetas ocasionales marcadas
+      return [0.88-0.16*t, 0.78-0.17*t, 0.58-0.16*t]; },
     mad:  function(x,y){ var g=noise2(x*0.045,y*0.6), s=Math.sin(y*1.15+g*13)*0.5+0.5;
       var t=s*0.55+0.45*noise2(x*0.8,y*2.2);                          // vetas a lo largo de X
       return [0.80-0.20*t, 0.63-0.20*t, 0.42-0.15*t]; },
@@ -1818,6 +1830,26 @@
     pvc:  function(x,y){ var n=0.985+0.015*noise2(x*2.5,y*2.5); return [0.93*n,0.93*n,0.95*n]; },
     plain:function(){ return [0.85,0.80,0.66]; }
   };
+  // lo que se ve DENTRO del corte (paredes y fondos), por material. mode: 0=nada,
+  // 1=color sólido, 2=chapas alternadas (triplay). Las paredes las pinta el SHADER
+  // según la altura real (por eso el triplay muestra sus capas en cualquier pared).
+  var SIMSIDE={
+    mdf:  {mode:1, a:[0.70,0.62,0.47]},                              // fibra: pareja, algo más oscura
+    tri:  {mode:2, a:[0.84,0.70,0.48], b:[0.56,0.42,0.28]},          // chapas claras/oscuras apiladas
+    mad:  {mode:1, a:[0.55,0.41,0.27]},
+    acr:  {mode:1, a:[0.90,0.93,0.95]},                              // canto maquinado: esmerilado
+    pvc:  {mode:1, a:[0.90,0.90,0.92]},
+    plain:{mode:0, a:[0.85,0.80,0.66]}
+  };
+  function plyT(thick){ return thick/Math.max(3,Math.round(thick/1.6)); }   // chapa real ≈1.6 mm
+  function matFloor(look,x,y,h,thick){
+    // color del FONDO de un corte a la altura h (las paredes van por shader)
+    var sd=SIMSIDE[look]||SIMSIDE.plain, n=0.97+0.06*noise2(x*2.3,y*2.3);
+    if(look==='tri'){ var c=(Math.floor(h/plyT(thick))%2)?sd.b:sd.a; return [c[0]*n,c[1]*n,c[2]*n]; }
+    if(look==='mad'){ var c2=SIMLOOKS.mad(x,y); return [c2[0]*0.72,c2[1]*0.72,c2[2]*0.72]; }
+    if(look==='plain'){ var s=1-0.4*Math.min(1,(thick-h)/thick), c3=sd.a; return [c3[0]*s,c3[1]*s,c3[2]*s]; }
+    return [sd.a[0]*n,sd.a[1]*n,sd.a[2]*n];
+  }
   var SIM_BED=[0.36,0.38,0.42], SIM_BAD=[0.85,0.22,0.22], SIM_FILL=[0.72,0.74,0.78];
   function tpColor(j){ var h=(j*137.508)%360/60, c=0.62, m=0.30;      // paleta por trayectoria
     var x=c*(1-Math.abs(h%2-1)), r=[c,x,0,0,x,c][Math.floor(h)%6], g=[x,c,c,x,0,0][Math.floor(h)%6], b=[0,0,x,c,c,x][Math.floor(h)%6];
@@ -1833,12 +1865,47 @@
     if(h>=r.thick-1e-3) return c;
     if(mode==='fill') return SIM_FILL;
     if(mode==='tp'&&r.owner[i]!==255) return tpColor(r.owner[i]);
-    var s=1-0.5*Math.min(1,(r.thick-h)/r.thick);                     // material: sombra por profundidad
-    return [c[0]*s,c[1]*s,c[2]*s];
+    return matFloor(look,x,y,h,r.thick);                             // material: el fondo del corte real
+  }
+  function simMaterial(){
+    // Lambert + colores por vértice, con un injerto de shader: en las caras casi
+    // verticales (paredes de corte y cantos de la hoja) el color sale de la ALTURA
+    // real del pixel — así el triplay muestra sus chapas apiladas, cosa imposible
+    // con colores por vértice (se interpolarían en un degradado).
+    var m=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+    m.onBeforeCompile=function(sh){
+      var c=S3.sideCfg||{mode:0,a:[0,0,0],b:[0,0,0],ply:1.6};
+      sh.uniforms.uSideMode={value:c.mode};
+      sh.uniforms.uSideA={value:new THREE.Vector3(c.a[0],c.a[1],c.a[2])};
+      sh.uniforms.uSideB={value:new THREE.Vector3(c.b[0],c.b[1],c.b[2])};
+      sh.uniforms.uPlyT={value:c.ply};
+      sh.vertexShader=sh.vertexShader
+        .replace('#include <common>','#include <common>\nvarying float vWZ; varying float vNz;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvWZ=position.z; vNz=normal.z;');
+      sh.fragmentShader=sh.fragmentShader
+        .replace('#include <common>','#include <common>\nvarying float vWZ; varying float vNz;\nuniform float uSideMode; uniform vec3 uSideA; uniform vec3 uSideB; uniform float uPlyT;')
+        .replace('#include <color_fragment>','#include <color_fragment>\n'+
+          'if(uSideMode>0.5){\n'+
+          '  float side=1.0-smoothstep(0.45,0.75,abs(vNz));\n'+
+          '  if(side>0.001){\n'+
+          '    vec3 sc=uSideA;\n'+
+          '    if(uSideMode>1.5){ sc=mix(uSideA,uSideB,mod(floor(vWZ/uPlyT),2.0)); }\n'+
+          '    diffuseColor.rgb=mix(diffuseColor.rgb,sc,side);\n'+
+          '  }\n}');
+      m.userData.sh=sh;
+    };
+    return m;
   }
   function simRecolor(){
     if(!S3.mesh||!S3.res) return;
     var r=S3.res, mode=simModeV, look=el('simLook').value;
+    var sd=(mode==='mat')?(SIMSIDE[look]||SIMSIDE.plain):{mode:0,a:[0,0,0]};
+    S3.sideCfg={mode:sd.mode, a:sd.a, b:sd.b||sd.a, ply:plyT(r.thick)};
+    var sh=S3.mesh.material.userData.sh;
+    if(sh){ sh.uniforms.uSideMode.value=S3.sideCfg.mode;
+      sh.uniforms.uSideA.value.set(S3.sideCfg.a[0],S3.sideCfg.a[1],S3.sideCfg.a[2]);
+      sh.uniforms.uSideB.value.set(S3.sideCfg.b[0],S3.sideCfg.b[1],S3.sideCfg.b[2]);
+      sh.uniforms.uPlyT.value=S3.sideCfg.ply; }
     var col=S3.mesh.geometry.attributes.color, arr=col.array, ud=S3.mesh.userData;
     for(var i=0;i<r.nx*r.ny;i++){
       var c=simVColor(r,i,mode,look);
@@ -1904,15 +1971,64 @@
     g.setAttribute('color',new THREE.BufferAttribute(col,3));
     g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
     g.setIndex(idx);
-    var m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}));
+    var m=new THREE.Mesh(g,simMaterial());
     m.userData={wallStart:wallStart,wallSrc:wallSrc,bottomStart:f};
     return m;
+  }
+  function simPick(ev){
+    // del clic a una celda del mapa: se recorre el RAYO de la cámara por el mapa de
+    // alturas (muchísimo más barato que un raycast contra 2.8M de triángulos)
+    var r=S3.res; if(!r) return null;
+    var b=S3.renderer.domElement.getBoundingClientRect();
+    var rc=new THREE.Raycaster();
+    rc.setFromCamera({x:((ev.clientX-b.left)/b.width)*2-1, y:-((ev.clientY-b.top)/b.height)*2+1}, S3.camera);
+    var o=rc.ray.origin, d=rc.ray.direction, t0=0, t1=1/0;
+    [[o.x,d.x,r.minx,r.minx+r.w],[o.y,d.y,r.miny,r.miny+r.h],[o.z,d.z,-1,r.thick+0.01]].forEach(function(ax){
+      if(Math.abs(ax[1])<1e-9){ if(ax[0]<ax[2]||ax[0]>ax[3]){ t0=1; t1=0; } return; }
+      var a=(ax[2]-ax[0])/ax[1], b2=(ax[3]-ax[0])/ax[1], tmp;
+      if(a>b2){ tmp=a; a=b2; b2=tmp; }
+      if(a>t0)t0=a; if(b2<t1)t1=b2;
+    });
+    if(t0>=t1) return null;
+    var horiz=Math.hypot(d.x,d.y);
+    var dt=horiz>1e-6? r.cell*0.5/horiz : (r.thick/40)/Math.max(Math.abs(d.z),1e-9);
+    for(var t=Math.max(t0,0); t<=t1; t+=dt){
+      var gx=Math.floor((o.x+d.x*t-r.minx)/r.cell), gy=Math.floor((o.y+d.y*t-r.miny)/r.cell);
+      if(gx<0||gy<0||gx>=r.nx||gy>=r.ny) continue;
+      if(o.z+d.z*t<=r.hm[gy*r.nx+gx]) return gy*r.nx+gx;
+    }
+    return null;
+  }
+  function simDeleteWaste(i){
+    // como el "delete waste" de Aspire: quita el PEDAZO conectado de material donde
+    // se hizo doble clic (inundación 4-vecinos limitada por los cortes pasantes)
+    var r=S3.res, nx=r.nx, hm=r.hm;
+    if(hm[i]<=0.05){ toast('Ahí ya no queda material'); return; }
+    var stack=[i], seen=new Uint8Array(hm.length), n=0;
+    seen[i]=1;
+    while(stack.length){
+      var c=stack.pop(); n++; hm[c]=0;
+      var cx=c%nx, cy=(c/nx)|0;
+      if(cx>0     &&!seen[c-1]  &&hm[c-1]>0.05){ seen[c-1]=1;  stack.push(c-1); }
+      if(cx<nx-1  &&!seen[c+1]  &&hm[c+1]>0.05){ seen[c+1]=1;  stack.push(c+1); }
+      if(cy>0     &&!seen[c-nx] &&hm[c-nx]>0.05){ seen[c-nx]=1; stack.push(c-nx); }
+      if(cy<r.ny-1&&!seen[c+nx] &&hm[c+nx]>0.05){ seen[c+nx]=1; stack.push(c+nx); }
+    }
+    var g=S3.mesh.geometry, pos=g.attributes.position.array;
+    for(var k=0;k<r.nx*r.ny;k++) pos[3*k+2]=hm[k];
+    simGridNormals(r,g.attributes.normal.array,0,r.ny-1);
+    simRecolor();
+    ['position','normal'].forEach(function(kk){ var a=g.attributes[kk];
+      a.updateRange={offset:0,count:-1}; a.needsUpdate=true; });
+    toast('Sobrante quitado — el bloque se restaura al reabrir o al animar');
   }
   function simScene(){
     if(S3.renderer) return;
     S3.renderer=new THREE.WebGLRenderer({antialias:true});
     S3.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
     el('simView').appendChild(S3.renderer.domElement);
+    S3.renderer.domElement.addEventListener('dblclick',function(ev){
+      var i=simPick(ev); if(i!=null) simDeleteWaste(i); });
     S3.scene=new THREE.Scene();
     S3.camera=new THREE.PerspectiveCamera(45,1,1,50000);
     S3.camera.up.set(0,0,1);                                 // en la CNC la Z es la altura
@@ -1940,7 +2056,7 @@
   function runSim(jobs){
     var t0=performance.now();
     S3.jobs=jobs;
-    var res=simulate(jobs,state.cnc.material);
+    var res=simulate(jobs,state.cnc.material,state.work);
     if(!res){ simStat('Ninguna trayectoria baja al material'); return; }
     S3.res=res; S3.anim=null; animBtn(false);
     if(S3.mesh){ S3.scene.remove(S3.mesh); S3.mesh.geometry.dispose(); S3.mesh.material.dispose(); S3.mesh=null; }
@@ -1959,7 +2075,7 @@
     S3.camera.position.set(cx-D*0.55,cy-D*0.75,D*0.8);
     S3.camera.near=Math.max(D/500,0.5); S3.camera.far=D*30; S3.camera.updateProjectionMatrix();
     S3.controls.update();
-    simStat(res.nx+'×'+res.ny+' celdas · '+(Math.round(res.cell*100)/100)+' mm/celda · '+Math.round(performance.now()-t0)+' ms');
+    simStat('hoja '+Math.round(res.w)+'×'+Math.round(res.h)+' mm · '+res.nx+'×'+res.ny+' celdas ('+(Math.round(res.cell*100)/100)+' mm) · '+Math.round(performance.now()-t0)+' ms');
   }
   // --- R4: animación — reinicia el bloque y estampa los movimientos al paso elegido ---
   function animBtn(on){ el('simPlay').innerHTML=on?'&#10073;&#10073; Pausa':'&#9654; Animar'; }
@@ -1984,13 +2100,16 @@
     simRecolor();
     var total=0;
     S3.jobs.forEach(function(j){ j.moves.forEach(function(v){ total+=Math.max(Math.hypot(v[3]-v[0],v[4]-v[1]),Math.abs(v[5]-v[2])); }); });
-    S3.anim={ji:0,mi:0,t:0,playing:true,total:Math.max(total,1e-6),done:0};
+    // a la animación se entra viendo la hoja SÓLIDA un instante (0% cortado)
+    S3.anim={ji:0,mi:0,t:0,playing:true,total:Math.max(total,1e-6),done:0,
+             startAt:performance.now()+700};
     if(S3.tool){ S3.scene.remove(S3.tool); }
     S3.tool=animToolMesh(S3.jobs[0].rad); S3.scene.add(S3.tool);
     animBtn(true);
   }
   function animTick(){
     var A=S3.anim, r=S3.res, budget=parseFloat(el('simSpeed').value);
+    if(performance.now()<A.startAt){ simStat('cortando… 0 %'); return; }
     var ry0=r.ny, ry1=-1, guard=4000;
     while(budget>0&&A.ji<S3.jobs.length&&guard-->0){
       var job=S3.jobs[A.ji], v=job.moves[A.mi];
