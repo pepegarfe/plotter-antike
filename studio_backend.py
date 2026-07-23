@@ -320,7 +320,17 @@ def _cnc_make(data):
         if v <= 0:
             tabs = None
     return (op, tps, drills, skipped, tool, material, depth, tabs,
-            bool(data.get('ramp')), data.get('name') or 'diseno')
+            _norm_ramp(data.get('ramp')), data.get('name') or 'diseno')
+
+
+def _norm_ramp(r):
+    """True/False (legado) o dict {'on','type','mode','v'} → lo que espera cnc_gcode."""
+    if isinstance(r, dict):
+        if not r.get('on', True):
+            return None
+        return {'type': r.get('type', 'smooth'), 'mode': r.get('mode', 'angle'),
+                'v': float(r.get('v') or 0) or None}
+    return bool(r)
 
 
 def _as_job(data):

@@ -15,10 +15,11 @@ más próximo; cada anillo arranca en su vértice más cercano a la posición ac
 PUENTES (tabs): por cantidad o "uno cada X mm"; RAMPEADOS (pendiente 1:2) — la fresa sube y
 baja interpolando XYZ, sin escalones verticales.
 
-ENTRADA EN RAMPA (Fase E, opcional por trayectoria): en vez de hundir la fresa en vertical,
-cada pasada desciende avanzando por el contorno (pendiente 1:5, como el ramp de Aspire) y el
-tramo de rampa se repasa a profundidad plena al cerrar la vuelta. La pasada siguiente arranca
-donde terminó el repaso. Recomendada para acrílico y fresas de 1 filo.
+ENTRADA EN RAMPA (opcional por trayectoria, con los TRES tipos de Aspire): en vez de hundir
+la fresa en vertical, cada pasada desciende avanzando — SUAVE (sobre una distancia o ángulo
+dados, repasando el tramo), ZIGZAG (vaivén sobre un tramo corto, para contornos chicos) o
+ESPIRAL (la bajada repartida en toda la vuelta + una vuelta plana final). Recomendada para
+acrílico y fresas de 1 filo.
 
 Dialecto: solo G00/G01 (sin arcos), G90 G21 G17, avances mm/min, comentarios ASCII puro.
 ⚠️ El controlador puede IGNORAR F y S de fábrica ("F Read = Ign" en el handle).
@@ -37,7 +38,6 @@ _CLOSE_TOL = 0.05    # mm: fin ≈ inicio → trazado cerrado
 _SAFE_MM = 5.0       # altura de seguridad sobre la cara superior del material
 _PECK_CLEAR = 2.0    # mm sobre el material entre picotazos del taladro
 _TAB_SLOPE = 2.0     # rampa de los puentes: 2 mm de avance por 1 mm de subida
-_ENTRY_SLOPE = 5.0   # entrada en rampa: 5 mm de avance por 1 mm de bajada (~11°)
 
 
 def _is_closed(pts):
@@ -298,11 +298,12 @@ def _tab_z(s, zones, perim, z_cut, z_tab, ramp_len):
 
 # ---------- emisión de una pasada (rampa de entrada + puentes unificados) ----------
 
-def _ring_pass(pts, cum, perim, s0, z_from, z_cut, entry_len, zones, z_tab, tab_ramp):
+def _ring_pass(pts, cum, perim, s0, z_from, z_cut, entry_len, zones, z_tab, tab_ramp,
+               overlap=True):
     """Vértices [x,y,z] de una pasada de anillo cerrado: arranca en s0, desciende en rampa
-    los primeros entry_len mm (si entry_len>0), da la vuelta completa y repasa el tramo de
-    rampa a fondo. z = max(rampa de entrada, techo de puente). Devuelve (vértices, s_final)."""
-    end = s0 + perim + (entry_len if entry_len > 0 else 0.0)
+    los primeros entry_len mm (si entry_len>0), da la vuelta completa y (si overlap) repasa
+    el tramo de rampa a fondo. z = max(rampa, techo de puente). Devuelve (vértices, s_final)."""
+    end = s0 + perim + (entry_len if (overlap and entry_len > 0) else 0.0)
     st = {s0, end}
     if entry_len > 0:
         st.add(s0 + entry_len)
@@ -332,7 +333,68 @@ def _ring_pass(pts, cum, perim, s0, z_from, z_cut, entry_len, zones, z_tab, tab_
                and abs(z-out[-1][2]) < 1e-6:
             continue
         out.append([p[0], p[1], z])
-    return out, (s0 + entry_len) % perim if entry_len > 0 else s0
+    return out, (s0 + entry_len) % perim if (overlap and entry_len > 0) else s0 % perim
+
+
+# ---------- rampa de entrada (estilo Aspire: Suave / Zigzag / Espiral, por ángulo o distancia) ----------
+
+def _ramp_cfg(ramp):
+    """Normaliza el parámetro ramp: True (legado) = suave a ~11°; dict = {'type','mode','v'}."""
+    if not ramp:
+        return None
+    if ramp is True:
+        return {'type': 'smooth', 'mode': 'angle', 'v': 11.3}
+    t = ramp.get('type', 'smooth')
+    m = ramp.get('mode', 'angle')
+    v = float(ramp.get('v') or (10.0 if m == 'angle' else 25.0))
+    return {'type': t if t in ('smooth', 'zigzag', 'spiral') else 'smooth', 'mode': m, 'v': v}
+
+
+def _entry_len(cfg, dz, perim):
+    """Largo horizontal de la rampa suave según ángulo o distancia."""
+    if cfg['mode'] == 'dist':
+        L = cfg['v']
+    else:
+        ang = max(1.0, min(45.0, cfg['v']))
+        L = dz / math.tan(math.radians(ang))
+    return max(1.0, min(perim, L))
+
+
+def _zigzag_pass(pts, cum, perim, s0, z_from, z_cut, cfg, zones, z_tab, tab_ramp):
+    """Baja en vaivén sobre un tramo corto y devuelve (vértices, s_final). Después de esto
+    se corta la vuelta completa a fondo (que repasa el tramo del vaivén)."""
+    dz = z_from - z_cut
+    if cfg['mode'] == 'dist':
+        L = max(2.0, min(perim / 3.0, cfg['v']))
+        slope = math.tan(math.radians(10.0))
+    else:
+        ang = max(1.0, min(45.0, cfg['v']))
+        slope = math.tan(math.radians(ang))
+        L = max(2.0, min(perim / 3.0, dz / (2.0 * slope)))
+    n = max(2, int(math.ceil(dz / (L * slope))))
+    drop = dz / n
+    out = []
+    z = z_from
+    fwd = True
+    for _ in range(n):
+        a, b = (s0, s0 + L) if fwd else (s0 + L, s0)
+        # estaciones del tramo (vértices del anillo dentro del leg + extremos)
+        st = sorted({round(c, 6) for c in cum[:-1] if min(a, b) - 1e-9 <= c <= max(a, b) + 1e-9}
+                    | {a, b}, reverse=not fwd)
+        z_a, z_b = z, z - drop
+        for s in st:
+            t = abs(s - a) / L
+            zz = z_a + (z_b - z_a) * t
+            if zones:
+                zz = max(zz, _tab_z(s % perim, zones, perim, z_cut, z_tab, tab_ramp))
+            p = _point_at(pts, cum, s % perim)
+            if out and abs(p[0]-out[-1][0]) < 1e-6 and abs(p[1]-out[-1][1]) < 1e-6 \
+                   and abs(zz-out[-1][2]) < 1e-6:
+                continue
+            out.append([p[0], p[1], zz])
+        z -= drop
+        fwd = not fwd
+    return out, (s0 if fwd else s0 + L) % perim
 
 
 # ---------- G-code ----------
@@ -373,6 +435,7 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
     tab_h = min(float(tabs.get('h', 3.0)), depth)
     z_tab = z_start - (depth - tab_h)             # techo del puente (desde el fondo real)
     tab_ramp = tab_h * _TAB_SLOPE
+    rcfg = _ramp_cfg(ramp)
     secs = 0.0
     for rg in toolpaths:
         pts = _rpts(rg)
@@ -390,13 +453,32 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
                 zones = _tab_zones(perim, n, tab_w, tab_ramp)
         lines.append('G00 X%s Y%s' % (_f(pts[0][0]), _f(pts[0][1])))
         s_cur, z_prev, z_now = 0.0, z_start, None   # z_now = altura real de la fresa (None = arriba)
+        rc = rcfg if closed else None
         for d in ring_depths:
             z_cut = z_start - d
+            dz = z_prev - z_cut
             pass_zones = zones if (zones and z_cut < z_tab - 1e-9) else None
-            entry = min(perim / 3.0, (z_prev - z_cut) * _ENTRY_SLOPE) if (ramp and closed) else 0.0
-            if pass_zones or entry > 0:
+            rtype = rc['type'] if (rc and dz > 1e-9) else None
+            if rtype == 'zigzag':
+                # vaivén descendente y luego la vuelta completa a fondo (repasa el tramo)
+                verts, s_zz = _zigzag_pass(pts, cum, perim, s_cur, z_prev, z_cut,
+                                           rc, pass_zones, z_tab, tab_ramp)
+                lap, s_cur = _ring_pass(pts, cum, perim, s_zz, z_cut, z_cut,
+                                        0.0, pass_zones, z_tab, tab_ramp)
+                verts += lap
+            elif rtype == 'spiral':
+                # la bajada repartida en TODA la vuelta; la vuelta plana final la da el cierre
                 verts, s_cur = _ring_pass(pts, cum, perim, s_cur, z_prev, z_cut,
-                                          entry, pass_zones, z_tab, tab_ramp)
+                                          perim, pass_zones, z_tab, tab_ramp, overlap=False)
+            elif rtype == 'smooth':
+                verts, s_cur = _ring_pass(pts, cum, perim, s_cur, z_prev, z_cut,
+                                          _entry_len(rc, dz, perim), pass_zones, z_tab, tab_ramp)
+            elif pass_zones:
+                verts, s_cur = _ring_pass(pts, cum, perim, s_cur, z_prev, z_cut,
+                                          0.0, pass_zones, z_tab, tab_ramp)
+            else:
+                verts = None
+            if verts is not None:
                 if z_now is None or abs(verts[0][2] - z_now) > 1e-9:   # no repetir una Z en la que ya está
                     lines.append('G01 Z%s F%s' % (_f(verts[0][2]), _f(plunge)))
                 for x, y, z in verts[1:]:
@@ -414,6 +496,14 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
                     z_now = z_cut
             z_prev = z_cut
             secs += (perim / feed + float(tool['pass_depth']) / plunge) * 60.0
+        if closed and rc and rc['type'] == 'spiral' and not finish:
+            z_fin = z_start - ring_depths[-1]
+            fzones = zones if (zones and z_fin < z_tab - 1e-9) else None
+            verts, s_cur = _ring_pass(pts, cum, perim, s_cur, z_fin, z_fin,
+                                      0.0, fzones, z_tab, tab_ramp)
+            for x, y, z in verts[1:]:
+                lines.append('G01 X%s Y%s Z%s F%s' % (_f(x), _f(y), _f(z), _f(feed)))
+            secs += (perim / feed) * 60.0
         lines.append('G00 Z%s' % _f(safe))
     return secs
 
@@ -459,7 +549,7 @@ def build_jobs(jobs, material, name=''):
                                 start=j.get('start', 0.0))
         else:
             secs += _contour_body(lines, j['toolpaths'], j['tool'], j['depth'],
-                                  j.get('tabs'), bool(j.get('ramp')), z_top, safe,
+                                  j.get('tabs'), j.get('ramp'), z_top, safe,
                                   start=j.get('start', 0.0))
     lines.append('M05')
     if material.get('home_end', True):        # "posición final": volver al origen (configurable)
