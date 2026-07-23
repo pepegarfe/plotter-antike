@@ -222,6 +222,9 @@
 
   /* --- Vista 3D (simulación del corte sobre el bloque de material) --- */
   .sheet.simsheet{width:min(94vw,1240px);max-width:94vw;height:min(90vh,880px);display:flex;flex-direction:column;}
+  #simBar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);}
+  #simBar .seg{margin:0;}
+  #simBar .seg button{flex:none;padding:0 12px;}
   #simView{flex:1;min-height:0;position:relative;background:var(--bg);}
   #simView canvas{display:block;}
   #simFoot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint);}
@@ -646,6 +649,20 @@
 <div class="modal" id="simModal" style="display:none">
   <div class="sheet simsheet">
     <div class="sheet-h"><h3>Vista 3D — simulación del corte</h3><button id="simClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div id="simBar">
+      <div class="seg" id="simMode" title="Cómo pintar las zonas maquinadas"><button class="on" data-m="mat">Material</button><button data-m="fill">Relleno</button><button data-m="tp">Por trayectoria</button></div>
+      <select class="selfield" id="simLook" title="Aspecto del material del bloque" style="flex:none;width:auto">
+        <option value="mdf">MDF / triplay</option><option value="mad">Madera</option>
+        <option value="acr">Acrílico</option><option value="pvc">PVC</option><option value="plain">Liso</option>
+      </select>
+      <span style="flex:1"></span>
+      <button class="pbtn" id="simPlay" title="Ver la fresa comerse el material en el orden real de corte">&#9654; Animar</button>
+      <select class="selfield" id="simSpeed" title="Velocidad de la animación" style="flex:none;width:auto">
+        <option value="8">Lenta</option><option value="30" selected>Normal</option>
+        <option value="120">Rápida</option><option value="500">Muy rápida</option>
+      </select>
+      <button class="pbtn" id="simShot" title="Guardar lo que se ve como imagen PNG (prueba para el cliente)">Guardar imagen…</button>
+    </div>
     <div id="simView"></div>
     <div id="simFoot"><span>Arrastrar = orbitar · rueda = zoom · clic derecho = mover · rojo = la fresa pasa DEBAJO de la cama</span><span id="simStat"></span></div>
   </div>
@@ -1705,32 +1722,38 @@
         a.href=URL.createObjectURL(blob); a.download=(state.name||'diseno').replace(/\.[^.]+$/,'')+'.tap'; a.click();
         toast('G-code generado: '+r.lines+' líneas · ≈ '+Math.floor(r.secs/60)+' min'); }).catch(function(e){toast('Error: '+e);}); } }
 
-  // ===== Vista 3D (R1+R2): bloque de material + simulación por mapa de alturas =====
+  // ===== Vista 3D (R1–R4): bloque de material + simulación por mapa de alturas =====
   // La simulación NO reimplementa la lógica de corte: pide el MISMO G-code (.tap)
   // que se exporta a la máquina (un .tap por trayectoria, para que cada una use su
   // fresa) y se lo come movimiento a movimiento — pasadas, rampas y puentes salen
   // solos. El bloque es un mapa de alturas: una rejilla donde cada celda guarda a
   // qué altura quedó el material; estampar el círculo de la fresa = bajar celdas.
-  var S3={renderer:null,scene:null,camera:null,controls:null,mesh:null,aux:null,raf:0,open:false};
+  // La "textura" del material va HORNEADA en el color de cada vértice (la rejilla
+  // es más fina que un pixel en pantalla): sin imágenes, y los colores planos
+  // (cama, relleno, por-trayectoria) quedan exactos.
+  var S3={renderer:null,scene:null,camera:null,controls:null,mesh:null,aux:null,tool:null,
+          raf:0,open:false,res:null,jobs:null,anim:null};
   function simTap(d){ return api()? api().cnc_tap_text(d) : postJSON('/api/tap',d); }
   function simStat(s){ el('simStat').textContent=s; }
   function parseTap(tap){
-    // G-code → movimientos [x0,y0,z0,x1,y1,z1]. Solo hay G00/G01 (límite del RichAuto).
-    // X/Y arrancan desconocidas (el primer G00 X Y viaja a Z segura): hasta no tener
-    // las tres coordenadas no se emiten movimientos.
+    // G-code → movimientos [x0,y0,z0,x1,y1,z1,rapid]. Solo hay G00/G01 (límite del
+    // RichAuto). X/Y arrancan desconocidas (el primer G00 X Y viaja a Z segura):
+    // hasta no tener las tres coordenadas no se emiten movimientos.
     var mv=[], cx=null, cy=null, cz=null;
     tap.split('\n').forEach(function(ln){
-      var g=/^G0?[01]\b/.exec(ln); if(!g) return;
+      var g=/^G0?([01])\b/.exec(ln); if(!g) return;
       var nx=cx, ny=cy, nz=cz, m;
       m=/X(-?[0-9.]+)/.exec(ln); if(m) nx=parseFloat(m[1]);
       m=/Y(-?[0-9.]+)/.exec(ln); if(m) ny=parseFloat(m[1]);
       m=/Z(-?[0-9.]+)/.exec(ln); if(m) nz=parseFloat(m[1]);
-      if(cx!==null&&cy!==null&&cz!==null&&(nx!==cx||ny!==cy||nz!==cz)) mv.push([cx,cy,cz,nx,ny,nz]);
+      if(cx!==null&&cy!==null&&cz!==null&&(nx!==cx||ny!==cy||nz!==cz))
+        mv.push([cx,cy,cz,nx,ny,nz,g[1]==='0'?1:0]);
       cx=nx; cy=ny; cz=nz;
     });
     return mv;
   }
-  function simulate(jobs,mat){
+  function simGrid(jobs,mat){
+    // el bloque: bbox de los movimientos que tocan material + radio de fresa + margen
     var thick=parseFloat(mat.thickness)||15, ztop=(mat.z_zero==='bed')?thick:0;
     var minx=1/0,miny=1/0,maxx=-1/0,maxy=-1/0;
     jobs.forEach(function(j){ j.moves.forEach(function(v){
@@ -1745,59 +1768,122 @@
     var cell=Math.max(0.15, Math.sqrt(W*H/1.4e6));
     var nx=Math.max(2,Math.round(W/cell)), ny=Math.max(2,Math.round(H/cell));
     var hm=new Float32Array(nx*ny); hm.fill(thick);
-    jobs.forEach(function(j){
-      var rc=j.rad/cell;
-      j.moves.forEach(function(v){
-        if(v[2]>=ztop-1e-9&&v[5]>=ztop-1e-9) return;
-        var dx=v[3]-v[0], dy=v[4]-v[1], dz=v[5]-v[2];
-        var n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/(cell*0.7)));
-        for(var s=0;s<=n;s++){
-          var t=s/n, d=ztop-(v[2]+dz*t);
-          if(d<=1e-9) continue;                              // ese tramo va sobre la superficie
-          var gx=(v[0]+dx*t-minx)/cell, gy=(v[1]+dy*t-miny)/cell, surf=thick-d;
-          var y0=Math.max(0,Math.ceil(gy-rc)), y1=Math.min(ny-1,Math.floor(gy+rc));
-          for(var q=y0;q<=y1;q++){
-            var hw=Math.sqrt(Math.max(0,rc*rc-(q-gy)*(q-gy)));
-            var x0=Math.max(0,Math.ceil(gx-hw)), x1=Math.min(nx-1,Math.floor(gx+hw)), row=q*nx;
-            for(var p=x0;p<=x1;p++) if(hm[row+p]>surf) hm[row+p]=surf;
-          }
-        }
-      });
-    });
-    return {hm:hm,nx:nx,ny:ny,cell:cell,minx:minx,miny:miny,w:W,h:H,thick:thick};
+    var owner=new Uint8Array(nx*ny); owner.fill(255);       // qué trayectoria cortó cada celda
+    return {hm:hm,owner:owner,nx:nx,ny:ny,cell:cell,minx:minx,miny:miny,w:W,h:H,
+            thick:thick,ztop:ztop};
+  }
+  function stampMove(r,rad,jobIdx,v){
+    // estampa un movimiento (o un pedazo) en el mapa; devuelve [fila0,fila1] tocadas o null
+    if(v[2]>=r.ztop-1e-9&&v[5]>=r.ztop-1e-9) return null;
+    var cell=r.cell, nx=r.nx, ny=r.ny, hm=r.hm, ow=r.owner, rc=rad/cell;
+    var dx=v[3]-v[0], dy=v[4]-v[1], dz=v[5]-v[2];
+    var n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/(cell*0.7)));
+    var ry0=ny, ry1=-1;
+    for(var s=0;s<=n;s++){
+      var t=s/n, d=r.ztop-(v[2]+dz*t);
+      if(d<=1e-9) continue;                                  // ese tramo va sobre la superficie
+      var gx=(v[0]+dx*t-r.minx)/cell, gy=(v[1]+dy*t-r.miny)/cell, surf=r.thick-d;
+      var y0=Math.max(0,Math.ceil(gy-rc)), y1=Math.min(ny-1,Math.floor(gy+rc));
+      for(var q=y0;q<=y1;q++){
+        var hw=Math.sqrt(Math.max(0,rc*rc-(q-gy)*(q-gy)));
+        var x0=Math.max(0,Math.ceil(gx-hw)), x1=Math.min(nx-1,Math.floor(gx+hw)), row=q*nx;
+        for(var p=x0;p<=x1;p++) if(hm[row+p]>surf){ hm[row+p]=surf; ow[row+p]=jobIdx; }
+      }
+      if(y0<=y1){ if(y0<ry0)ry0=y0; if(y1>ry1)ry1=y1; }
+    }
+    return ry1>=ry0? [ry0,ry1] : null;
+  }
+  function simulate(jobs,mat){
+    var r=simGrid(jobs,mat);
+    if(!r) return null;
+    jobs.forEach(function(j,ji){ j.moves.forEach(function(v){ stampMove(r,j.rad,ji,v); }); });
+    return r;
+  }
+  // --- materiales procedurales (colores 0..1; x,y en mm para que el patrón no dependa del zoom) ---
+  function hash2(x,y){ var h=Math.sin(x*127.1+y*311.7)*43758.5453; return h-Math.floor(h); }
+  function noise2(x,y){
+    var xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+    var a=hash2(xi,yi), b=hash2(xi+1,yi), c=hash2(xi,yi+1), d=hash2(xi+1,yi+1);
+    var u=xf*xf*(3-2*xf), w=yf*yf*(3-2*yf);
+    return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
+  }
+  var SIMLOOKS={
+    mdf:  function(x,y){ var n=0.94+0.09*noise2(x*3.1,y*3.1);
+      if(hash2(Math.floor(x*4),Math.floor(y*4))>0.986) n*=0.82;      // motitas de fibra prensada
+      return [0.85*n,0.78*n,0.62*n]; },
+    mad:  function(x,y){ var g=noise2(x*0.045,y*0.6), s=Math.sin(y*1.15+g*13)*0.5+0.5;
+      var t=s*0.55+0.45*noise2(x*0.8,y*2.2);                          // vetas a lo largo de X
+      return [0.80-0.20*t, 0.63-0.20*t, 0.42-0.15*t]; },
+    acr:  function(x,y){ var n=0.985+0.015*noise2(x*2,y*2); return [0.79*n,0.86*n,0.90*n]; },
+    pvc:  function(x,y){ var n=0.985+0.015*noise2(x*2.5,y*2.5); return [0.93*n,0.93*n,0.95*n]; },
+    plain:function(){ return [0.85,0.80,0.66]; }
+  };
+  var SIM_BED=[0.36,0.38,0.42], SIM_BAD=[0.85,0.22,0.22], SIM_FILL=[0.72,0.74,0.78];
+  function tpColor(j){ var h=(j*137.508)%360/60, c=0.62, m=0.30;      // paleta por trayectoria
+    var x=c*(1-Math.abs(h%2-1)), r=[c,x,0,0,x,c][Math.floor(h)%6], g=[x,c,c,x,0,0][Math.floor(h)%6], b=[0,0,x,c,c,x][Math.floor(h)%6];
+    return [r+m,g+m,b+m]; }
+  function simVColor(r,i,mode,look){
+    // color de la celda i según el modo de pintado (como Aspire):
+    // mat = solo material (más hondo, más sombra) · fill = zonas cortadas en un color ·
+    // tp = un color por trayectoria. Pasante = cama; bajo la cama = ROJO (mordida).
+    var h=r.hm[i], tex=SIMLOOKS[look]||SIMLOOKS.plain;
+    if(h<-0.01) return SIM_BAD;
+    if(h<=0.02) return SIM_BED;
+    var x=r.minx+(i%r.nx+0.5)*r.cell, y=r.miny+((i/r.nx|0)+0.5)*r.cell, c=tex(x,y);
+    if(h>=r.thick-1e-3) return c;
+    if(mode==='fill') return SIM_FILL;
+    if(mode==='tp'&&r.owner[i]!==255) return tpColor(r.owner[i]);
+    var s=1-0.5*Math.min(1,(r.thick-h)/r.thick);                     // material: sombra por profundidad
+    return [c[0]*s,c[1]*s,c[2]*s];
+  }
+  function simRecolor(){
+    if(!S3.mesh||!S3.res) return;
+    var r=S3.res, mode=simModeV, look=el('simLook').value;
+    var col=S3.mesh.geometry.attributes.color, arr=col.array, ud=S3.mesh.userData;
+    for(var i=0;i<r.nx*r.ny;i++){
+      var c=simVColor(r,i,mode,look);
+      arr[3*i]=c[0]; arr[3*i+1]=c[1]; arr[3*i+2]=c[2];
+    }
+    ud.wallSrc.forEach(function(vi,k){ var w=ud.wallStart+k;          // paredes: su celda de orilla, sombreada
+      arr[3*w]=arr[3*vi]*0.8; arr[3*w+1]=arr[3*vi+1]*0.8; arr[3*w+2]=arr[3*vi+2]*0.8; });
+    for(var k=0;k<4;k++){ var b=ud.bottomStart+k;
+      arr[3*b]=SIM_BED[0]*0.8; arr[3*b+1]=SIM_BED[1]*0.8; arr[3*b+2]=SIM_BED[2]*0.8; }
+    col.needsUpdate=true;
+  }
+  function simGridNormals(r,nrm,y0,y1){
+    // normal por gradiente del mapa (rápido y actualizable por filas, a diferencia
+    // de computeVertexNormals): en los acantilados sale casi horizontal, que es lo que se ve
+    var nx=r.nx, ny=r.ny, hm=r.hm, c2=2*r.cell;
+    for(var gy=y0;gy<=y1;gy++) for(var gx=0;gx<nx;gx++){
+      var i=gy*nx+gx;
+      var hx0=hm[gy*nx+Math.max(0,gx-1)], hx1=hm[gy*nx+Math.min(nx-1,gx+1)];
+      var hy0=hm[Math.max(0,gy-1)*nx+gx], hy1=hm[Math.min(ny-1,gy+1)*nx+gx];
+      var vx=(hx0-hx1)/c2, vy=(hy0-hy1)/c2, L=Math.sqrt(vx*vx+vy*vy+1);
+      nrm[3*i]=vx/L; nrm[3*i+1]=vy/L; nrm[3*i+2]=1/L;
+    }
   }
   function simMesh(r){
-    // superficie tallada + paredes del bloque + fondo, con color por vértice:
-    // material intacto claro, corte más profundo = más oscuro, hueco pasante = cama,
-    // y ROJO si la fresa baja más allá de la cama (sin cama de sacrificio = mordida).
-    var nx=r.nx, ny=r.ny, cell=r.cell, hm=r.hm, thick=r.thick;
-    var TOP=[217,201,163], DEEP=[132,106,72], BED=[102,110,121], BAD=[204,68,68], WALL=0.8;
-    function colAt(h){
-      if(h<-0.01) return BAD;
-      if(h<=0.02) return BED;
-      if(h>=thick-1e-3) return TOP;
-      var t=Math.min(1,(thick-h)/thick)*0.85+0.15;
-      return [TOP[0]+(DEEP[0]-TOP[0])*t, TOP[1]+(DEEP[1]-TOP[1])*t, TOP[2]+(DEEP[2]-TOP[2])*t];
-    }
+    var nx=r.nx, ny=r.ny, cell=r.cell, hm=r.hm;
     var nv=nx*ny, extra=2*nx+2*ny+4;
-    var pos=new Float32Array((nv+extra)*3), col=new Float32Array((nv+extra)*3);
-    var gx,gy,i,c,h;
+    var pos=new Float32Array((nv+extra)*3), col=new Float32Array((nv+extra)*3),
+        nrm=new Float32Array((nv+extra)*3);
+    var gx,gy,i;
     for(gy=0;gy<ny;gy++) for(gx=0;gx<nx;gx++){
-      i=gy*nx+gx; h=hm[i];
-      pos[3*i]=r.minx+(gx+0.5)*cell; pos[3*i+1]=r.miny+(gy+0.5)*cell; pos[3*i+2]=h;
-      c=colAt(h); col[3*i]=c[0]/255; col[3*i+1]=c[1]/255; col[3*i+2]=c[2]/255;
+      i=gy*nx+gx;
+      pos[3*i]=r.minx+(gx+0.5)*cell; pos[3*i+1]=r.miny+(gy+0.5)*cell; pos[3*i+2]=hm[i];
     }
     var idx=[];
     for(gy=0;gy<ny-1;gy++) for(gx=0;gx<nx-1;gx++){
       var a=gy*nx+gx, b=a+1, cc=a+nx, dd=cc+1;
       idx.push(a,b,dd, a,dd,cc);
     }
-    var vcur=nv;
-    function wall(ids){                                      // orilla → cortina hasta la cama
+    var vcur=nv, wallSrc=[], wallStart=nv;
+    function wall(ids,n){                                    // orilla → cortina hasta la cama
       var st=vcur;
       ids.forEach(function(vi,k){
         pos[3*(vcur+k)]=pos[3*vi]; pos[3*(vcur+k)+1]=pos[3*vi+1]; pos[3*(vcur+k)+2]=0;
-        col[3*(vcur+k)]=col[3*vi]*WALL; col[3*(vcur+k)+1]=col[3*vi+1]*WALL; col[3*(vcur+k)+2]=col[3*vi+2]*WALL;
+        nrm[3*(vcur+k)]=n[0]; nrm[3*(vcur+k)+1]=n[1]; nrm[3*(vcur+k)+2]=n[2];
+        wallSrc.push(vi);
       });
       for(var k=0;k<ids.length-1;k++) idx.push(ids[k],ids[k+1],st+k+1, ids[k],st+k+1,st+k);
       vcur+=ids.length;
@@ -1805,19 +1891,22 @@
     var e1=[],e2=[],e3=[],e4=[];
     for(gx=0;gx<nx;gx++){ e1.push(gx); e2.push((ny-1)*nx+gx); }
     for(gy=0;gy<ny;gy++){ e3.push(gy*nx); e4.push(gy*nx+nx-1); }
-    wall(e1); wall(e2); wall(e3); wall(e4);
+    wall(e1,[0,-1,0]); wall(e2,[0,1,0]); wall(e3,[-1,0,0]); wall(e4,[1,0,0]);
     var f=vcur, corners=[[0,0],[nx-1,0],[nx-1,ny-1],[0,ny-1]];
     corners.forEach(function(q,k){
       pos[3*(f+k)]=r.minx+(q[0]+0.5)*cell; pos[3*(f+k)+1]=r.miny+(q[1]+0.5)*cell; pos[3*(f+k)+2]=0;
-      col[3*(f+k)]=BED[0]/255*WALL; col[3*(f+k)+1]=BED[1]/255*WALL; col[3*(f+k)+2]=BED[2]/255*WALL;
+      nrm[3*(f+k)+2]=-1;
     });
     idx.push(f,f+1,f+2, f,f+2,f+3);
+    simGridNormals(r,nrm,0,ny-1);
     var g=new THREE.BufferGeometry();
     g.setAttribute('position',new THREE.BufferAttribute(pos,3));
     g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
     g.setIndex(idx);
-    g.computeVertexNormals();
-    return new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}));
+    var m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}));
+    m.userData={wallStart:wallStart,wallSrc:wallSrc,bottomStart:f};
+    return m;
   }
   function simScene(){
     if(S3.renderer) return;
@@ -1844,16 +1933,21 @@
   function simLoop(){
     if(!S3.open) return;
     S3.raf=requestAnimationFrame(simLoop);
+    if(S3.anim&&S3.anim.playing) animTick();
     S3.controls.update();
     S3.renderer.render(S3.scene,S3.camera);
   }
   function runSim(jobs){
     var t0=performance.now();
+    S3.jobs=jobs;
     var res=simulate(jobs,state.cnc.material);
     if(!res){ simStat('Ninguna trayectoria baja al material'); return; }
+    S3.res=res; S3.anim=null; animBtn(false);
     if(S3.mesh){ S3.scene.remove(S3.mesh); S3.mesh.geometry.dispose(); S3.mesh.material.dispose(); S3.mesh=null; }
     if(S3.aux){ S3.scene.remove(S3.aux); S3.aux=null; }
+    if(S3.tool){ S3.scene.remove(S3.tool); S3.tool=null; }
     S3.mesh=simMesh(res); S3.scene.add(S3.mesh);
+    simRecolor();
     var span=Math.max(res.w,res.h)*1.7;
     var grid=new THREE.GridHelper(span,Math.max(4,Math.round(span/25)),0x888888,0x888888);
     grid.material.transparent=true; grid.material.opacity=0.18;
@@ -1867,6 +1961,80 @@
     S3.controls.update();
     simStat(res.nx+'×'+res.ny+' celdas · '+(Math.round(res.cell*100)/100)+' mm/celda · '+Math.round(performance.now()-t0)+' ms');
   }
+  // --- R4: animación — reinicia el bloque y estampa los movimientos al paso elegido ---
+  function animBtn(on){ el('simPlay').innerHTML=on?'&#10073;&#10073; Pausa':'&#9654; Animar'; }
+  function animToolMesh(rad){
+    var g=new THREE.Group();
+    var fresa=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,16,24),
+      new THREE.MeshLambertMaterial({color:0x8f98a5}));
+    fresa.rotation.x=Math.PI/2; fresa.position.z=8; g.add(fresa);
+    var cuello=new THREE.Mesh(new THREE.CylinderGeometry(rad*0.6,rad*0.6,10,16),
+      new THREE.MeshLambertMaterial({color:0x525a66}));
+    cuello.rotation.x=Math.PI/2; cuello.position.z=21; g.add(cuello);
+    return g;
+  }
+  function animStart(){
+    var r=S3.res; if(!r||!S3.jobs) return;
+    r.hm.fill(r.thick); r.owner.fill(255);
+    var pos=S3.mesh.geometry.attributes.position.array;
+    for(var i=0;i<r.nx*r.ny;i++) pos[3*i+2]=r.thick;
+    S3.mesh.geometry.attributes.position.needsUpdate=true;
+    simGridNormals(r,S3.mesh.geometry.attributes.normal.array,0,r.ny-1);
+    S3.mesh.geometry.attributes.normal.needsUpdate=true;
+    simRecolor();
+    var total=0;
+    S3.jobs.forEach(function(j){ j.moves.forEach(function(v){ total+=Math.max(Math.hypot(v[3]-v[0],v[4]-v[1]),Math.abs(v[5]-v[2])); }); });
+    S3.anim={ji:0,mi:0,t:0,playing:true,total:Math.max(total,1e-6),done:0};
+    if(S3.tool){ S3.scene.remove(S3.tool); }
+    S3.tool=animToolMesh(S3.jobs[0].rad); S3.scene.add(S3.tool);
+    animBtn(true);
+  }
+  function animTick(){
+    var A=S3.anim, r=S3.res, budget=parseFloat(el('simSpeed').value);
+    var ry0=r.ny, ry1=-1, guard=4000;
+    while(budget>0&&A.ji<S3.jobs.length&&guard-->0){
+      var job=S3.jobs[A.ji], v=job.moves[A.mi];
+      if(!v){ A.ji++; A.mi=0; A.t=0;
+        if(S3.jobs[A.ji]){ S3.scene.remove(S3.tool); S3.tool=animToolMesh(S3.jobs[A.ji].rad); S3.scene.add(S3.tool); }
+        continue; }
+      var L=Math.max(Math.hypot(v[3]-v[0],v[4]-v[1]),Math.abs(v[5]-v[2]),1e-6);
+      var step=(v[6]?budget*6:budget)/L, t1=Math.min(1,A.t+step);     // los G00 vuelan (×6)
+      var sub=[v[0]+(v[3]-v[0])*A.t, v[1]+(v[4]-v[1])*A.t, v[2]+(v[5]-v[2])*A.t,
+               v[0]+(v[3]-v[0])*t1,  v[1]+(v[4]-v[1])*t1,  v[2]+(v[5]-v[2])*t1];
+      var rows=stampMove(r,job.rad,A.ji,sub);
+      if(rows){ if(rows[0]<ry0)ry0=rows[0]; if(rows[1]>ry1)ry1=rows[1]; }
+      if(S3.tool) S3.tool.position.set(sub[3],sub[4],sub[5]);
+      A.done+=(t1-A.t)*L; budget-=(t1-A.t)*L*(v[6]?1/6:1);
+      if(t1>=1){ A.mi++; A.t=0; } else A.t=t1;
+    }
+    if(ry1>=ry0){
+      // subir a la GPU SOLO las filas tocadas (updateRange): la malla es de ~1.4M vértices
+      var g=S3.mesh.geometry, pos=g.attributes.position, col=g.attributes.color, nr=g.attributes.normal;
+      var mode=simModeV, look=el('simLook').value;
+      var yA=Math.max(0,ry0-1), yB=Math.min(r.ny-1,ry1+1);
+      for(var gy=yA;gy<=yB;gy++) for(var gx=0;gx<r.nx;gx++){
+        var i=gy*r.nx+gx;
+        pos.array[3*i+2]=r.hm[i];
+        var c=simVColor(r,i,mode,look);
+        col.array[3*i]=c[0]; col.array[3*i+1]=c[1]; col.array[3*i+2]=c[2];
+      }
+      simGridNormals(r,nr.array,yA,yB);
+      var off=yA*r.nx*3, cnt=(yB-yA+1)*r.nx*3;
+      pos.updateRange={offset:off,count:cnt}; col.updateRange={offset:off,count:cnt};
+      nr.updateRange={offset:off,count:cnt};
+      pos.needsUpdate=true; col.needsUpdate=true; nr.needsUpdate=true;
+    }
+    simStat('cortando… '+Math.min(100,Math.round(A.done/A.total*100))+' %');
+    if(A.ji>=S3.jobs.length){                                // terminó: refresco completo (paredes incluidas)
+      A.playing=false; animBtn(false);
+      simRecolor();
+      simGridNormals(r,S3.mesh.geometry.attributes.normal.array,0,r.ny-1);
+      ['position','color','normal'].forEach(function(k){    // anular el updateRange parcial de este
+        var a=S3.mesh.geometry.attributes[k];                // mismo frame: el refresco final va COMPLETO
+        a.updateRange={offset:0,count:-1}; a.needsUpdate=true; });
+      simStat('corte terminado · '+r.nx+'×'+r.ny+' celdas');
+    }
+  }
   function openSim(){
     if(!window.THREE){ toast('Falta three.bundle.js junto a la app — reinstala Design Studio.'); return; }
     if(!hasDoc()||!state.cnc){ toast('Abre un diseño primero'); return; }
@@ -1875,6 +2043,8 @@
     el('simModal').style.display='flex';
     S3.open=true; simScene();
     S3.scene.background=new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
+    var lk=el('simLook'), mt=(state.cnc.material||{}).type;
+    if(lk.querySelector('option[value="'+mt+'"]')) lk.value=mt;      // arranca con el material activo
     simSize(); simLoop();
     simStat('Generando G-code…');
     var jobs=[], bad=null;
@@ -1887,7 +2057,7 @@
       }
       var t=list[k];
       simTap(tpPayloadOf(t)).then(function(r){
-        if(r&&r.ok) jobs.push({moves:parseTap(r.tap), rad:(parseFloat(tpToolOf(t).dia)||6)/2});
+        if(r&&r.ok) jobs.push({moves:parseTap(r.tap), rad:(parseFloat(tpToolOf(t).dia)||6)/2, name:t.name});
         else bad=(t.name?t.name+': ':'')+((r&&r.error)||'error');
         next(k+1);
       }).catch(function(e){ bad=String(e); next(k+1); });
@@ -1895,9 +2065,29 @@
   }
   function closeSim(){
     S3.open=false;
+    if(S3.anim) S3.anim.playing=false;
     if(S3.raf){ cancelAnimationFrame(S3.raf); S3.raf=0; }
     el('simModal').style.display='none';
   }
+  var simModeV='mat';
+  el('simMode').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+    simModeV=b.getAttribute('data-m');
+    el('simMode').querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
+    simRecolor(); });
+  el('simLook').addEventListener('change',simRecolor);
+  el('simPlay').addEventListener('click',function(){
+    if(S3.anim&&S3.anim.playing){ S3.anim.playing=false; animBtn(false); return; }   // pausa
+    if(S3.anim&&S3.anim.ji<S3.jobs.length){ S3.anim.playing=true; animBtn(true); return; }  // reanudar
+    animStart(); });
+  el('simShot').addEventListener('click',function(){
+    if(!S3.renderer||!S3.mesh) return;
+    S3.renderer.render(S3.scene,S3.camera);                  // render + captura en el mismo tick
+    var url=S3.renderer.domElement.toDataURL('image/png');
+    var nm=(state.name||'diseno').replace(/\.[^.]+$/,'')+'_3d.png';
+    if(api()){ api().save_png({name:nm,data:url}).then(function(r){
+        if(r&&r.ok) toast('Imagen guardada: '+r.path);
+        else if(r&&r.error&&!r.cancelled) toast(r.error); }).catch(function(e){toast('Error: '+e);}); }
+    else { var a=document.createElement('a'); a.href=url; a.download=nm; a.click(); } });
   el('btnSim3d').addEventListener('click',openSim);
   el('simClose').addEventListener('click',closeSim);
   el('simModal').addEventListener('click',function(e){ if(e.target===el('simModal')) closeSim(); });

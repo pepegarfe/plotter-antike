@@ -92,6 +92,28 @@ class Api:
         """Trayectorias del centro de la fresa, para previsualizar en el lienzo."""
         return _cnc_preview(data or {})
 
+    def save_png(self, data):
+        """Guarda una captura PNG de la Vista 3D (llega como data-URL base64)."""
+        import base64
+        d = data or {}
+        try:
+            raw = base64.b64decode((d.get('data') or '').split(',', 1)[1])
+        except Exception:
+            return {'ok': False, 'error': 'Captura vacía o corrupta.'}
+        res = self.window.create_file_dialog(webview.SAVE_DIALOG,
+                                             save_filename=d.get('name') or 'vista3d.png')
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res if isinstance(res, str) else res[0]
+        if not path.lower().endswith('.png'):
+            path += '.png'
+        try:
+            with open(path, 'wb') as f:
+                f.write(raw)
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo guardar: {e}'}
+        return {'ok': True, 'path': os.path.basename(path)}
+
     def cnc_tap_text(self, data):
         """El G-code como TEXTO (sin diálogo): lo consume la Vista 3D, que simula
         el corte comiéndose el mismo .tap que se llevaría la máquina."""
