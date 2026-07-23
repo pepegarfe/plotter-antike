@@ -96,7 +96,7 @@
   .field{display:flex;align-items:center;gap:6px;background:var(--input);border:1px solid var(--line-2);border-radius:7px;padding:0 9px;height:32px;}
   .field:focus-within{border-color:var(--accent);}
   .field label{font-size:11px;color:var(--faint);font-weight:600;}
-  .field input{flex:1;width:100%;min-width:0;background:transparent;border:0;color:var(--ink);font-family:var(--mono);font-size:13px;text-align:right;padding:0;outline:none;}
+  .field input{flex:1;width:100%;min-width:0;background:transparent;border:0;color:var(--ink);font-family:var(--mono);font-size:11px;text-align:right;padding:0;outline:none;}
   .field input:disabled{color:var(--faint);}
   .field .u{font-family:var(--mono);font-size:10px;color:var(--faint);}
   .grp-t.sec{margin:16px 0 10px;padding-top:14px;border-top:1px solid var(--line);}
@@ -417,7 +417,7 @@
         <div class="seg" id="sideSeg">
           <button class="on" data-s="outside" title="La fresa corre por FUERA de la línea — para recortar piezas a su medida exacta">Fuera</button>
           <button data-s="inside" title="Por DENTRO de la línea — para huecos y ventanas a medida exacta">Dentro</button>
-          <button data-s="on" title="El centro de la fresa va SOBRE la línea (sin compensar). Único modo para trazos abiertos">Línea</button>
+          <button data-s="on" title="El centro de la fresa va SOBRE la línea (sin compensar). Único modo para trazos abiertos">Sobre</button>
         </div>
         <label class="chk" style="margin-top:10px"><input type="checkbox" id="tabsOn"> Puentes (sujetan la pieza al soltarse)</label>
         <div id="tabFields">
