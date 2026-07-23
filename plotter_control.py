@@ -1007,7 +1007,16 @@ class DXFParser:
                     result.append(self._wrap(pts, color))
 
             elif t in ('ELLIPSE', 'SPLINE'):
-                pts = [(p[0], p[1]) for p in entity.flattening(getattr(self, '_tol', self._TOL))]
+                # tolerancia = piso absoluto (0.01mm reales) + componente RELATIVA al tamaño
+                # de la entidad (a prueba de que el usuario escale el diseño después)
+                try:
+                    _cps = [(float(p[0]), float(p[1])) for p in entity.control_points]
+                    _dg = math.hypot(max(c[0] for c in _cps) - min(c[0] for c in _cps),
+                                     max(c[1] for c in _cps) - min(c[1] for c in _cps))
+                except Exception:
+                    _dg = 0.0
+                _t = max(getattr(self, '_tol', self._TOL), _dg * 1.5e-4)
+                pts = [(p[0], p[1]) for p in entity.flattening(_t)]
                 if len(pts) >= 2:
                     result.append(self._wrap(pts, color))
 
