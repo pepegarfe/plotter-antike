@@ -390,7 +390,7 @@ class HPGLConverter:
 # Todos los parsers devuelven List[dict]:
 #   {"pts": [(x,y)…], "fill": (r,g,b)|None, "stroke": (r,g,b)|None}
 
-def _simplify_mm(pts, tol=0.01):
+def _simplify_mm(pts, tol=0.001):
     """Douglas-Peucker iterativo en MILÍMETROS (post-matriz): quita los puntos que no
     aportan (desviación < tol). Es la pasada de limpieza estándar de los importadores CAM
     y atrapa TODAS las fuentes de sobre-muestreo (transforms anidados incluidos)."""
@@ -423,7 +423,7 @@ def _simplify_mm(pts, tol=0.01):
     return [pts[i] for i in range(n) if keep[i]]
 
 
-def _simplify_styled(styled, tol=0.01):
+def _simplify_styled(styled, tol=0.001):
     for d in styled:
         p = d.get('pts')
         if p and len(p) > 3:
@@ -439,7 +439,7 @@ def _curve_tol(pts, floor=0.0):
     microscópica por tramo y exploten en puntos."""
     xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
     diag = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
-    return max(diag * 1.5e-4, floor, 1e-9)
+    return max(diag * 1e-5, floor, 1e-9)
 
 
 def _flat_cubic(p0, p1, p2, p3, floor=0.0):
@@ -481,7 +481,7 @@ def _flat_quad(p0, q, p1, floor=0.0):
 
 def _arc_steps(r, dtheta, floor=0.0):
     """Pasos para un arco con desviación (sagita) ≤ tolerancia relativa al radio."""
-    tol = max(r * 1.5e-4, floor, 1e-9)
+    tol = max(r * 1e-5, floor, 1e-9)
     arg = max(-1.0, min(1.0, 1.0 - tol / max(r, 1e-9)))
     step = 2 * math.acos(arg) or 0.05
     return max(8, min(720, int(math.ceil(abs(dtheta) / step))))
@@ -596,7 +596,7 @@ class SVGParser:
         root = ET.parse(filepath).getroot()
         mtx = self._root_mtx(root)
         # piso de aplanado: 0.01 mm reales convertidos a user-units con la escala raíz
-        self._flat_floor = 0.01 / max(abs(mtx[0]), abs(mtx[3]), 1e-9)
+        self._flat_floor = 0.001 / max(abs(mtx[0]), abs(mtx[3]), 1e-9)
         result = []
         self._walk(root, result, (0, 0, 0), None, mtx)
         return self._dedup(result)
@@ -922,7 +922,7 @@ class DXFParser:
         if ea <= sa:
             ea += 2 * math.pi
         span = ea - sa
-        tol = max(getattr(self, '_tol', self._TOL), r * 1.5e-4)
+        tol = max(getattr(self, '_tol', self._TOL), r * 1e-5)
         arg = max(-1.0, min(1.0, 1.0 - tol / r))
         n_full = max(48, math.ceil(math.pi / math.acos(arg)))
         n = max(12, math.ceil(n_full * span / (2 * math.pi)))
@@ -934,7 +934,7 @@ class DXFParser:
         """Sample a full circle → closed point list with deviation ≤ _TOL."""
         if r <= 0:
             return []
-        tol = max(getattr(self, '_tol', self._TOL), r * 1.5e-4)
+        tol = max(getattr(self, '_tol', self._TOL), r * 1e-5)
         arg = max(-1.0, min(1.0, 1.0 - tol / r))
         n = max(48, math.ceil(math.pi / math.acos(arg)))
         pts = [(cx + r * math.cos(2 * math.pi * k / n),
@@ -1015,7 +1015,7 @@ class DXFParser:
                                      max(c[1] for c in _cps) - min(c[1] for c in _cps))
                 except Exception:
                     _dg = 0.0
-                _t = max(getattr(self, '_tol', self._TOL), _dg * 1.5e-4)
+                _t = max(getattr(self, '_tol', self._TOL), _dg * 1e-5)
                 pts = [(p[0], p[1]) for p in entity.flattening(_t)]
                 if len(pts) >= 2:
                     result.append(self._wrap(pts, color))
@@ -1128,7 +1128,7 @@ class DXFParser:
         insunits = doc.header.get('$INSUNITS', 4)
         scale = self._INSUNITS_TO_MM.get(insunits, 1.0)
         # tolerancia de muestreo = 0.01 mm REALES expresados en unidades del dibujo
-        self._tol = 0.01 / max(scale, 1e-9)
+        self._tol = 0.001 / max(scale, 1e-9)
 
         result = []
         for entity in doc.modelspace():
@@ -1258,7 +1258,7 @@ class AIParser:
                     p1 = pt(item[1])
                     p2 = pt(item[2])
                     p3 = pt(item[3])
-                    current.extend([(px, py) for (px, py) in _flat_cubic(p0, p1, p2, p3, 0.01)])
+                    current.extend([(px, py) for (px, py) in _flat_cubic(p0, p1, p2, p3, 0.001)])
 
             elif kind == "h":                        # closepath explícito
                 flush(force_close=True)
