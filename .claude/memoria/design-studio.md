@@ -295,8 +295,18 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   el MISMO que usa el motor — viaja en el payload para que casen) + traslado; undo completo.
   Números: 30 piezas en cama 2440×1220 en 0.65s; 6/6 rects e2e util 42%; pieza larga elige
   sola girar 90°. Verificado: 14 checks Python + 12 UI + e2e (regresión total 187 en 7
-  arneses). Mejora futura consciente: capa genética (orden+rotación evolutivos) estilo
-  SVGnest si el taller pide más aprovechamiento.
+  arneses). **Mejorado el mismo día (pregunta de Jose "¿más ángulos?")**: medido
+  que MÁS ÁNGULOS SOLOS pueden EMPEORAR con greedy (hoja apretada: 90°=9/16 vs 45°=8/16 — el
+  codicioso se auto-bloquea); la mejora correcta fue **MULTI-ARRANQUE** (6 órdenes: área/lado
+  mayor/lado menor desc + 3 barajados con semilla fija 20260724 → se queda el mejor por
+  (piezas, área)): apretada subió a 10/16 en todos los modos y los finos ganan +2% util; **y Jose remató con la pregunta correcta ("¿por qué elegir
+  ángulo yo?")**: la perilla de ángulos SE ELIMINÓ — el motor ahora es AUTOMÁTICO por etapas
+  (90°→45°→15° como rondas del torneo, presupuesto de 5s entre etapas, gana el mejor por
+  (piezas, área)): apretada 10/16 util 64% en 3.8s; cama grande 30/30 en 5.6s. `rots` explícito
+  sigue aceptado (compatibilidad/pruebas). ⚠️ El presupuesto hace el resultado dependiente de
+  la VELOCIDAD de la máquina (una lenta puede saltarse etapas) — determinista en la misma
+  máquina, no entre máquinas. Mejora futura consciente: capa genética (orden+rotación evolutivos)
+  estilo SVGnest si el taller pide más aprovechamiento.
 
 - **9. Rotación LIBRE con el mouse — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo.**
   Manija estilo Illustrator: tallo+perilla arriba del centro de la caja de selección
