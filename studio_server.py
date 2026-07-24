@@ -160,6 +160,16 @@ def api_nest():
     return _json(nester.nest_op(request.json or {}))
 
 
+@app.post('/api/nest_start')
+def api_nest_start():
+    return _json(nester.nest_start(request.json or {}))
+
+
+@app.post('/api/nest_status')
+def api_nest_status():
+    return _json(nester.nest_status(request.json or {}))
+
+
 @app.post('/api/parse')
 def api_parse():
     up = request.files.get('file')

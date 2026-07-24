@@ -217,6 +217,13 @@ class Api:
         """Acomodo de piezas en la hoja (nesting BLF con rotaciones)."""
         return nester.nest_op(data or {})
 
+    def geo_nest_start(self, data):
+        """Nesting EN VIVO: arranca el cálculo en un hilo y devuelve el id."""
+        return nester.nest_start(data or {})
+
+    def geo_nest_status(self, data):
+        return nester.nest_status(data or {})
+
     def ref_image(self):
         """Imagen de referencia: diálogo nativo → data-URL para pintarla de fondo."""
         res = self.window.create_file_dialog(

@@ -996,6 +996,7 @@
   var outlineMode=false;                        // Cmd+Y estilo Illustrator: esqueleto sin adornos
   var rotating=null;                            // giro libre con el mouse {A,pivot,start,applied,deg,moved}
   var ROTH=22;                                  // alto del tallo de la manija de rotación (px)
+  var nestAnim=null;                            // reproducción de los intentos del nesting (fantasmas)
   function fitScale(W,H){ return Math.min((W-108)/state.work[0], (H-108)/state.work[1]); }
   function fitView(){ var r=cv.getBoundingClientRect(); if(r.width<10||r.height<10) return; var s=fitScale(r.width,r.height); view.scale=s; view.ox=(r.width-state.work[0]*s)/2; view.oy=(r.height+state.work[1]*s)/2; view.ready=true; draw(); }
   function tp(x,y){ return [view.ox+x*view.scale, view.oy-y*view.scale]; }
@@ -1144,6 +1145,52 @@
     if(marquee){ ctx.strokeStyle=selC; ctx.fillStyle=cvar('--accent-soft'); ctx.lineWidth=1; ctx.setLineDash([3,2]);
       var x0=Math.min(marquee.x0,marquee.x1),y0=Math.min(marquee.y0,marquee.y1),w=Math.abs(marquee.x1-marquee.x0),h2=Math.abs(marquee.y1-marquee.y0);
       ctx.fillRect(x0,y0,w,h2); ctx.strokeRect(x0,y0,w,h2); ctx.setLineDash([]); }
+    // animación del nesting: cada intento como fantasmas + marcador
+    if(typeof nestAnim!=='undefined' && nestAnim && !nestAnim.runs.length){
+      var msg0='Calculando acomodos…';
+      ctx.font='12px '+cvar('--mono');
+      var mt0=ctx.measureText?ctx.measureText(msg0):null; var tw0=(mt0&&mt0.width)||180;
+      ctx.fillStyle=cvar('--panel'); ctx.fillRect(r.width/2-tw0/2-12, RUL+10, tw0+24, 26);
+      ctx.strokeStyle=cvar('--line-2'); ctx.lineWidth=1; ctx.strokeRect(r.width/2-tw0/2-12, RUL+10, tw0+24, 26);
+      ctx.fillStyle=cvar('--accent'); ctx.fillText(msg0, r.width/2-tw0/2, RUL+27);
+    }
+    if(typeof nestAnim!=='undefined' && nestAnim && nestAnim.runs.length){
+      var nk=Math.min(nestAnim.k, nestAnim.runs.length-1);
+      var esGanador=nestAnim.done && nestAnim.k>=nestAnim.runs.length;
+      if(esGanador) nk=nestAnim.best;
+      var nrun=nestAnim.runs[nk];
+      ctx.strokeStyle=cvar(esGanador?'--good':'--accent'); ctx.lineWidth=esGanador?1.8:1.2;
+      ctx.globalAlpha=esGanador?0.95:0.6;
+      nrun.placed.forEach(function(p){
+        var cu=nestAnim.cache[nestAnim.mapa[p.i]];   // p.i es índice del payload → mapa → unidad
+        if(!cu) return;
+        var pv=[(cu.b[0]+cu.b[2])/2,(cu.b[1]+cu.b[3])/2];
+        var rad=p.rot*Math.PI/180, cosn=Math.cos(rad), sinn=Math.sin(rad);
+        cu.pts.forEach(function(e2){
+          ctx.beginPath();
+          for(var q=0;q<e2.length;q++){
+            var vx=e2[q][0]-pv[0], vy=e2[q][1]-pv[1];
+            var S=tp(pv[0]+vx*cosn-vy*sinn+p.dx, pv[1]+vx*sinn+vy*cosn+p.dy);
+            if(q===0) ctx.moveTo(S[0],S[1]); else ctx.lineTo(S[0],S[1]);
+          }
+          ctx.stroke();
+        });
+      });
+      ctx.globalAlpha=1;
+      var msg=esGanador
+        ? ('★ GANADOR — intento '+(nk+1)+' · '+nrun.placed.length+' piezas · '+(state.machine==='plotter'&&nrun.used!=null?((nrun.used/10).toFixed(1)+' cm de material'):(Math.round(nrun.util*100)+'%')))
+        : ('Probando acomodos '+(nk+1)+'/'+nestAnim.runs.length+' · giros '+nrun.stage+' · orden '+nrun.order+
+           ' · '+nrun.placed.length+' piezas · '+(state.machine==='plotter'&&nrun.used!=null?((nrun.used/10).toFixed(0)+' cm'):(Math.round(nrun.util*100)+'%')));
+      ctx.font='12px '+cvar('--mono');
+      var mtx=ctx.measureText?ctx.measureText(msg):null;
+      var tw=(mtx&&mtx.width)||360;
+      ctx.fillStyle=cvar('--panel');
+      ctx.fillRect(r.width/2-tw/2-12, RUL+10, tw+24, 26);
+      ctx.strokeStyle=cvar('--line-2'); ctx.lineWidth=1;
+      ctx.strokeRect(r.width/2-tw/2-12, RUL+10, tw+24, 26);
+      ctx.fillStyle=cvar(esGanador?'--good':'--accent');
+      ctx.fillText(msg, r.width/2-tw/2, RUL+27);
+    }
     // guías (azules), guía en arrastre y líneas del imán
     ctx.lineWidth=1;
     ctx.strokeStyle=grpC;
@@ -1364,6 +1411,7 @@
 
   cv.addEventListener('mousedown',function(e){
     if(e.button===2) return;   // el clic DERECHO es del menú contextual, no mueve ni selecciona aquí
+    if(nestAnim){ finishNestAnim(); return; }   // clic durante la función = saltar al ganador
     var r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
     var panMode = (tool==='pan') || spaceDown || e.button===1;
     if(panMode){ pan={x:e.clientX,y:e.clientY,ox:view.ox,oy:view.oy}; cv.style.cursor='grabbing'; userZoomed=true; return; }
@@ -1585,6 +1633,7 @@
   window.addEventListener('keydown',function(e){
     if(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
     var meta=e.ctrlKey||e.metaKey;
+    if(typeof nestAnim!=='undefined' && nestAnim){ if(e.key==='Escape'||e.key==='Enter') finishNestAnim(); return; }
     if(e.key==='Escape' && el('ctxMenu').style.display==='block'){ ctxHide(); return; }
     if(typeof pen!=='undefined' && pen){       // dibujando con la pluma: teclas propias
       if(e.key==='Escape'||e.key==='Enter'){ e.preventDefault(); penFinish(false); }
@@ -1914,7 +1963,8 @@
   }
   var GEO_API={boolean:['geo_boolean','/api/boolean'], offset:['geo_offset','/api/offset'],
                expand:['geo_expand','/api/expand'], round:['geo_round','/api/round'],
-               nest:['geo_nest','/api/nest']};
+               nest:['geo_nest','/api/nest'],
+               nest_start:['geo_nest_start','/api/nest_start'], nest_status:['geo_nest_status','/api/nest_status']};
   function geoCall(kind, payload, done){
     var m=GEO_API[kind];
     if(api()){ api()[m[0]](payload).then(done).catch(function(e){ toast('Error: '+e); }); }
@@ -2022,31 +2072,83 @@
       obst.push(isClosedIdx(i2)?{rings:[e2],open:[]}:{rings:[],open:[e2]}); }
     var payload={ sheet:[state.work[0],state.work[1]],
       margin:parseFloat(el('nstMar').value)||0, gap:parseFloat(el('nstGap').value)||0,
+      mode:(state.machine==='plotter'?'roll':'sheet'),   // plotter = ROLLO: llenar el ancho y gastar el mínimo largo
       units:payloadUnits, obstacles:obst };   // sin ángulos: el motor prueba 90°→45°→15° y gana el mejor
     el('btnNest').disabled=true; el('btnNest').textContent='Acomodando…';
-    geoCall('nest', payload, function(r){
-      el('btnNest').disabled=false; el('btnNest').textContent='Acomodar piezas';
-      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo acomodar'); return; }
-      pushUndo();
-      r.placed.forEach(function(p){
-        var u=myUnits[mapa[p.i]];
-        if(p.rot){   // girar la unidad alrededor de su centro (mismo pivote que usó el motor)
-          var pv=[(u.b[0]+u.b[2])/2,(u.b[1]+u.b[3])/2];
-          var rad=p.rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
-          u.idxs.forEach(function(i){
-            var ecx=doc.oc[i][0]+doc.off[i][0], ecy=doc.oc[i][1]+doc.off[i][1];
-            var vx=ecx-pv[0], vy=ecy-pv[1];
-            doc.off[i][0]=pv[0]+vx*cos-vy*sin-doc.oc[i][0];
-            doc.off[i][1]=pv[1]+vx*sin+vy*cos-doc.oc[i][1];
-            doc.rot[i]+=p.rot;
-          });
+    geoCall('nest_start', payload, function(r0){
+      if(!r0||!r0.ok){
+        el('btnNest').disabled=false; el('btnNest').textContent='Acomodar piezas';
+        toast((r0&&r0.error)||'No se pudo acomodar'); return;
+      }
+      // EN VIVO: el motor trabaja en su hilo; aquí sondeamos y pintamos cada intento al llegar
+      var cache=myUnits.map(function(u){ return {pts:u.idxs.map(function(i){ return effPts(i); }), b:u.b}; });
+      nestAnim={job:r0.job, runs:[], best:0, final:null, done:false, skip:false,
+                myUnits:myUnits, mapa:mapa, cache:cache, k:0};
+      function nestPoll(){
+        if(!nestAnim||nestAnim.done) return;
+        geoCall('nest_status', {job:nestAnim.job, from:nestAnim.runs.length}, function(st){
+          if(!nestAnim) return;
+          if(!st||!st.ok){
+            var na=nestAnim; nestAnim=null;
+            clearInterval(na.timer); clearInterval(na.poll);
+            el('btnNest').disabled=false; el('btnNest').textContent='Acomodar piezas';
+            toast((st&&st.error)||'No se pudo acomodar'); draw(); return;
+          }
+          (st.runs||[]).forEach(function(x){ nestAnim.runs.push(x); });
+          if(st.done){
+            nestAnim.done=true; nestAnim.best=st.best||0;
+            nestAnim.final={placed:st.placed||[], util:st.util||0, skipped:st.skipped||0, used:st.used};
+            clearInterval(nestAnim.poll);
+            if(nestAnim.skip) finishNestAnim();
+          }
+        });
+      }
+      nestAnim.poll=setInterval(nestPoll,300);
+      nestAnim.timer=setInterval(function(){
+        if(!nestAnim) return;
+        if(nestAnim.k<nestAnim.runs.length-1) nestAnim.k++;             // avanzar hasta el último intento disponible
+        else if(nestAnim.done){
+          nestAnim.k++;
+          if(nestAnim.k>=nestAnim.runs.length+3){ finishNestAnim(); return; }   // pausa en el ganador
         }
-        u.idxs.forEach(function(i){ doc.off[i][0]+=p.dx; doc.off[i][1]+=p.dy; });
-      });
-      refreshUI();
-      toast(r.placed.length+' pieza(s) acomodadas · aprovechamiento '+Math.round(r.util*100)+'%'+
-        (r.skipped?(' · '+r.skipped+' NO cupieron (quedaron donde estaban)'):''));
+        draw();
+      },380);
+      nestPoll(); draw();
+      toast('Acomodando en vivo… (clic o Esc para saltar al ganador)');
     });
+  }
+  function applyNestPlacements(myUnits, mapa, placed){
+    pushUndo();
+    placed.forEach(function(p){
+      var u=myUnits[mapa[p.i]];
+      if(p.rot){   // girar la unidad alrededor de su centro (mismo pivote que usó el motor)
+        var pv=[(u.b[0]+u.b[2])/2,(u.b[1]+u.b[3])/2];
+        var rad=p.rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+        u.idxs.forEach(function(i){
+          var ecx=doc.oc[i][0]+doc.off[i][0], ecy=doc.oc[i][1]+doc.off[i][1];
+          var vx=ecx-pv[0], vy=ecy-pv[1];
+          doc.off[i][0]=pv[0]+vx*cos-vy*sin-doc.oc[i][0];
+          doc.off[i][1]=pv[1]+vx*sin+vy*cos-doc.oc[i][1];
+          doc.rot[i]+=p.rot;
+        });
+      }
+      u.idxs.forEach(function(i){ doc.off[i][0]+=p.dx; doc.off[i][1]+=p.dy; });
+    });
+    refreshUI();
+  }
+  function finishNestAnim(){
+    if(!nestAnim) return;
+    if(!nestAnim.done){ nestAnim.skip=true; toast('Terminando el cálculo…'); return; }   // saltó antes de tiempo: aplicar en cuanto acabe
+    var na=nestAnim; nestAnim=null;
+    if(na.timer) clearInterval(na.timer);
+    if(na.poll) clearInterval(na.poll);
+    applyNestPlacements(na.myUnits, na.mapa, na.final.placed);
+    el('btnNest').disabled=false; el('btnNest').textContent='Acomodar piezas';
+    var resumen=(state.machine==='plotter'&&na.final.used!=null)
+      ? ('usarás '+(na.final.used/10).toFixed(1)+' cm de material')
+      : ('aprovechamiento '+Math.round(na.final.util*100)+'%');
+    toast(na.final.placed.length+' pieza(s) · '+resumen+
+      (na.final.skipped?(' · '+na.final.skipped+' NO cupieron'):'')+' — ganó el intento '+(na.best+1)+' de '+na.runs.length);
   }
   el('btnNest').addEventListener('click',doNest);
 
@@ -3872,7 +3974,7 @@
   el('traceApply').addEventListener('click',doTrace);
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
-  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;} };
+  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;} };
 })();
 </script>
 </body>
