@@ -340,8 +340,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   Verificado: 13 checks (90° exacto con bbox intercambiado y centro quieto, snap 15°, undo,
   sin-basura, modo todos hace marco) — regresión total 200 checks en 8 arneses.
 
-- **10. Escalar con el mouse + AUTOGUARDADO — ⚑ CONSTRUIDOS 24-jul, SIN COMMIT, falta
-  vistazo.** (a) Las 4 esquinas de la caja de selección ya se ARRASTRAN: escala anclada en la
+- **10. Escalar con el mouse + AUTOGUARDADO — ✅ COMMIT 446d9ce (24-jul).** (a) Las 4 esquinas de la caja de selección ya se ARRASTRAN: escala anclada en la
   esquina OPUESTA (clavada), factores desde el estado INICIAL del drag (orig cacheado — sin
   deriva), **Shift = proporcional por la diagonal** (convención Illustrator); clic sin mover
   no ensucia el historial; bloqueado en paso CNC; prioridad de manijas: esquinas → perilla de
@@ -353,6 +352,18 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   decidir (sí o no) limpia el respaldo; guardar de verdad también. Verificado: 18 checks
   (recuperación única, dirty solo-con-cambios, factores exactos 1.6/1.3, ancla clavada,
   Shift proporcional) + backend real + regresión 223 en 9 arneses.
+
+- **11. Suavizar importaciones facetadas — ✅ COMMIT 446d9ce (24-jul).**
+  El "curve fitting de Vectric" que la nota vieja daba por no-construido: clic derecho →
+  **"Suavizar (quitar facetas)"** (solo en trazos ≥8 pts) re-ajusta Béziers con el Schneider
+  de curve_fit (`fit_nodes_many`, tol 0.1mm — más alta que la de edición: debe TRAGARSE las
+  facetas) y hornea con nodePts; transform reseteado, uid conservado (CNC ok), undo normal.
+  ⚠️ **Bug cazado por la prueba de calidad**: en cerrados SIN esquinas, la COSTURA de los dos
+  cortes artificiales heredaba la tangente de la faceta local (un lado) → quiebre de ~15°
+  sobrevivía. Fix: tangente CENTRAL en costuras artificiales (`seam_suave`/`bordes`) — 24-gon:
+  quiebre 15°→2.6°, desviación 0.10mm, 6 anclas; de pilón el editor de nodos ya no tiene
+  costura en círculos (12 anclas, rect sigue 4 esquinas exactas). Api `fit_many` +
+  `/api/fit_many`. Verificado: calidad medida + 5 checks de menú + regresión 228 en 9 arneses.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
