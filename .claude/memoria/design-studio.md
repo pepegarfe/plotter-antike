@@ -365,6 +365,31 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   costura en círculos (12 anclas, rect sigue 4 esquinas exactas). Api `fit_many` +
   `/api/fit_many`. Verificado: calidad medida + 5 checks de menú + regresión 228 en 9 arneses.
 
+- **12. Tanda de "reflejos Illustrator" (6 funciones) — ⚑ CONSTRUIDA 24-jul, SIN COMMIT,
+  falta vistazo.** Pedida en bloque (#1,2,4,5,9,10 de la lista de faltantes):
+  · **Cmd+A** selecciona todo (excluye bloqueados; 1 solo → individual).
+  · **Alt+arrastre = jalar una COPIA** (copyWithGroups antes de armar moving; alt+clic sin
+    mover se CANCELA restaurando el snapshot — no basta con pop del undo, la copia ya existía).
+  · **Transformar de nuevo (⇧⌘D + menú)**: `lastXform` se graba en los mouseup de mover
+    (con bandera dup si fue alt-copia → repetir ⇧⌘D = PATRÓN en cadena), rotar (deg) y
+    escalar (fx/fy); repite sobre la selección actual.
+  · **Pathfinder completo**: Exclusión (symmetric_difference en boolean_op, botón boolX) y
+    **Dividir** (`divide_op`: polygonize de todas las fronteras + filtro de caras-material
+    por representative_point; cada cara queda SUELTA — grupo solo si trae hueco; botón
+    boolDiv + menú). Api geo_divide + /api/divide.
+  · **Unidades mm|pulgadas** (`unitMode` + mmU/uMM; seg en el modal de Configuración,
+    persistida en cnc_config `units`): convierte SOLO en los bordes — campos X/Y/W/H
+    (mostrar y ESCRIBIR), barra inferior y etiquetas de reglas (pasos imperiales 1/8"…);
+    el interno sigue 100% mm (CNC/HPGL intactos).
+  · **Multi-hoja CNC** (`sheets` 1-8 en Configuración, persistida; plotter siempre 1):
+    el lienzo dibuja N láminas lado a lado (pasillo 50mm, "Hoja n"), fitView abarca todas
+    (`sheetSpanW`), y el NESTING reparte con la restricción de no cruzar pasillos
+    (`_x_valid`, candidatos/rejilla por hoja, slide topado a SU hoja, hoja temprana gana,
+    util×hojas); menú de vacío ofrece **"Traer la hoja N aquí"** (flujo: cortas la 1,
+    apartas, traes la siguiente — el export sigue siendo por hoja física). .dstudio guarda
+    sheets. Backend medido: 3 piezas 250 en 3 hojas de 300 → una por hoja (paso 350).
+  Verificado: 18 checks nuevos + regresión 246 en 10 arneses.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
