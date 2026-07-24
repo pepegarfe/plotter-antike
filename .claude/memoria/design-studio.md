@@ -340,6 +340,20 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   Verificado: 13 checks (90° exacto con bbox intercambiado y centro quieto, snap 15°, undo,
   sin-basura, modo todos hace marco) — regresión total 200 checks en 8 arneses.
 
+- **10. Escalar con el mouse + AUTOGUARDADO — ⚑ CONSTRUIDOS 24-jul, SIN COMMIT, falta
+  vistazo.** (a) Las 4 esquinas de la caja de selección ya se ARRASTRAN: escala anclada en la
+  esquina OPUESTA (clavada), factores desde el estado INICIAL del drag (orig cacheado — sin
+  deriva), **Shift = proporcional por la diagonal** (convención Illustrator); clic sin mover
+  no ensucia el historial; bloqueado en paso CNC; prioridad de manijas: esquinas → perilla de
+  rotación → mover. (b) **Autoguardado**: `dirtySince` se enciende en pushUndo (toda mutación
+  pasa ahí); cada 60s si hay cambios se respalda el proyecto completo a `autosave.dstudio`
+  (junto a la config, en .gitignore) vía autosave_save/load/clear (studio_backend + Api +
+  rutas); al ABRIR, `checkAutosave` (con candado de una-sola-vez que solo se fija cuando hay
+  RESPUESTA — loadWork corre hasta 3 veces) ofrece recuperar con askConfirm (nombre + hora);
+  decidir (sí o no) limpia el respaldo; guardar de verdad también. Verificado: 18 checks
+  (recuperación única, dirty solo-con-cambios, factores exactos 1.6/1.3, ancla clavada,
+  Shift proporcional) + backend real + regresión 223 en 9 arneses.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
