@@ -21,7 +21,7 @@ import math
 
 try:
     from shapely.geometry import Polygon, LineString
-    from shapely.ops import unary_union
+    from shapely.ops import unary_union, polygonize
     HAS_SHAPELY = True
 except Exception:
     HAS_SHAPELY = False
@@ -90,6 +90,10 @@ def boolean_op(data):
             res = polys[0]
             for p in polys[1:]:
                 res = res.intersection(p)
+        elif op == 'exclude':                # Exclusión: quita los traslapes, deja el resto
+            res = polys[0]
+            for p in polys[1:]:
+                res = res.symmetric_difference(p)
         else:
             return {'ok': False, 'error': 'Operación desconocida.'}
     except Exception as e:
@@ -199,3 +203,30 @@ def round_op(data):
     if comidas:
         res['eaten'] = comidas
     return res
+
+
+def divide_op(data):
+    """Dividir (Pathfinder): parte las figuras por TODOS sus cruces; cada carita
+    del arreglo queda como pieza independiente (lista de 'faces', cada una con
+    sus anillos par-impar)."""
+    if not HAS_SHAPELY:
+        return {'ok': False, 'error': _NEED}
+    polys = _units_polys((data or {}).get('units'))
+    if len(polys) < 2:
+        return {'ok': False, 'error': 'Se necesitan al menos dos figuras cerradas.'}
+    total = unary_union(polys)
+    lines = unary_union([p.boundary for p in polys])
+    faces = []
+    try:
+        for f in polygonize(lines):
+            rp = f.representative_point()
+            if total.covers(rp):                 # solo las caras que SON material
+                rings = _rings_of(f)
+                if rings:
+                    faces.append([r['pts'] for r in rings])
+    except Exception as e:
+        return {'ok': False, 'error': f'No se pudo dividir: {e}'}
+    if len(faces) < 2:
+        return {'ok': False, 'error': 'Las figuras no se cruzan — no hay nada que dividir.'}
+    return {'ok': True, 'faces': faces}
+

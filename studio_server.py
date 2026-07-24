@@ -160,6 +160,11 @@ def api_round():
     return _json(geo.round_op(request.json or {}))
 
 
+@app.post('/api/divide')
+def api_divide():
+    return _json(geo.divide_op(request.json or {}))
+
+
 @app.post('/api/nest')
 def api_nest():
     return _json(nester.nest_op(request.json or {}))

@@ -376,13 +376,13 @@
         </div>
         <div class="xform-fields">
           <div class="grid2">
-            <div class="field"><label>X</label><input id="fx" value="0.0" disabled><span class="u">mm</span></div>
-            <div class="field"><label>Y</label><input id="fy" value="0.0" disabled><span class="u">mm</span></div>
+            <div class="field"><label>X</label><input id="fx" value="0.0" disabled><span class="u" id="uX">mm</span></div>
+            <div class="field"><label>Y</label><input id="fy" value="0.0" disabled><span class="u" id="uY">mm</span></div>
           </div>
           <div class="whrow">
-            <div class="field"><label>W</label><input id="fw" value="0.0" disabled><span class="u">mm</span></div>
+            <div class="field"><label>W</label><input id="fw" value="0.0" disabled><span class="u" id="uW">mm</span></div>
             <button class="lockbtn on" id="lockAspect" disabled title="Proporciones bloqueadas"></button>
-            <div class="field"><label>H</label><input id="fh" value="0.0" disabled><span class="u">mm</span></div>
+            <div class="field"><label>H</label><input id="fh" value="0.0" disabled><span class="u" id="uH">mm</span></div>
           </div>
           <div class="grid2">
             <div class="field"><label>∠</label><input id="fr" value="0" disabled><select id="rotPreset" class="mini-sel" disabled><option value="">°▾</option><option>0</option><option>45</option><option>90</option><option>135</option><option>180</option><option>225</option><option>270</option><option>315</option></select></div>
@@ -415,6 +415,9 @@
         <button class="abtn" id="boolU" disabled title="Unir (soldar): las figuras seleccionadas se funden en una sola"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5A1.5 1.5 0 0 1 5.5 8H10V5.5A1.5 1.5 0 0 1 11.5 4h7A1.5 1.5 0 0 1 20 5.5v7a1.5 1.5 0 0 1-1.5 1.5H14v4.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 18.5z"/></svg></button>
         <button class="abtn" id="boolD" disabled title="Restar: a la figura de ABAJO (la primera que dibujaste) se le quitan las de encima"><svg viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M4 9.5A1.5 1.5 0 0 1 5.5 8h7A1.5 1.5 0 0 1 14 9.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 16.5zM10 8h4v6h-4z"/><rect x="10" y="4" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".55"/></svg></button>
         <button class="abtn" id="boolI" disabled title="Intersectar: queda solo la zona donde TODAS se enciman"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="10" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".55"/><rect x="10" y="4" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".55"/><path fill="currentColor" d="M10 8h4v6h-4z"/></svg></button>
+        <span class="asep"></span>
+        <button class="abtn" id="boolX" disabled title="Exclusión: quita los traslapes y deja el resto"><svg viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M4 8h10v12H4zM10 4h10v10H10zM10 8h4v6h-4z"/></svg></button>
+        <button class="abtn" id="boolDiv" disabled title="Dividir: parte las figuras por todos sus cruces; cada pedazo queda como pieza suelta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="8" width="10" height="12" rx="1.5" opacity=".55"/><rect x="10" y="4" width="10" height="10" rx="1.5" opacity=".55"/><path d="M10 8h4v6h-4z" stroke-width="1.8"/></svg></button>
       </div>
 
       <div class="grp-t sec">Contorno</div>
@@ -584,6 +587,11 @@
       <div class="grp-t" id="waMachLbl">Área de trabajo · Plotter</div>
       <div class="mrow"><div class="field" style="flex:1"><label>Ancho</label><input id="waW" value="3000"><span class="u">mm</span></div>
         <div class="field" style="flex:1"><label>Alto</label><input id="waH" value="600"><span class="u">mm</span></div></div>
+      <div class="seg" id="unitSeg" style="margin:2px 0 8px">
+        <button class="on" data-u="mm" title="Medir en milímetros">mm</button>
+        <button data-u="in" title="Medir en pulgadas (los campos X/Y/W/H, la barra inferior y las reglas)">pulgadas</button>
+      </div>
+      <div class="mrow" id="waSheetsRow" style="display:none"><div class="field" style="flex:1" title="Cuántas láminas iguales pones lado a lado; el nesting reparte solo y lo que no cabe pasa a la siguiente"><label>Hojas</label><input id="waSheets" value="1"></div></div>
       <div class="mrow"><button class="pbtn acc" id="waSave" style="flex:1">Guardar área</button></div>
       <div class="cstat" id="waNote">El tamaño se recuerda para la próxima vez.</div>
     </div>
@@ -804,7 +812,7 @@
   // ===== Estado del documento =====
   // machine: 'plotter' | 'cnc'. work = área de la máquina ACTIVA; plotterWork guarda la del
   // plotter para poder alternar sin re-pedirla; cnc = config completa (área, material, fresas).
-  var state={work:[3000,600], name:null, machine:'plotter', plotterWork:[3000,600], cnc:null};
+  var state={work:[3000,600], name:null, machine:'plotter', plotterWork:[3000,600], cnc:null, sheets:1};
   var doc={paths:[], off:[], sx:[], sy:[], rot:[], oc:[], grp:[], uid:[]};   // por trazado: puntos crudos + transform + centro original + id estable
   var uidSeq=0;   // los uid sobreviven a borrar/pegar: las trayectorias CNC referencian por uid
   var sel={idx:-1, set:new Set()};                     // idx = individual ; set = grupo (rubber-band)
@@ -851,6 +859,7 @@
     showTab(dsg?'transform':'cnccfg'); }   // el paso CNC entra por Configuración (como el Job Setup de Aspire)
   el('modeSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     var m=b.getAttribute('data-sm'); if(m!==sideMode) setSideMode(m); });
+  el('unitSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; setUnits(b.getAttribute('data-u'),true); });
   el('tabTransform').addEventListener('click',function(){ showTab('transform'); });
   el('tabLayers').addEventListener('click',function(){ showTab('layers'); });
   el('tabCncCfg').addEventListener('click',function(){ showTab('cnccfg'); });
@@ -998,8 +1007,10 @@
   var ROTH=22;                                  // alto del tallo de la manija de rotación (px)
   var nestAnim=null;                            // reproducción de los intentos del nesting (fantasmas)
   var scaling=null;                             // escalado con el mouse {A,anchor,w0,h0,orig,moved}
-  function fitScale(W,H){ return Math.min((W-108)/state.work[0], (H-108)/state.work[1]); }
-  function fitView(){ var r=cv.getBoundingClientRect(); if(r.width<10||r.height<10) return; var s=fitScale(r.width,r.height); view.scale=s; view.ox=(r.width-state.work[0]*s)/2; view.oy=(r.height+state.work[1]*s)/2; view.ready=true; draw(); }
+  var lastXform=null;                           // última transformación (para repetirla con ⇧⌘D)
+  function sheetSpanW(){ var n=state.sheets||1; return state.work[0]*n+50*(n-1); }
+  function fitScale(W,H){ return Math.min((W-108)/sheetSpanW(), (H-108)/state.work[1]); }
+  function fitView(){ var r=cv.getBoundingClientRect(); if(r.width<10||r.height<10) return; var s=fitScale(r.width,r.height); view.scale=s; view.ox=(r.width-sheetSpanW()*s)/2; view.oy=(r.height+state.work[1]*s)/2; view.ready=true; draw(); }
   function tp(x,y){ return [view.ox+x*view.scale, view.oy-y*view.scale]; }
   function sp(sx,sy){ return [(sx-view.ox)/view.scale, (view.oy-sy)/view.scale]; } // pantalla -> mm
   function zoomAt(f,sx,sy){ if(!view.ready) return; userZoomed=true; var m=sp(sx,sy); view.scale=Math.max(0.003,Math.min(80,view.scale*f)); view.ox=sx-m[0]*view.scale; view.oy=sy+m[1]*view.scale; draw(); }
@@ -1014,13 +1025,18 @@
     ctx.clearRect(0,0,r.width,r.height);
     ctx.fillStyle=cvar('--canvas'); ctx.fillRect(0,0,r.width,r.height);
     var ww=state.work[0], wh=state.work[1], s=view.scale, top=view.oy-wh*s;
-    ctx.strokeStyle=cvar('--grid'); ctx.lineWidth=1; ctx.beginPath();
+    var NS=state.sheets||1, SHGAP=50;
     var g,p;
-    for(g=0;g<=ww+0.1;g+=100){p=tp(g,0);ctx.moveTo(p[0],view.oy);ctx.lineTo(p[0],top);}
-    for(g=0;g<=wh+0.1;g+=100){p=tp(0,g);ctx.moveTo(view.ox,p[1]);ctx.lineTo(view.ox+ww*s,p[1]);}
-    ctx.stroke();
-    ctx.strokeStyle=cvar('--gridax'); ctx.setLineDash([7,5]); ctx.lineWidth=1.2; ctx.strokeRect(view.ox,top,ww*s,wh*s); ctx.setLineDash([]);
-    ctx.fillStyle=cvar('--faint'); ctx.font='11px '+cvar('--mono'); ctx.fillText((state.machine==='cnc'?'CNC':'Plotter')+' · Área de trabajo · '+ww+' × '+wh+' mm', view.ox, top-8);
+    for(var shl=0; shl<NS; shl++){
+      var offxS=shl*(ww+SHGAP), oxpx=view.ox+offxS*s;
+      ctx.strokeStyle=cvar('--grid'); ctx.lineWidth=1; ctx.beginPath();
+      for(g=0;g<=ww+0.1;g+=100){p=tp(offxS+g,0);ctx.moveTo(p[0],view.oy);ctx.lineTo(p[0],top);}
+      for(g=0;g<=wh+0.1;g+=100){p=tp(offxS,g);ctx.moveTo(oxpx,p[1]);ctx.lineTo(oxpx+ww*s,p[1]);}
+      ctx.stroke();
+      ctx.strokeStyle=cvar('--gridax'); ctx.setLineDash([7,5]); ctx.lineWidth=1.2; ctx.strokeRect(oxpx,top,ww*s,wh*s); ctx.setLineDash([]);
+      ctx.fillStyle=cvar('--faint'); ctx.font='11px '+cvar('--mono');
+      ctx.fillText((NS>1?('Hoja '+(shl+1)+' · '):((state.machine==='cnc'?'CNC':'Plotter')+' · Área de trabajo · '))+ww+' × '+wh+' mm', oxpx, top-8);
+    }
     var o=tp(0,0); ctx.strokeStyle=cvar('--bad'); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(o[0]-7,o[1]);ctx.lineTo(o[0]+7,o[1]);ctx.moveTo(o[0],o[1]-7);ctx.lineTo(o[0],o[1]+7);ctx.stroke();
     // imagen de referencia (tenue, bloqueada, debajo de todo)
     if(refImg && !outlineMode){ var rp0=tp(refImg.x, refImg.y+refImg.h);
@@ -1210,14 +1226,14 @@
     ctx.fillRect(0,0,r.width,RUL); ctx.fillRect(0,0,RUL,r.height);
     ctx.strokeStyle=cvar('--line-2'); ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,RUL+0.5); ctx.lineTo(r.width,RUL+0.5); ctx.moveTo(RUL+0.5,0); ctx.lineTo(RUL+0.5,r.height); ctx.stroke();
-    var steps=[1,2,5,10,25,50,100,250,500,1000], stp=steps[steps.length-1];
+    var steps=(unitMode==='in')?[3.175,6.35,12.7,25.4,50.8,127,254,635,1270]:[1,2,5,10,25,50,100,250,500,1000], stp=steps[steps.length-1];
     for(var si=0;si<steps.length;si++){ if(steps[si]*s>=46){ stp=steps[si]; break; } }
     ctx.font='9px '+cvar('--mono'); ctx.fillStyle=cvar('--faint'); ctx.strokeStyle=cvar('--line-2');
     var mmL=(RUL-view.ox)/s, mmR=(r.width-view.ox)/s;
     for(var mx=Math.floor(mmL/stp)*stp; mx<=mmR; mx+=stp){
       var TX=tp(mx,0)[0]; if(TX<RUL) continue;
       ctx.beginPath(); ctx.moveTo(TX+0.5,RUL-7); ctx.lineTo(TX+0.5,RUL); ctx.stroke();
-      ctx.fillText(String(Math.round(mx)), TX+3, 9.5);
+      ctx.fillText(unitMode==='in'?String(Math.round(mx/25.4*100)/100):String(Math.round(mx)), TX+3, 9.5);
       for(var mk=1;mk<5;mk++){ var TXm=tp(mx+stp*mk/5,0)[0]; if(TXm<RUL||TXm>r.width) continue;
         ctx.beginPath(); ctx.moveTo(TXm+0.5,RUL-3.5); ctx.lineTo(TXm+0.5,RUL); ctx.stroke(); }
     }
@@ -1225,7 +1241,7 @@
     for(var my=Math.floor(mmB/stp)*stp; my<=mmT; my+=stp){
       var TY=tp(0,my)[1]; if(TY<RUL) continue;
       ctx.beginPath(); ctx.moveTo(RUL-7,TY+0.5); ctx.lineTo(RUL,TY+0.5); ctx.stroke();
-      ctx.save(); ctx.translate(9.5,TY-3); ctx.rotate(-Math.PI/2); ctx.fillText(String(Math.round(my)),0,0); ctx.restore();
+      ctx.save(); ctx.translate(9.5,TY-3); ctx.rotate(-Math.PI/2); ctx.fillText(unitMode==='in'?String(Math.round(my/25.4*100)/100):String(Math.round(my)),0,0); ctx.restore();
       for(var mk2=1;mk2<5;mk2++){ var TYm=tp(0,my+stp*mk2/5)[1]; if(TYm<RUL||TYm>r.height) continue;
         ctx.beginPath(); ctx.moveTo(RUL-3.5,TYm+0.5); ctx.lineTo(RUL,TYm+0.5); ctx.stroke(); }
     }
@@ -1234,7 +1250,18 @@
   }
 
   // ===== Inspector =====
-  function fmt(v){return (Math.round(v*10)/10).toFixed(1);}
+  var unitMode='mm';                            // unidades VISIBLES (interno siempre mm)
+  function mmU(v){ return unitMode==='in'? v/25.4 : v; }
+  function uMM(v){ return unitMode==='in'? v*25.4 : v; }
+  function fmt(v){ return unitMode==='in'? (Math.round(mmU(v)*1000)/1000).toFixed(3) : (Math.round(v*10)/10).toFixed(1); }
+  function fmtDim(v){ return unitMode==='in'? (Math.round(mmU(v)*100)/100).toFixed(2) : String(Math.round(v)); }
+  function setUnits(u, persist){
+    unitMode=(u==='in')?'in':'mm';
+    ['uX','uY','uW','uH'].forEach(function(id){ if(el(id)) el(id).textContent=(unitMode==='in'?'in':'mm'); });
+    if(el('unitSeg')) el('unitSeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-u')===unitMode); });
+    refreshInspector(); draw();
+    if(persist) CNC.set({units:unitMode}).then(function(r){ if(r&&r.ok) state.cnc=r; }).catch(function(){});
+  }
   function sideSegRefresh(){
     // Fuera/Dentro piden contornos CERRADOS; Izq/Der existen para trazos ABIERTOS —
     // cada juego solo aparece si el objetivo (trayectoria en edición o selección) lo trae
@@ -1261,10 +1288,10 @@
     sideSegRefresh();
     var has=hasDoc();
     ['fx','fy','fw','fh','fr','fs'].forEach(function(id){el(id).disabled=!has;});
-    ['lockAspect','rotPreset','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','btnOffset','offDist','btnExpand','expW','btnRound','rndR','btnNest','nstGap','nstMar'].forEach(function(id){el(id).disabled=!has;});
+    ['lockAspect','rotPreset','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','boolX','boolDiv','btnOffset','offDist','btnExpand','expW','btnRound','rndR','btnNest','nstGap','nstMar'].forEach(function(id){el(id).disabled=!has;});
     el('alignTo').querySelectorAll('button').forEach(function(b){b.disabled=!has;});   // segmentado: apagar sus botones
     if(has){ var actIdx=activeIdx(); var nUnits=activeUnits().length; el('disH').disabled = nUnits<3; el('disV').disabled = nUnits<3;
-      ['boolU','boolD','boolI'].forEach(function(id){ el(id).disabled = nUnits<2; });   // combinar pide 2+ figuras
+      ['boolU','boolD','boolI','boolX','boolDiv'].forEach(function(id){ el(id).disabled = nUnits<2; });   // combinar pide 2+ figuras
       var hayAb=false, hayCe=false;
       actIdx.forEach(function(i){ if(isClosedIdx(i)) hayCe=true; else hayAb=true; });
       el('btnExpand').disabled=!hayAb; el('btnRound').disabled=!hayCe;
@@ -1286,7 +1313,7 @@
     var ap=anchorPt(b); el('fx').value=fmt(ap[0]); el('fy').value=fmt(ap[1]); el('fw').value=fmt(w); el('fh').value=fmt(h);
     el('fr').value = (m==='ind') ? String(Math.round(doc.rot[sel.idx]*10)/10) : '0';
     el('fs').value = (m==='ind') ? String(Math.round(doc.sx[sel.idx]*1000)/10) : '100';
-    el('metaSize').textContent=Math.round(w)+' × '+Math.round(h)+' mm';
+    el('metaSize').textContent=fmtDim(w)+' × '+fmtDim(h)+(unitMode==='in'?' in':' mm');
     var mmps = state.machine==='cnc' ? (cncTool()?cncTool().feed/60:1) : cutParams().speed;   // CNC: avance de la fresa (mm/min → mm/s)
     var secs=Math.round(pathLen()/Math.max(1,mmps)); el('metaTime').textContent='≈ '+Math.floor(secs/60)+' min '+(secs%60)+' s';
     el('stSel').textContent = m==='ind'?'1 objeto seleccionado':(m==='grp'?(sel.set.size+' objetos seleccionados'):(doc.paths.length+' trazados'));
@@ -1294,10 +1321,10 @@
 
   function commitField(id){
     if(!hasDoc()) return; var v=parseFloat(el(id).value); if(isNaN(v)) { refreshInspector(); return; }
-    if(id==='fx'){ var ap=anchorPt(bboxOf(activeIdx())); op(function(){setPosition(v,ap[1]);}); }
-    else if(id==='fy'){ var ap2=anchorPt(bboxOf(activeIdx())); op(function(){setPosition(ap2[0],v);}); }
-    else if(id==='fw'){ var A3=activeIdx(),b3=bboxOf(A3),cw=b3[2]-b3[0]; if(cw>0){ var f=v/cw; op(function(){scaleActive(f, aspectLocked?f:1);}); } }
-    else if(id==='fh'){ var A4=activeIdx(),b4=bboxOf(A4),ch=b4[3]-b4[1]; if(ch>0){ var f=v/ch; op(function(){scaleActive(aspectLocked?f:1, f);}); } }
+    if(id==='fx'){ var ap=anchorPt(bboxOf(activeIdx())); op(function(){setPosition(uMM(v),ap[1]);}); }
+    else if(id==='fy'){ var ap2=anchorPt(bboxOf(activeIdx())); op(function(){setPosition(ap2[0],uMM(v));}); }
+    else if(id==='fw'){ var A3=activeIdx(),b3=bboxOf(A3),cw=b3[2]-b3[0]; if(cw>0){ var f=uMM(v)/cw; op(function(){scaleActive(f, aspectLocked?f:1);}); } }
+    else if(id==='fh'){ var A4=activeIdx(),b4=bboxOf(A4),ch=b4[3]-b4[1]; if(ch>0){ var f=uMM(v)/ch; op(function(){scaleActive(aspectLocked?f:1, f);}); } }
     else if(id==='fr'){ var m=mode(); if(m==='ind'){var d=v-doc.rot[sel.idx]; op(function(){rotateActive(d);});} else { op(function(){rotateActive(v);}); } }
     else if(id==='fs'){ var m2=mode(); if(m2==='ind'){var cur=doc.sx[sel.idx]*100; if(cur>0){var f=v/cur; op(function(){scaleActive(f,f);});}} else { var f2=v/100; op(function(){scaleActive(f2,f2);}); } }
   }
@@ -1499,8 +1526,15 @@
       if(cncStep()){ sel.set=new Set(); sel.idx=(sel.idx===hit?-1:hit); refreshUI(); return; }   // individual, sin mover
       if(!activeContains(hit)){ selectHit(hit); refreshUI(); }
       pushUndo();
+      var altCopied=false;
+      if(e.altKey && !cncStep()){                 // Alt+arrastre = jalar una COPIA (Illustrator)
+        var nsA=copyWithGroups(activeIdx(),0,0);
+        if(nsA.length===1){ sel.set=new Set(); sel.idx=nsA[0]; }
+        else { sel.idx=-1; sel.set=new Set(nsA); }
+        altCopied=true;
+      }
       var A0=activeIdx();
-      moving={x:e.clientX, y:e.clientY, moved:false, A:A0,
+      moving={x:e.clientX, y:e.clientY, moved:false, altCopied:altCopied, A:A0,
         orig:A0.map(function(i){ return [doc.off[i][0],doc.off[i][1]]; }), cx:[], cy:[]};
       // candidatos del imán: bordes/centros de las DEMÁS unidades + hoja + guías
       var mine={}; A0.forEach(function(i){ mine[i]=1; });
@@ -1544,7 +1578,7 @@
         doc.off[i][1]=fy*o.off[1]+(1-fy)*(ay-doc.oc[i][1]);
         doc.sx[i]=o.sx*fx; doc.sy[i]=o.sy*fy;
       });
-      scaling.moved=true;
+      scaling.moved=true; scaling.fx=fx; scaling.fy=fy;
       draw(); refreshInspector(); return;
     }
     if(rotating){
@@ -1634,11 +1668,13 @@
   window.addEventListener('mouseup',function(){
     if(pan){ pan=null; cv.style.cursor=(tool==='pan'||spaceDown)?'grab':'default'; return; }
     if(scaling){
-      if(!scaling.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; }
+      if(!scaling.moved){ undoStack.pop(); updateUndoBtns(); }
+      else { redoStack.length=0; if(scaling.fx) lastXform={t:'scale', fx:scaling.fx, fy:scaling.fy}; }
       scaling=null; refreshUI(); return;
     }
     if(rotating){
-      if(!rotating.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; }
+      if(!rotating.moved){ undoStack.pop(); updateUndoBtns(); }
+      else { redoStack.length=0; if(rotating.applied) lastXform={t:'rot', deg:rotating.applied}; }
       rotating=null; refreshUI(); return;
     }
     if(guideDrag){
@@ -1653,7 +1689,17 @@
     if(pen && pen.drag){ pen.drag=false; return; }
     if(nedit && nedit.drag){ nedit.drag=null; return; }
     if(draft){ var d0=draft; draft=null; commitDraft(d0); return; }
-    if(moving){ snapGuides=null; if(!moving.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; } moving=null; cv.style.cursor=(tool==='pan')?'grab':'default'; refreshUI(); return; }
+    if(moving){ snapGuides=null;
+      if(!moving.moved){
+        if(moving.altCopied){ restore(undoStack.pop()); }   // Alt+clic sin mover: la copia se cancela
+        else { undoStack.pop(); }
+        updateUndoBtns();
+      } else {
+        redoStack.length=0;
+        if(moving.A.length) lastXform={t:'move', dup:moving.altCopied,
+          dx:doc.off[moving.A[0]][0]-moving.orig[0][0], dy:doc.off[moving.A[0]][1]-moving.orig[0][1]};
+      }
+      moving=null; cv.style.cursor=(tool==='pan')?'grab':'default'; refreshUI(); return; }
     if(marquee){ var mnx=Math.min(marquee.x0,marquee.x1),mny=Math.min(marquee.y0,marquee.y1),mxx=Math.max(marquee.x0,marquee.x1),mxy=Math.max(marquee.y0,marquee.y1);
       var moved=Math.abs(marquee.x1-marquee.x0)>3||Math.abs(marquee.y1-marquee.y0)>3;
       if(moved){ var s=new Set(); for(var i=0;i<doc.paths.length;i++){ if(isLocked(i)) continue; var e=effPts(i); for(var k=0;k<e.length;k++){ var pp=tp(e[k][0],e[k][1]); if(pp[0]>=mnx&&pp[0]<=mxx&&pp[1]>=mny&&pp[1]<=mxy){ s.add(i); break; } } }
@@ -1694,7 +1740,9 @@
       toast(outlineMode?'Modo contorno — solo el esqueleto de los trazos (Cmd+Y regresa)':'Vista normal'); }
     else if(meta && e.key.toLowerCase()==='c'){ e.preventDefault(); doCopy(); }
     else if(meta && e.key.toLowerCase()==='v'){ e.preventDefault(); doPaste(); }
+    else if(meta && e.key.toLowerCase()==='d' && e.shiftKey){ e.preventDefault(); transformAgain(); }
     else if(meta && e.key.toLowerCase()==='d'){ e.preventDefault(); doDuplicate(); }
+    else if(meta && e.key.toLowerCase()==='a'){ e.preventDefault(); selectAll(); }
     else if(meta && e.code==='KeyG' && !e.shiftKey){ e.preventDefault(); doGroup(); }     // Ctrl/Cmd+G
     else if(meta && e.code==='KeyG' && e.shiftKey){ e.preventDefault(); doUngroup(); }    // Ctrl/Cmd+Shift+G
     else if(meta && (e.key==='='||e.key==='+')){ e.preventDefault(); var r=cv.getBoundingClientRect(); zoomAt(1.25,r.width/2,r.height/2); }
@@ -1718,6 +1766,14 @@
   window.addEventListener('keyup',function(e){ if(e.code==='Space'){ spaceDown=false; if(!pan) cv.style.cursor=(tool==='pan')?'grab':'default'; } });
   function nudge(dx,dy,big){ if(!hasDoc()||mode()==='all'||cncLock()) return; var step=big?10:1; op(function(){moveBy(dx*step,dy*step);}); }
 
+  function selectAll(){
+    if(!hasDoc()) return;
+    var sa=[]; allIdx().forEach(function(i){ if(!isLocked(i)) sa.push(i); });
+    if(!sa.length) return;
+    if(sa.length===1){ sel.set=new Set(); sel.idx=sa[0]; }
+    else { sel.idx=-1; sel.set=new Set(sa); }
+    refreshUI();
+  }
   function doCopy(){ if(!hasDoc()||mode()==='all') return; var A=activeIdx(); clip=A.map(function(i){return {pts:doc.paths[i].pts.map(function(q){return [q[0],q[1]];}), off:[doc.off[i][0],doc.off[i][1]], sx:doc.sx[i], sy:doc.sy[i], rot:doc.rot[i], oc:[doc.oc[i][0],doc.oc[i][1]], grp:doc.grp[i]};}); toast(clip.length+' copiado(s)'); }
   function doPaste(){ if(!clip.length||cncLock()) return; pushUndo(); var newSet=new Set(), map={}; for(var n=0;n<clip.length;n++){ var c=clip[n]; var idx=doc.paths.length; doc.paths.push({pts:c.pts.map(function(q){return [q[0],q[1]];})}); doc.off.push([c.off[0]+5,c.off[1]+5]); doc.sx.push(c.sx); doc.sy.push(c.sy); doc.rot.push(c.rot); doc.oc.push([c.oc[0],c.oc[1]]); var g=c.grp||0; doc.grp.push(g?(map[g]||(map[g]=++groupSeq)):0); doc.uid.push(++uidSeq); newSet.add(idx);} sel.idx=-1; sel.set=newSet; refreshUI(); toast('Pegado'); }
   function doDelete(){ if(cncLock()) return; var A=activeIdx().slice().sort(function(a,b){return b-a;}); pushUndo(); for(var n=0;n<A.length;n++){var i=A[n]; doc.paths.splice(i,1); doc.off.splice(i,1); doc.sx.splice(i,1); doc.sy.splice(i,1); doc.rot.splice(i,1); doc.oc.splice(i,1); doc.grp.splice(i,1); doc.uid.splice(i,1);} sel.idx=-1; sel.set=new Set(); paintTps(); refreshUI(); toast('Eliminado'); }
@@ -2003,7 +2059,7 @@
                expand:['geo_expand','/api/expand'], round:['geo_round','/api/round'],
                nest:['geo_nest','/api/nest'],
                nest_start:['geo_nest_start','/api/nest_start'], nest_status:['geo_nest_status','/api/nest_status'],
-               fit_many:['fit_many','/api/fit_many']};
+               fit_many:['fit_many','/api/fit_many'], divide:['geo_divide','/api/divide']};
   function geoCall(kind, payload, done){
     var m=GEO_API[kind];
     if(api()){ api()[m[0]](payload).then(done).catch(function(e){ toast('Error: '+e); }); }
@@ -2030,7 +2086,7 @@
     });
     if(gid){ sel.idx=-1; sel.set=ns; } else { sel.set=new Set(); sel.idx=doc.paths.length-1; }
   }
-  var BOOL_LBL={union:'Unidas', difference:'Restadas', intersection:'Intersectadas'};
+  var BOOL_LBL={union:'Unidas', difference:'Restadas', intersection:'Intersectadas', exclude:'Exclusión aplicada (los traslapes se quitaron)'};
   function doBoolean(op){
     if(!hasDoc()||cncLock()) return;
     var gu=geoUnits().filter(function(u){ return u.rings.length; });
@@ -2060,6 +2116,30 @@
       geoInsert(r.paths);   // el contorno se SUMA, el original se queda
       refreshUI();
       toast('Contorno a '+dist+' mm ('+r.paths.length+' anillo'+(r.paths.length>1?'s':'')+')');
+    });
+  }
+  function doDivide(){
+    if(!hasDoc()||cncLock()) return;
+    var gu=geoUnits().filter(function(u){ return u.rings.length; });
+    if(gu.length<2){ toast('Selecciona al menos dos figuras cerradas'); return; }
+    geoCall('divide', {units:gu.map(function(u){ return u.rings; })}, function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo dividir'); return; }
+      pushUndo();
+      var del=[]; gu.forEach(function(u){ u.idxs.forEach(function(i){ if(isClosedIdx(i)) del.push(i); }); });
+      geoRemove(del);
+      var ns=new Set();
+      r.faces.forEach(function(face){
+        var gid=face.length>1?(++groupSeq):0;   // cara con hueco = mini-grupo; las demás sueltas
+        face.forEach(function(pts){
+          var idx=doc.paths.length;
+          doc.paths.push({pts:pts.map(function(q){ return [q[0],q[1]]; })});
+          doc.off.push([0,0]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0);
+          var bb=bboxOfPts(pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]);
+          doc.grp.push(gid); doc.uid.push(++uidSeq); ns.add(idx);
+        });
+      });
+      sel.idx=-1; sel.set=ns;
+      refreshUI(); toast('Dividido en '+r.faces.length+' piezas sueltas');
     });
   }
   function doExpand(){
@@ -2112,6 +2192,7 @@
     var payload={ sheet:[state.work[0],state.work[1]],
       margin:parseFloat(el('nstMar').value)||0, gap:parseFloat(el('nstGap').value)||0,
       mode:(state.machine==='plotter'?'roll':'sheet'),   // plotter = ROLLO: llenar el ancho y gastar el mínimo largo
+      sheets:(state.machine==='cnc'?(state.sheets||1):1),
       units:payloadUnits, obstacles:obst };   // sin ángulos: el motor prueba 90°→45°→15° y gana el mejor
     el('btnNest').disabled=true; el('btnNest').textContent='Acomodando…';
     geoCall('nest_start', payload, function(r0){
@@ -2194,6 +2275,8 @@
   el('boolU').addEventListener('click',function(){ doBoolean('union'); });
   el('boolD').addEventListener('click',function(){ doBoolean('difference'); });
   el('boolI').addEventListener('click',function(){ doBoolean('intersection'); });
+  el('boolX').addEventListener('click',function(){ doBoolean('exclude'); });
+  el('boolDiv').addEventListener('click',doDivide);
   el('btnOffset').addEventListener('click',doOffset);
   el('btnExpand').addEventListener('click',doExpand);
   el('btnRound').addEventListener('click',doRound);
@@ -2478,6 +2561,29 @@
     refreshUI(); toast('Transformación restablecida (tamaño y giro originales)');
   }
 
+  function traerHoja(sh){
+    if(cncLock()) return;
+    pushUndo();
+    var spanM=state.work[0]+50, n=0;
+    for(var i=0;i<doc.paths.length;i++){
+      var bb=bboxOf([i]); var cx=(bb[0]+bb[2])/2;
+      if(cx>=sh*spanM && cx<sh*spanM+state.work[0]){ doc.off[i][0]-=sh*spanM; n++; }
+    }
+    refreshUI(); toast(n+' trazo(s) traídos de la hoja '+(sh+1)+' — quita o aparta antes lo ya cortado');
+  }
+  function transformAgain(){
+    if(!hasDoc()||cncLock()) return;
+    if(!lastXform){ toast('Aún no hay una transformación que repetir'); return; }
+    var lx=lastXform;
+    pushUndo();
+    if(lx.dup){ var ns=copyWithGroups(activeIdx(),0,0);
+      if(ns.length===1){ sel.set=new Set(); sel.idx=ns[0]; } else { sel.idx=-1; sel.set=new Set(ns); } }
+    if(lx.t==='move') moveBy(lx.dx,lx.dy);
+    else if(lx.t==='rot') rotateActive(lx.deg);
+    else if(lx.t==='scale') scaleActive(lx.fx,lx.fy);
+    refreshUI(); toast('Transformación repetida'+(lx.dup?' (con copia)':''));
+  }
+
   // ===== Menú contextual (clic derecho) =====
   function ctxHide(){ el('ctxMenu').style.display='none'; }
   function ctxShow(items, x, y){
@@ -2516,6 +2622,8 @@
         items.push({label:'Unir (soldar)', fn:function(){ doBoolean('union'); }});
         items.push({label:'Restar (la de atrás manda)', fn:function(){ doBoolean('difference'); }});
         items.push({label:'Intersectar', fn:function(){ doBoolean('intersection'); }});
+        items.push({label:'Exclusión (quitar traslapes)', fn:function(){ doBoolean('exclude'); }});
+        items.push({label:'Dividir en pedazos', fn:doDivide});
         items.push({sep:1});
       }
       var hayAb=false, hayCe=false;
@@ -2539,6 +2647,7 @@
       items.push({label:'Centrar en la hoja', fn:function(){ op(centerActive); }});
       items.push({label:'Copias…', fn:function(){ el('gridModal').style.display='flex'; }});
       items.push({label:'Zoom a esto', keys:'F', fn:zoomSelection});
+      items.push({label:'Transformar de nuevo', keys:'⇧⌘D', fn:transformAgain});
       items.push({sep:1});
       items.push({label:'Restablecer transformación', fn:resetTransformActive});
       items.push({label:'Bloquear', fn:lockActive});
@@ -2547,6 +2656,20 @@
       items.push({label:'Deseleccionar', dis:(mode()==='all'), fn:function(){ sel.idx=-1; sel.set=new Set(); refreshUI(); }});
       items.push({label:'Ajustar vista', fn:function(){ userZoomed=false; view.ready=false; fitView(); }});
       if(lockedUids.size) items.push({label:'Desbloquear todo ('+lockedUids.size+')', fn:unlockAll});
+      if(state.machine==='cnc' && (state.sheets||1)>1 && hasDoc()){
+        var spanM=state.work[0]+50;
+        for(var shx=1; shx<state.sheets; shx++){
+          (function(shy){
+            for(var ii=0; ii<doc.paths.length; ii++){
+              var bbT=bboxOf([ii]); var cxT=(bbT[0]+bbT[2])/2;
+              if(cxT>=shy*spanM && cxT<shy*spanM+state.work[0]){
+                items.push({label:'Traer la hoja '+(shy+1)+' aquí', fn:function(){ traerHoja(shy); }});
+                return;
+              }
+            }
+          })(shx);
+        }
+      }
     }
     ctxShow(items, e.clientX, e.clientY);
   });
@@ -2601,6 +2724,7 @@
     textMeta=proj.textMeta||{};   // recetas de texto del proyecto (v3)
     guides=(proj.guides&&proj.guides.v&&proj.guides.h)?proj.guides:{v:[],h:[]};
     lockedUids=new Set(proj.locked||[]);
+    if(proj.sheets && state.machine==='cnc') state.sheets=Math.max(1,Math.min(8,proj.sheets|0));
     tpaths=(proj.cncTps||[]).slice(); tpSeq=proj.tpSeq||tpaths.length; tpSel=tpaths.length?0:-1;
     paintTps(); if(tpSel>=0) loadEditor(tpaths[tpSel]);
     state.name=proj.name||'proyecto';
@@ -2613,7 +2737,7 @@
     toast('Proyecto abierto: '+state.name+' ('+doc.paths.length+' objetos)');
   }
   function projectData(){ return { format:'design-studio-project', version:3, name:state.name||'proyecto', work:state.work, cut:cutParams(),
-    cncTps:tpaths, tpSeq:tpSeq, textMeta:textMeta, guides:guides, locked:Array.from(lockedUids),
+    cncTps:tpaths, tpSeq:tpSeq, textMeta:textMeta, guides:guides, locked:Array.from(lockedUids), sheets:state.sheets||1,
     objects: doc.paths.map(function(p,i){ return {pts:p.pts, off:doc.off[i], sx:doc.sx[i], sy:doc.sy[i], rot:doc.rot[i], grp:doc.grp[i], uid:doc.uid[i]}; }) }; }
   function saveProject(){ if(!hasDoc()) return; var data=projectData();
     if(api()){ api().save_project(data).then(function(r){ if(r&&r.ok){ toast('Proyecto guardado: '+r.path); autosaveClear(); } else if(r&&r.error&&!r.cancelled) toast(r.error); }).catch(function(e){toast('Error: '+e);}); }
@@ -2754,7 +2878,7 @@
     if(api()){ api().get_workarea().then(got).catch(function(){fitView();}); }
     else { fetch('/api/workarea').then(function(r){return r.json();}).then(got).catch(function(){fitView();}); }
     // Config del CNC + máquina activa de la sesión pasada (idempotente: se puede re-llamar)
-    CNC.get().then(function(r){ if(r&&r.ok!==false){ state.cnc=r; if(r.theme&&r.theme!==curTheme()) setTheme(r.theme); applyMachine(r.machine||'plotter', false);
+    CNC.get().then(function(r){ if(r&&r.ok!==false){ state.cnc=r; if(r.theme&&r.theme!==curTheme()) setTheme(r.theme); if(r.units) setUnits(r.units,false); applyMachine(r.machine||'plotter', false);
       setSideMode('design'); } }).catch(function(){});   // al ABRIR siempre se arranca en el paso Diseño (aunque la máquina guardada sea la CNC)
   }
   if(window.ResizeObserver){ new ResizeObserver(function(){ if(userZoomed&&view.ready) draw(); else fitView(); }).observe(document.querySelector('.canvas')); }
@@ -2815,6 +2939,9 @@
 
   // ===== Fase 4: área de trabajo (config persistente, por máquina) =====
   function openWA(){ var cncMode=state.machine==='cnc';
+    el('waSheetsRow').style.display=cncMode?'':'none';
+    el('waSheets').value=state.sheets||1;
+    setUnits(unitMode,false);
     var wk=cncMode?((state.cnc&&state.cnc.work)||[1220,2440]):state.plotterWork;
     el('waW').value=Math.round(wk[0]); el('waH').value=Math.round(wk[1]);
     el('waMachLbl').textContent='Área de trabajo · '+(cncMode?'CNC':'Plotter');
@@ -2828,7 +2955,8 @@
     var w=parseFloat(el('waW').value), h=parseFloat(el('waH').value);
     if(!(w>=10&&h>=10)){ toast('Mínimo 10 × 10 mm'); return; }
     var done=function(r){ if(r&&r.ok){ state.work=r.work; el('waModal').style.display='none'; userZoomed=false; view.ready=false; fitView(); toast('Área guardada: '+Math.round(r.work[0])+' × '+Math.round(r.work[1])+' mm'); } else toast((r&&r.error)||'No se pudo guardar'); };
-    if(state.machine==='cnc'){ CNC.set({work:[w,h]}).then(function(r){ if(r&&r.ok) state.cnc=r; done(r); }).catch(function(e){toast('Error: '+e);}); }
+    if(state.machine==='cnc'){ var shN=Math.max(1,Math.min(8,parseInt(el('waSheets').value,10)||1));
+      CNC.set({work:[w,h], sheets:shN}).then(function(r){ if(r&&r.ok){ state.cnc=r; state.sheets=shN; } done(r); }).catch(function(e){toast('Error: '+e);}); }
     else { var save = api()? api().set_workarea(w,h) : postJSON('/api/set_workarea',{w:w,h:h});
       save.then(function(r){ if(r&&r.ok) state.plotterWork=r.work; done(r); }).catch(function(e){toast('Error: '+e);}); }
   });
@@ -2879,6 +3007,7 @@
     el('btnSendTop').style.display=cncMode?'none':'';   // la CNC trabaja offline (archivo por USB), no hay envío
     el('connPill').style.display=cncMode?'none':'';
     state.work = cncMode ? ((state.cnc&&state.cnc.work)||[1220,2440]) : state.plotterWork;
+    state.sheets = cncMode ? ((state.cnc&&state.cnc.sheets)||1) : 1;
     paintCnc();
     userZoomed=false; view.ready=false; fitView(); refreshInspector();
     if(persist) CNC.set({machine:m}).then(function(r){ if(r&&r.ok) state.cnc=r; }).catch(function(){});
@@ -4072,7 +4201,7 @@
   el('traceApply').addEventListener('click',doTrace);
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
-  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;} };
+  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits };
 })();
 </script>
 </body>

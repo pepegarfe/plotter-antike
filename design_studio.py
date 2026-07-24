@@ -217,6 +217,9 @@ class Api:
     def geo_round(self, data):
         return geo.round_op(data or {})
 
+    def geo_divide(self, data):
+        return geo.divide_op(data or {})
+
     def geo_nest(self, data):
         """Acomodo de piezas en la hoja (nesting BLF con rotaciones)."""
         return nester.nest_op(data or {})

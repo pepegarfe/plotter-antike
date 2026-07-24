@@ -72,6 +72,8 @@ _CUT_FIELDS = ('pass_depth', 'feed', 'plunge', 'rpm', 'stepover_pct')
 CNC_DEFAULTS = {
     'machine': 'plotter',                              # máquina activa al abrir la app
     'theme': 'light',                                  # tema de la interfaz (claro por default)
+    'units': 'mm',                                     # unidades de MEDICIÓN de la UI: mm | in
+    'sheets': 1,                                       # nº de hojas/láminas en la mesa (CNC)
     'work': [1220.0, 2440.0],                          # cama de la CNC de Jose (122×244 cm)
     'material': {'thickness': 15.0, 'z_zero': 'top',   # z_zero: 'top' (cara superior) | 'bed' (cama)
                  'clearance': 5.0, 'home_end': True,   # Z segura (mm) y "volver a X0 Y0 al terminar"
@@ -179,7 +181,7 @@ def cnc_get():
         p = _cnc_path()
         if p.exists():
             saved = json.loads(p.read_text())
-            for k in ('machine', 'theme', 'work', 'material', 'materials', 'tool_sel', 'tools'):
+            for k in ('machine', 'theme', 'units', 'sheets', 'work', 'material', 'materials', 'tool_sel', 'tools'):
                 if k in saved:
                     data[k] = saved[k]
             data['material'] = {**CNC_DEFAULTS['material'], **(data.get('material') or {})}
@@ -188,8 +190,8 @@ def cnc_get():
                 if not any(t['id'] == data['tool_sel'] for t in data['tools']):
                     data['tool_sel'] = data['tools'][0]['id']
                 p.write_text(json.dumps({k: data[k] for k in
-                                         ('machine', 'theme', 'work', 'material', 'materials',
-                                          'tool_sel', 'tools')}, ensure_ascii=False, indent=1))
+                                         ('machine', 'theme', 'units', 'sheets', 'work', 'material',
+                                          'materials', 'tool_sel', 'tools')}, ensure_ascii=False, indent=1))
             if not any(m['id'] == data['material'].get('type') for m in data['materials']):
                 data['material']['type'] = data['materials'][0]['id']
     except Exception:
@@ -212,6 +214,15 @@ def cnc_set(patch):
             if patch['theme'] not in ('light', 'dark'):
                 return {'ok': False, 'error': 'Tema desconocido.'}
             cur['theme'] = patch['theme']
+        if 'units' in patch:
+            if patch['units'] not in ('mm', 'in'):
+                return {'ok': False, 'error': 'Unidades desconocidas.'}
+            cur['units'] = patch['units']
+        if 'sheets' in patch:
+            n = int(patch['sheets'])
+            if not (1 <= n <= 8):
+                return {'ok': False, 'error': 'Hojas: entre 1 y 8.'}
+            cur['sheets'] = n
         if 'work' in patch:
             w, h = float(patch['work'][0]), float(patch['work'][1])
             if w < 10 or h < 10:

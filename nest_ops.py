@@ -74,6 +74,16 @@ def _collides(geom, bbox, placed):
     return False
 
 
+def _x_valid(x, w, W, margin, sheets, shgap):
+    """¿[x, x+w] cabe COMPLETO dentro de una sola hoja? (sin cruzar el pasillo)"""
+    span = W + shgap
+    s = int(x // span) if span > 0 else 0
+    if s < 0 or s >= sheets:
+        return False
+    x0 = s * span
+    return x >= x0 + margin - 1e-9 and x + w <= x0 + W - margin + 1e-9
+
+
 def _free_at(gb, minx, miny, w, h, x, y, placed):
     bbox = (x, y, x + w, y + h)
     hit = False
@@ -87,7 +97,7 @@ def _free_at(gb, minx, miny, w, h, x, y, placed):
     return not _collides(moved, bbox, placed)
 
 
-def _blf_position(gb, W, H, margin, placed, roll=False):
+def _blf_position(gb, W, H, margin, placed, roll=False, sheets=1, shgap=50.0):
     """Primera posición libre. roll=False: abajo-izquierda (hoja). roll=True:
     IZQUIERDA-abajo (rollo: llenar el ancho primero, avanzar lo mínimo a lo largo).
     Candidatos por ESQUINAS de lo ya puesto (apretado) + rejilla de respaldo."""
@@ -95,24 +105,28 @@ def _blf_position(gb, W, H, margin, placed, roll=False):
     w, h = maxx - minx, maxy - miny
     if w > W - 2 * margin + 1e-9 or h > H - 2 * margin + 1e-9:
         return None
-    # 1) candidatos pegados a las piezas existentes (y al margen)
-    xs, ys = {margin}, {margin}
+    span = W + shgap
+    # 1) candidatos pegados a las piezas existentes (y al margen de CADA hoja)
+    xs, ys = set(), {margin}
+    for sh in range(sheets):
+        xs.add(sh * span + margin)
     for pg, pb in placed:
         xs.add(pb[2]); xs.add(pb[0] - w)
         ys.add(pb[3]); ys.add(pb[1] - h)
     cands = []
     for cx in xs:
-        if cx < margin - 1e-9 or cx + w > W - margin + 1e-9:
+        if not _x_valid(cx, w, W, margin, sheets, shgap):
             continue
         for cy in ys:
             if cy < margin - 1e-9 or cy + h > H - margin + 1e-9:
                 continue
             cands.append((cx, cy))
-    cands.sort(key=(lambda c: (c[0], c[1])) if roll else (lambda c: (c[1], c[0])))
+    cands.sort(key=(lambda c: (c[0], c[1])) if roll
+               else (lambda c: (int(c[0] // span), c[1], c[0])))   # hoja 1 primero, luego abajo-izq
     for (cx, cy) in cands:
         if _free_at(gb, minx, miny, w, h, cx, cy, placed):
             return (cx, cy)
-    # 2) rejilla de respaldo (por si el hueco no toca ninguna esquina)
+    # 2) rejilla de respaldo (por si el hueco no toca ninguna esquina), hoja por hoja
     step = max(2.0, min(w, h) / 4.0)
     if roll:
         x = margin
@@ -124,18 +138,20 @@ def _blf_position(gb, W, H, margin, placed, roll=False):
                 y += step
             x += step
     else:
-        y = margin
-        while y + h <= H - margin + 1e-9:
-            x = margin
-            while x + w <= W - margin + 1e-9:
-                if _free_at(gb, minx, miny, w, h, x, y, placed):
-                    return (x, y)
-                x += step
-            y += step
+        for sh in range(sheets):
+            x0 = sh * span
+            y = margin
+            while y + h <= H - margin + 1e-9:
+                x = x0 + margin
+                while x + w <= x0 + W - margin + 1e-9:
+                    if _free_at(gb, minx, miny, w, h, x, y, placed):
+                        return (x, y)
+                    x += step
+                y += step
     return None
 
 
-def _slide(gb, x, y, W, H, margin, placed, roll=False):
+def _slide(gb, x, y, W, H, margin, placed, roll=False, sheets=1, shgap=50.0):
     """Compactación: empuja la pieza hacia abajo y hacia la izquierda con
     bisección (afina más fino que el paso de la rejilla)."""
     minx, miny, maxx, maxy = gb.bounds
@@ -143,7 +159,7 @@ def _slide(gb, x, y, W, H, margin, placed, roll=False):
 
     def free(px, py):
         bbox = (px, py, px + w, py + h)
-        if px < margin - 1e-9 or py < margin - 1e-9:
+        if py < margin - 1e-9 or not _x_valid(px, w, W, margin, sheets, shgap):
             return False
         moved = affinity.translate(gb, px - minx, py - miny)
         return not _collides(moved, bbox, placed)
@@ -161,7 +177,8 @@ def _slide(gb, x, y, W, H, margin, placed, roll=False):
                         hi = mid
                 y -= lo
             else:                                  # izquierda ←
-                lo, hi = 0.0, x - margin
+                x0s = int(x // (W + shgap)) * (W + shgap) + margin
+                lo, hi = 0.0, x - x0s
                 for _ in range(9):
                     mid = (lo + hi) / 2
                     if free(x - mid, y):
@@ -188,6 +205,8 @@ def _nest_core(data, report):
     margin = max(0.0, float(o.get('margin') or 0))
     gap = max(0.0, float(o.get('gap') or 0))
     roll = (o.get('mode') == 'roll')               # rollo (plotter): minimizar el LARGO usado
+    sheets = max(1, min(8, int(o.get('sheets') or 1)))   # láminas lado a lado (CNC)
+    SHGAP = 50.0                                    # pasillo visual entre hojas (mm)
     # 'rots' explícito = modo fijo (compatibilidad/pruebas). Sin 'rots' = AUTOMÁTICO:
     # se prueban 90°→45°→15° como etapas del torneo mientras alcance el presupuesto
     # de tiempo, y gana el mejor acomodo global.
@@ -249,20 +268,17 @@ def _nest_core(data, report):
             for r in rots:
                 g = affinity.rotate(u['geom'], r, origin=u['pivot']) if r else u['geom']
                 gb = g.buffer(gap / 2.0, quad_segs=8) if gap else g
-                pos = _blf_position(gb, W, H, margin, pl, roll)
+                pos = _blf_position(gb, W, H, margin, pl, roll, sheets, SHGAP)
                 if pos is None:
                     continue
-                clave = (pos[0], pos[1]) if roll else (pos[1], pos[0])
-                if best is None or clave < (best[0], best[1]):
-                    best = (clave[0], clave[1], r, gb)
+                clave = (pos[0], pos[1]) if roll else (int(pos[0] // (W + SHGAP)), pos[1], pos[0])
+                if best is None or clave < best['k']:
+                    best = {'k': clave, 'x': pos[0], 'y': pos[1], 'r': r, 'gb': gb}
             if best is None:
                 skipped += 1
                 continue
-            if roll:
-                x0, y0, r, gb = best[0], best[1], best[2], best[3]
-            else:
-                y0, x0, r, gb = best
-            x0, y0 = _slide(gb, x0, y0, W, H, margin, pl, roll)
+            r, gb = best['r'], best['gb']
+            x0, y0 = _slide(gb, best['x'], best['y'], W, H, margin, pl, roll, sheets, SHGAP)
             minx, miny = gb.bounds[0], gb.bounds[1]
             dx, dy = x0 - minx, y0 - miny
             final = affinity.translate(gb, dx, dy)
@@ -274,7 +290,7 @@ def _nest_core(data, report):
 
     import time
     t0 = time.time()
-    usable = max(1e-9, (W - 2 * margin) * (H - 2 * margin))
+    usable = max(1e-9, (W - 2 * margin) * (H - 2 * margin) * sheets)
     ORDER_LBL = ['área', 'lado mayor', 'lado menor', 'mezcla 1', 'mezcla 2', 'mezcla 3']
     runs = []                                       # bitácora de TODOS los intentos (para animarlos)
     best_run, best_i = None, -1
