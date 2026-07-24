@@ -311,14 +311,22 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   orden, piezas, util%) a 380ms/cuadro + 3 cuadros de pausa en el ganador; clic o Esc saltan y
   aplican; el doc NO se toca hasta el final (cache de effPts previo). `finishNestAnim`/
   `applyNestPlacements`; __DS ganó `nestAnim`. Jose preguntó si era en vivo o repetición →
-  se hizo **EN VIVO de verdad**: `nest_start` (hilo daemon + `_JOBS`, poda a 4) / `nest_status`
+  se hizo **EN VIVO de verdad (✅ COMMIT 90161c3)**: `nest_start` (hilo daemon + `_JOBS`, poda a 4) / `nest_status`
   (runs desde `from`, al terminar placed/best/util/skipped; error del hilo se reporta) + Api
   geo_nest_start/status + rutas; la UI SONDEA cada 300ms y anima MIENTRAS el motor trabaja
   (HUD "Calculando…" sin intentos aún; el tick avanza hasta el último intento disponible);
   saltar ANTES de terminar deja `skip=true` y aplica solo al llegar el ganador. `nest_op`
   síncrono sigue para compatibilidad. Verificado: 16 checks nest-UI (parciales sin done, doc
   intacto, salto pendiente que aplica al terminar) + e2e real con lecturas parciales +
-  regresión 204. Mejora futura consciente: capa genética (orden+rotación evolutivos)
+  regresión 204. **Jose señaló DESPERDICIO en plotter → MODO ROLLO (✅ COMMIT 90161c3, junto con el EN VIVO)**: la causa
+  era llenar ABAJO-izquierda a lo LARGO del rollo de 3m (una fila = todo el rollo). Ahora
+  `mode:'roll'` (la UI lo manda si machine=plotter; CNC sigue 'sheet'): BLF gira a
+  IZQUIERDA-abajo (columnas: llenar el ANCHO, avanzar lo mínimo), slide compacta ← primero,
+  puntaje = (piezas, −largo usado, área), y se reporta `used` (mm de material) en HUD/toast
+  ("usarás X cm"). + **candidatos por ESQUINAS** de lo ya puesto antes de la rejilla (más
+  apretado y más rápido; `_free_at` compartido). MEDIDO: 8 piezas 100×50 en rollo 3000×600:
+  845mm→**120mm** de material (7×); 20 mixtas → 665mm, 5.6s. Motor hoja intacto (invariantes
+  re-verificados); 17 checks nest-UI; regresión 205. Mejora futura consciente: capa genética (orden+rotación evolutivos)
   estilo SVGnest si el taller pide más aprovechamiento.
 
 - **9. Rotación LIBRE con el mouse — ✅ COMMIT 423f65f (24-jul).**
