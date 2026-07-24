@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-23T21:33:45.470Z
+  modified: 2026-07-24T03:41:21.354Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -108,6 +108,25 @@ Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `
 **Commit `73229b8`** (ya pusheado):
 - **Alinear-a**: el `<select>` de texto "Selección/Área de trabajo" ahora es un **segmentado con iconos**
   (id `alignTo`, dos `<button data-to>`; estilo `.seg`). De regalo mejoró el resaltado del modo B/N/Color.
+
+## Épica en curso: reemplazar Illustrator (iniciada 24-jul-2026, pedida por Jose)
+Jose quiere diseñar TODO dentro de Design Studio (hoy solo edita lo importado). Orden acordado:
+1) formas básicas → 2) texto con fuentes → 3) soldar/booleanas + contorno-offset → 4) edición de
+nodos (al final a propósito: los trazos viven aplanados en puntos; editar anclas estilo
+Illustrator pedirá otra representación). V-carve sigue fuera.
+- **1. Formas básicas — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de Jose.** 4 herramientas
+  nuevas en el riel: Rectángulo (R), Elipse (E), Polígono/Estrella (P, con popover Lados/Estrella/
+  Interior% arriba-izquierda del lienzo), Línea (L). Arrastre estilo Illustrator con
+  previsualización punteada en acento; Shift = cuadrado/círculo/ángulos 45°/rotación a 15°;
+  polígono se dibuja DESDE EL CENTRO y el ángulo del arrastre lo rota; Escape vuelve a Selección.
+  Elipse con segmentos por sagita (~0.002 mm, 48–720) — sin N fijo burdo (lección del 22-jul).
+  Se puede dibujar sobre la mesa VACÍA (el overlay tiene pointer-events:none; al crear la 1ª
+  forma se asigna nombre 'nuevo-diseno' ASCII). Umbral anti-fantasma: arrastres <4 px de PANTALLA
+  no crean nada (en mm engañaba: alejado, medio píxel ya era >1 mm). Bloqueado en paso CNC
+  (cncLock). Verificado con el arnés node de DOM falso (22 checks: bbox exacto, deshacer/rehacer,
+  radios de estrella, snap 45°, uids únicos). Arnés en scratchpad de la sesión (`test_shapes.js`);
+  al arnés le hicieron falta `lastChild`/`dataset` en los elementos falsos y disparar toolFit
+  para que la vista esté lista antes de simular.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
