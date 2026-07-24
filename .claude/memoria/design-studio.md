@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T04:22:49.372Z
+  modified: 2026-07-24T04:38:42.573Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -171,6 +171,25 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   16 checks de UI simulada + e2e por el servidor real. **Gotcha del arnés**: tras dibujar con
   una herramienta hay que Escape antes de hacer marco — si no, el "marco" dibuja otra figura
   (dos checks fallaron por eso; no era bug de la app).
+
+- **4. Edición de nodos (anclas + manijas) — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de
+  Jose.** El reto: los trazos viven APLANADOS en puntitos. Solución pro (la de Vectric): módulo
+  **`curve_fit.py`** (Schneider de Graphics Gems, puro Python, sin dependencias) **re-ajusta
+  Béziers** sobre la polilínea al entrar — detección de esquinas >35°, tramos de 2 pts = rectas
+  exactas con manijas CERO, re-parametrización de Newton; rect→4 anclas exactas, círculo de
+  300 pts→12 anclas suaves fieles a 0.018mm, estrella conserva sus 10 picos. Api `fit_nodes` +
+  ruta `/api/fit`. UI: herramienta **flecha hueca "Editar nodos" (A)** en el riel; clic en un
+  trazado → anclas (cuadritos); arrastrar ancla/manija, Shift+clic multi-selección, **doble
+  clic agrega nodo** (en recta sin manijas; en curva parte con De Casteljau), **Supr quita**
+  (respeta mínimo 2/3), manijas de anclas SUAVES giran en espejo conservando el largo de la
+  gemela (colinealidad <5° al cargar = suave). **Esc/Enter/V/clic-en-vacío HORNEA** de vuelta a
+  puntitos (flatten adaptativo 0.005mm; transform reseteado patrón mirrorActive; `nedit.uid`
+  referencia por uid por si el doc cambia). Sin cambios = sin tocar doc ni historial; el
+  pushUndo va en el PRIMER arrastre real (Cmd+Z durante la edición = hornear y deshacer → el
+  original). `__DS` ganó getter `nedit` para los arneses. Verificado: 13 checks Python del fit
+  + 23 de UI simulada + e2e (14 anclas para círculo de 200 pts por el servidor real).
+  ⚠️ Limitación consciente v1: no hay "sacar manijas" de una esquina recta (convertir recta en
+  curva) — se suple insertando nodos en la curva vecina; retomar si Jose lo pide.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
