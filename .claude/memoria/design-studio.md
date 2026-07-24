@@ -281,6 +281,23 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   overflow:hidden de .sheet lo recortaba → clase .sheet.canspill (overflow visible) SOLO en el
   modal de texto. Señal: flotante que se corta en un borde = overflow:hidden en un padre.
 
+- **8. NESTING (acomodar piezas en la hoja) — ⚑ CONSTRUIDO 24-jul, SIN COMMIT, falta vistazo.**
+  Investigación previa (pedida por Jose): el óptimo académico es NFP+algoritmo genético
+  (SVGnest/Deepnest); libnest2d haría NFP exacto pero arrastra Boost/Clipper/NLopt (mal para
+  PyInstaller). **Decisión: Bottom-Left-Fill (Burke et al.) sobre shapely** — grandes primero,
+  rotaciones candidatas, barrido abajo-izquierda con PRE-FILTRO DE BBOXES (el grueso de las
+  pruebas es aritmética pura; shapely solo cuando el bbox no descarta) + compactación por
+  bisección (3 vueltas ↓←, 9 pasos). Módulo **`nest_ops.py`**: unidades par-impar + abiertos
+  con cuerpo (buffer 0.15), gap por buffer/2, margen, **obstáculos** (= piezas BLOQUEADAS:
+  se quedan y estorban — sinergia con el candado), skipped si no caben, util%. Api `geo_nest`
+  + `/api/nest`. UI: sección "Acomodar en la hoja" (Sep./Margen/rotaciones 0-90-45 seg +
+  botón con estado Acomodando…); aplica rot alrededor del PIVOTE (centro del bbox de unidad,
+  el MISMO que usa el motor — viaja en el payload para que casen) + traslado; undo completo.
+  Números: 30 piezas en cama 2440×1220 en 0.65s; 6/6 rects e2e util 42%; pieza larga elige
+  sola girar 90°. Verificado: 14 checks Python + 12 UI + e2e (regresión total 187 en 7
+  arneses). Mejora futura consciente: capa genética (orden+rotación evolutivos) estilo
+  SVGnest si el taller pide más aprovechamiento.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
