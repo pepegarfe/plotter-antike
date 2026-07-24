@@ -298,6 +298,7 @@
 
   <nav class="rail">
     <div class="tool on" id="toolSelect" title="Seleccionar (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 3 7 17 2.5-6.5L20 11z"/></svg></div>
+    <div class="tool" id="toolNodes" title="Editar nodos (A) — clic en un trazado para mover sus puntos de ancla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 3v14l4-3.6 2.4 5.6 2.4-1-2.4-5.6H18z"/><rect x="15.5" y="15.5" width="5" height="5" rx="1"/></svg></div>
     <div class="tool" id="toolPan" title="Mover / Panear (barra espaciadora)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-3-4"/></svg></div>
     <div class="sep"></div>
     <div class="tool" id="toolShape" title="Figuras — clic para elegir (R/E/P/L)">
@@ -951,12 +952,37 @@
     var m=mode(), selSet=(m==='ind')?new Set([sel.idx]):(m==='grp'?sel.set:new Set());
     var cutC=showCut?cvar('--cut'):cvar('--stroke'), selC=cvar('--sel'), grpC=cvar('--group');
     ctx.lineJoin='round'; ctx.lineCap='round';
+    var neI=(typeof nedit!=='undefined'&&nedit)?neditIdx():-1;   // el trazado en edición de nodos se pinta aparte
     for(var i=0;i<doc.paths.length;i++){
+      if(i===neI) continue;
       var e=effPts(i), isSel=selSet.has(i);
       ctx.strokeStyle=isSel?(m==='grp'?grpC:selC):cutC; ctx.lineWidth=isSel?2:1.3;
       ctx.beginPath(); var a=tp(e[0][0],e[0][1]); ctx.moveTo(a[0],a[1]);
       for(var j=1;j<e.length;j++){var b2=tp(e[j][0],e[j][1]); ctx.lineTo(b2[0],b2[1]);}
       ctx.stroke();
+    }
+    // edición de nodos: la curva viva + manijas + anclas
+    if(neI>=0 || (typeof nedit!=='undefined'&&nedit)){
+      if(nedit){
+        var np=nodePts(nedit);
+        ctx.strokeStyle=cvar('--sel'); ctx.lineWidth=1.6;
+        ctx.beginPath(); var np0=tp(np[0][0],np[0][1]); ctx.moveTo(np0[0],np0[1]);
+        for(var nz=1;nz<np.length;nz++){ var npz=tp(np[nz][0],np[nz][1]); ctx.lineTo(npz[0],npz[1]); }
+        ctx.stroke();
+        // manijas de las anclas seleccionadas
+        ctx.strokeStyle=cvar('--group'); ctx.lineWidth=1;
+        nedit.sel.forEach(function(k){ var nd=nedit.nodes[k]; var ps=tp(nd.p[0],nd.p[1]);
+          ['hin','hout'].forEach(function(w){ if(hzero(nd,w)) return;
+            var hs=tp(nd[w][0],nd[w][1]);
+            ctx.beginPath(); ctx.moveTo(ps[0],ps[1]); ctx.lineTo(hs[0],hs[1]); ctx.stroke();
+            ctx.beginPath(); ctx.arc(hs[0],hs[1],3.5,0,Math.PI*2);
+            ctx.fillStyle=cvar('--group'); ctx.fill(); }); });
+        // anclas: cuadrito hueco; seleccionada = relleno de acento
+        for(var na=0;na<nedit.nodes.length;na++){ var nps=tp(nedit.nodes[na].p[0],nedit.nodes[na].p[1]);
+          ctx.beginPath(); ctx.rect(nps[0]-3.5,nps[1]-3.5,7,7);
+          ctx.fillStyle=nedit.sel.has(na)?cvar('--accent'):cvar('--canvas'); ctx.fill();
+          ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.4; ctx.stroke(); }
+      }
     }
     // borrador de la forma en curso (punteado en acento)
     if(draft){ var dpts=shapePts(draft); if(dpts&&dpts.length>1){
@@ -1190,6 +1216,27 @@
     var r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
     var panMode = (tool==='pan') || spaceDown || e.button===1;
     if(panMode){ pan={x:e.clientX,y:e.clientY,ox:view.ox,oy:view.oy}; cv.style.cursor='grabbing'; userZoomed=true; return; }
+    if(tool==='nodes'){
+      if(cncLock()) return;
+      if(nedit){
+        var hh=nodeHitHandle(sx,sy);
+        if(hh){ nedit.drag={kind:'h',k:hh.k,w:hh.w,moved:false}; return; }
+        var ha=nodeHitAnchor(sx,sy);
+        if(ha>=0){
+          if(e.shiftKey){ nedit.sel.has(ha)?nedit.sel.delete(ha):nedit.sel.add(ha); draw(); return; }
+          if(!nedit.sel.has(ha)) nedit.sel=new Set([ha]);
+          var m1=sp(sx,sy); nedit.drag={kind:'a',last:m1,moved:false}; draw(); return;
+        }
+        var hit2=hitPath(sx,sy);
+        if(hit2>=0 && hit2!==neditIdx()){ nodeBake(); nodeEnter(hit2); return; }
+        if(hit2<0){ nodeBake(); sel.idx=-1; sel.set=new Set(); refreshUI(); }
+        else { nedit.sel=new Set(); draw(); }   // clic en el propio trazado: deseleccionar anclas
+        return;
+      }
+      var hitN=hitPath(sx,sy);
+      if(hitN>=0) nodeEnter(hitN); else toast('Clic en un trazado para editar sus nodos');
+      return;
+    }
     if(DRAW_TOOLS[tool]){ if(cncLock()) return; var m0=sp(sx,sy);
       draft={tool:tool, x0:m0[0], y0:m0[1], x1:m0[0], y1:m0[1], shift:e.shiftKey}; return; }
     if(!hasDoc()) return;
@@ -1212,6 +1259,25 @@
   });
   window.addEventListener('mousemove',function(e){
     if(pan){ view.ox=pan.ox+(e.clientX-pan.x); view.oy=pan.oy+(e.clientY-pan.y); draw(); return; }
+    if(nedit && nedit.drag){
+      var rn=cv.getBoundingClientRect(); var mn=sp(e.clientX-rn.left, e.clientY-rn.top);
+      var dg=nedit.drag;
+      if(!dg.moved){ nodeDirty(); dg.moved=true; }
+      if(dg.kind==='a'){
+        var ddx=mn[0]-dg.last[0], ddy=mn[1]-dg.last[1]; dg.last=mn;
+        nedit.sel.forEach(function(k){ var nd=nedit.nodes[k];
+          nd.p[0]+=ddx; nd.p[1]+=ddy; nd.hin[0]+=ddx; nd.hin[1]+=ddy; nd.hout[0]+=ddx; nd.hout[1]+=ddy; });
+      } else {
+        var nd2=nedit.nodes[dg.k]; nd2[dg.w]=[mn[0],mn[1]];
+        if(nd2.sm){   // ancla suave: la manija opuesta gira para seguir colineal (conserva su largo)
+          var ow=dg.w==='hin'?'hout':'hin';
+          var vx=nd2.p[0]-mn[0], vy=nd2.p[1]-mn[1], L=Math.hypot(vx,vy);
+          var oL=Math.hypot(nd2[ow][0]-nd2.p[0], nd2[ow][1]-nd2.p[1]);
+          if(L>1e-9&&oL>1e-9){ nd2[ow]=[nd2.p[0]+vx/L*oL, nd2.p[1]+vy/L*oL]; }
+        }
+      }
+      draw(); return;
+    }
     if(draft){ var rd=cv.getBoundingClientRect(); var dm=sp(e.clientX-rd.left, e.clientY-rd.top);
       draft.x1=dm[0]; draft.y1=dm[1]; draft.shift=e.shiftKey; draw(); return; }
     if(moving){ var dxmm=(e.clientX-moving.x)/view.scale, dymm=-(e.clientY-moving.y)/view.scale; if(dxmm||dymm){ moveBy(dxmm,dymm); moving.x=e.clientX; moving.y=e.clientY; moving.moved=true; draw(); refreshInspector(); } return; }
@@ -1219,6 +1285,7 @@
   });
   window.addEventListener('mouseup',function(){
     if(pan){ pan=null; cv.style.cursor=(tool==='pan'||spaceDown)?'grab':'default'; return; }
+    if(nedit && nedit.drag){ nedit.drag=null; return; }
     if(draft){ var d0=draft; draft=null; commitDraft(d0); return; }
     if(moving){ if(!moving.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; } moving=null; cv.style.cursor=(tool==='pan')?'grab':'default'; refreshUI(); return; }
     if(marquee){ var mnx=Math.min(marquee.x0,marquee.x1),mny=Math.min(marquee.y0,marquee.y1),mxx=Math.max(marquee.x0,marquee.x1),mxy=Math.max(marquee.y0,marquee.y1);
@@ -1236,6 +1303,13 @@
   window.addEventListener('keydown',function(e){
     if(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
     var meta=e.ctrlKey||e.metaKey;
+    if(typeof nedit!=='undefined' && nedit){   // editando nodos: juego de teclas propio
+      if(e.key==='Escape'||e.key==='Enter'){ e.preventDefault(); nodeBake(); }
+      else if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); nodeDeleteSel(); }
+      else if(meta && e.key.toLowerCase()==='z'){ e.preventDefault(); nodeBake(); undo(); }
+      else if(e.key.toLowerCase()==='v'){ nodeBake(); setTool('select'); }
+      return;
+    }
     if(e.code==='Space'){ spaceDown=true; if(!pan&&!moving&&!marquee) cv.style.cursor='grab'; }
     else if(meta && e.key.toLowerCase()==='z' && !e.shiftKey){ e.preventDefault(); undo(); }
     else if(meta && (e.key.toLowerCase()==='z' && e.shiftKey || e.key.toLowerCase()==='y')){ e.preventDefault(); redo(); }
@@ -1257,6 +1331,7 @@
     else if(e.key.toLowerCase()==='e'){ setTool('ellipse'); }
     else if(e.key.toLowerCase()==='p'){ setTool('poly'); }
     else if(e.key.toLowerCase()==='l'){ setTool('line'); }
+    else if(e.key.toLowerCase()==='a'){ setTool('nodes'); var Aa=activeIdx(); if(mode()!=='all'&&Aa.length===1) nodeEnter(Aa[0]); }
     else if(e.key.toLowerCase()==='t'){ openTextModal(0); }
     else if(e.key.toLowerCase()==='f'){ e.preventDefault(); zoomSelection(); }
   });
@@ -1272,7 +1347,9 @@
   var SHAPE_FLY={rect:'flyRect',ellipse:'flyEllipse',poly:'flyPoly',line:'flyLine'};
   var lastShapeTool='rect';   // la que muestra el botón de figuras (estilo Illustrator)
   function setTool(t){ tool=t; if(draft){ draft=null; draw(); }
+    if(typeof nedit!=='undefined' && nedit && t!=='nodes') nodeBake();   // salir de nodos = hornear
     el('toolSelect').classList.toggle('on',t==='select');
+    el('toolNodes').classList.toggle('on',t==='nodes');
     el('toolPan').classList.toggle('on',t==='pan');
     el('toolShape').classList.toggle('on',!!DRAW_TOOLS[t]);
     if(DRAW_TOOLS[t]){ lastShapeTool=t; el('shapeIco').innerHTML=el(SHAPE_FLY[t]).innerHTML; }
@@ -1443,7 +1520,9 @@
   el('textModal').addEventListener('click',function(e){ if(e.target===el('textModal')) el('textModal').style.display='none'; });
   cv.addEventListener('dblclick',function(e){
     if(!hasDoc()) return;
-    var r=cv.getBoundingClientRect(); var hit=hitPath(e.clientX-r.left, e.clientY-r.top);
+    var r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
+    if(typeof nedit!=='undefined' && nedit){ nodeInsertAt(sx,sy); return; }   // doble clic = agregar nodo
+    var hit=hitPath(sx,sy);
     if(hit<0) return; var g=doc.grp[hit];
     if(g && textMeta[g]) openTextModal(g);   // cncLock lo revisa openTextModal
   });
@@ -1520,6 +1599,121 @@
   el('boolI').addEventListener('click',function(){ doBoolean('intersection'); });
   el('btnOffset').addEventListener('click',doOffset);
   el('offDist').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); doOffset(); this.blur(); } });
+
+  // ===== Edición de nodos (anclas + manijas Bézier) =====
+  // El trazado vive aplanado en puntitos; al entrar se le RE-AJUSTAN curvas en el
+  // backend (curve_fit.py, Schneider) y aquí se editan anclas/manijas. Al salir se
+  // HORNEA de vuelta a puntitos (transform reseteado, patrón de mirrorActive).
+  var nedit=null;   // {uid, nodes:[{p,hin,hout,sm}], closed, sel:Set, drag, dirty}
+  function neditIdx(){ return nedit?doc.uid.indexOf(nedit.uid):-1; }   // por uid: sobrevive a reordenamientos
+  function hzero(nd,w){ return Math.hypot(nd[w][0]-nd.p[0], nd[w][1]-nd.p[1])<1e-9; }
+  function nodeIsSmooth(nd){
+    if(hzero(nd,'hin')||hzero(nd,'hout')) return false;
+    var v1x=nd.p[0]-nd.hin[0], v1y=nd.p[1]-nd.hin[1], v2x=nd.hout[0]-nd.p[0], v2y=nd.hout[1]-nd.p[1];
+    return (v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y))>0.996;   // < ~5°
+  }
+  function nodeEnter(i){
+    if(cncLock()) return;
+    var e=effPts(i);
+    var closed=e.length>2 && Math.hypot(e[0][0]-e[e.length-1][0], e[0][1]-e[e.length-1][1])<=0.05;
+    var done=function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo preparar el trazado'); return; }
+      nedit={uid:doc.uid[i], closed:r.closed, sel:new Set(), drag:null, dirty:false,
+        nodes:r.nodes.map(function(n){ return {p:n.p.slice(), hin:n.hin.slice(), hout:n.hout.slice(), sm:false}; })};
+      nedit.nodes.forEach(function(n){ n.sm=nodeIsSmooth(n); });
+      sel.set=new Set(); sel.idx=i;
+      draw(); toast(nedit.nodes.length+' nodos — arrastra anclas/manijas · doble clic agrega · Supr quita · Esc termina');
+    };
+    var payload={pts:e, closed:closed, tol:0.02};
+    if(api()) api().fit_nodes(payload).then(done).catch(function(er){ toast('Error: '+er); });
+    else fetch('/api/fit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json(); }).then(done).catch(function(er){ toast('Error: '+er); });
+  }
+  function cubicAt(p0,c1,c2,p1,t){ var mt=1-t;
+    return [mt*mt*mt*p0[0]+3*mt*mt*t*c1[0]+3*mt*t*t*c2[0]+t*t*t*p1[0],
+            mt*mt*mt*p0[1]+3*mt*mt*t*c1[1]+3*mt*t*t*c2[1]+t*t*t*p1[1]]; }
+  function flatCubicJS(p0,c1,c2,p1,tol,out,depth){
+    var d1=distSegMM(c1,p0,p1), d2=distSegMM(c2,p0,p1);
+    if((depth||0)>16 || (d1<=tol&&d2<=tol)){ out.push([p1[0],p1[1]]); return; }
+    var ab=[(p0[0]+c1[0])/2,(p0[1]+c1[1])/2], bc=[(c1[0]+c2[0])/2,(c1[1]+c2[1])/2], cd=[(c2[0]+p1[0])/2,(c2[1]+p1[1])/2];
+    var abc=[(ab[0]+bc[0])/2,(ab[1]+bc[1])/2], bcd=[(bc[0]+cd[0])/2,(bc[1]+cd[1])/2];
+    var m=[(abc[0]+bcd[0])/2,(abc[1]+bcd[1])/2];
+    flatCubicJS(p0,ab,abc,m,tol,out,(depth||0)+1); flatCubicJS(m,bcd,cd,p1,tol,out,(depth||0)+1);
+  }
+  function distSegMM(p,a,b){ var dx=b[0]-a[0],dy=b[1]-a[1],L=dx*dx+dy*dy;
+    if(L===0) return Math.hypot(p[0]-a[0],p[1]-a[1]);
+    var t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L));
+    return Math.hypot(p[0]-(a[0]+t*dx), p[1]-(a[1]+t*dy)); }
+  function nodePts(ne){
+    var nds=ne.nodes, N=nds.length, out=[[nds[0].p[0],nds[0].p[1]]];
+    var segs=ne.closed?N:N-1;
+    for(var k=0;k<segs;k++){ var a=nds[k], b=nds[(k+1)%N];
+      if(hzero(a,'hout')&&hzero(b,'hin')) out.push([b.p[0],b.p[1]]);
+      else flatCubicJS(a.p,a.hout,b.hin,b.p,0.005,out,0); }
+    return out;
+  }
+  function nodeBake(){
+    if(!nedit) return;
+    var ne=nedit; nedit=null;
+    var i=doc.uid.indexOf(ne.uid);
+    if(i<0 || !ne.dirty){ draw(); return; }   // sin cambios (o el trazado ya no existe): salir sin tocar
+    var pts=nodePts(ne);
+    doc.paths[i]={pts:pts};
+    doc.off[i]=[0,0]; doc.sx[i]=1; doc.sy[i]=1; doc.rot[i]=0;
+    var bb=bboxOfPts(pts); doc.oc[i]=[(bb[0]+bb[2])/2,(bb[1]+bb[3])/2];
+    refreshUI();
+  }
+  function nodeDirty(){ if(nedit&&!nedit.dirty){ pushUndo(); nedit.dirty=true; } }
+  function nodeHitAnchor(sx,sy){
+    for(var k=0;k<nedit.nodes.length;k++){ var s=tp(nedit.nodes[k].p[0],nedit.nodes[k].p[1]);
+      if(Math.abs(sx-s[0])<=6&&Math.abs(sy-s[1])<=6) return k; }
+    return -1;
+  }
+  function nodeHitHandle(sx,sy){
+    var out=null;
+    nedit.sel.forEach(function(k){ var nd=nedit.nodes[k];
+      ['hin','hout'].forEach(function(w){ if(hzero(nd,w)) return;
+        var s=tp(nd[w][0],nd[w][1]);
+        if(Math.hypot(sx-s[0],sy-s[1])<=6) out={k:k,w:w}; }); });
+    return out;
+  }
+  function nodeDeleteSel(){
+    if(!nedit||!nedit.sel.size) return;
+    var min=nedit.closed?3:2;
+    if(nedit.nodes.length-nedit.sel.size<min){ toast('Un trazado necesita al menos '+min+' nodos'); return; }
+    nodeDirty();
+    nedit.nodes=nedit.nodes.filter(function(_,k){ return !nedit.sel.has(k); });
+    nedit.sel=new Set(); draw();
+  }
+  function nodeInsertAt(sx,sy){
+    var N=nedit.nodes.length, segs=nedit.closed?N:N-1, best={d2:100,k:-1,t:0};   // 10px de radio
+    for(var k=0;k<segs;k++){ var a=nedit.nodes[k], b=nedit.nodes[(k+1)%N];
+      for(var i=1;i<32;i++){ var t=i/32, q=cubicAt(a.p,a.hout,b.hin,b.p,t), s=tp(q[0],q[1]);
+        var d2=(s[0]-sx)*(s[0]-sx)+(s[1]-sy)*(s[1]-sy);
+        if(d2<best.d2) best={d2:d2,k:k,t:t}; } }
+    if(best.k<0) return false;
+    nodeDirty();
+    var a2=nedit.nodes[best.k], b2=nedit.nodes[(best.k+1)%N], t2=best.t, nuevo;
+    if(hzero(a2,'hout')&&hzero(b2,'hin')){                        // recta: punto en la recta, sin manijas
+      var q2=[a2.p[0]+(b2.p[0]-a2.p[0])*t2, a2.p[1]+(b2.p[1]-a2.p[1])*t2];
+      nuevo={p:q2, hin:q2.slice(), hout:q2.slice(), sm:false};
+    } else {                                                       // curva: partir con De Casteljau
+      var lerp=function(u,v,tt){ return [u[0]+(v[0]-u[0])*tt, u[1]+(v[1]-u[1])*tt]; };
+      var q0=lerp(a2.p,a2.hout,t2), q1=lerp(a2.hout,b2.hin,t2), qq2=lerp(b2.hin,b2.p,t2);
+      var r0=lerp(q0,q1,t2), r1=lerp(q1,qq2,t2), m=lerp(r0,r1,t2);
+      a2.hout=q0; b2.hin=qq2;
+      nuevo={p:m, hin:r0, hout:r1, sm:true};
+    }
+    nedit.nodes.splice(best.k+1,0,nuevo);
+    nedit.sel=new Set([best.k+1]); draw();
+    return true;
+  }
+  el('toolNodes').addEventListener('click',function(){
+    setTool('nodes');
+    var A=activeIdx();
+    if(mode()!=='all'&&A.length===1) nodeEnter(A[0]);
+    else toast('Clic en un trazado para editar sus nodos');
+  });
   el('toolMirror').addEventListener('click',function(){ if(hasDoc()) op(function(){mirrorActive('h');}); });
   el('toolFit').addEventListener('click',function(){ userZoomed=false; view.ready=false; fitView(); });
   el('toolCut').addEventListener('click',function(){ showCut=!showCut; el('toolCut').classList.toggle('on',showCut); draw(); toast(showCut?'Vectores de corte (magenta)':'Vista normal'); });
@@ -3011,7 +3205,7 @@
   el('traceApply').addEventListener('click',doTrace);
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
-  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject };
+  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;} };
 })();
 </script>
 </body>

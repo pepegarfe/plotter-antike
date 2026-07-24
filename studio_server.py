@@ -23,6 +23,7 @@ from studio_backend import (SERVICE, set_workarea as _set_workarea,
 import img_trace as tracer
 import text_vector as texter
 import geo_ops as geo
+import curve_fit as fitter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8765
@@ -136,6 +137,11 @@ def api_boolean():
 @app.post('/api/offset')
 def api_offset():
     return _json(geo.offset_op(request.json or {}))
+
+
+@app.post('/api/fit')
+def api_fit():
+    return _json(fitter.fit_nodes(request.json or {}))
 
 
 @app.post('/api/parse')

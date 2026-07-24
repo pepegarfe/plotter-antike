@@ -18,6 +18,7 @@ from studio_backend import (SERVICE, set_workarea as _set_workarea,
 import img_trace as tracer
 import text_vector as texter
 import geo_ops as geo
+import curve_fit as fitter
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -200,6 +201,10 @@ class Api:
 
     def geo_offset(self, data):
         return geo.offset_op(data or {})
+
+    def fit_nodes(self, data):
+        """Polilínea → anclas+manijas Bézier, para la edición de nodos."""
+        return fitter.fit_nodes(data or {})
 
     def open_design(self):
         """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI), un proyecto (.dstudio)
