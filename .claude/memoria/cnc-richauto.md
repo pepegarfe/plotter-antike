@@ -377,6 +377,25 @@ M30
   botones renombrados (Ver/esconder trayectorias · Ver render); Material mínimo con Config
   avanzada (Z0, Z seg., husillo, 0,0, marchas) — commits afb5ced + e3df84d.
 
+- **R3. Vista 3D — saga de la COSTURA y el sobrante físico (24-jul noche, commit a926588)**:
+  render híbrido (rejilla fina solo en la zona de corte + placa para el resto de la hoja).
+  **Lecciones duras, en orden**: (1) dos mallas con textura por vértice NUNCA casan (la piel
+  depende de la densidad) → UNA CanvasTexture por look, espejo-repetible, mapeada por
+  coordenadas de MUNDO, con interruptor `aCut` por vértice en el shader (intacto=textura,
+  cortado=color plano); (2) costura entre mallas = unión en T (rendijas) → traslape coplanar;
+  (3) ⚠️ **polygonOffset DESCARTADO DOS VECES**: factor explota con la pendiente (rasante) y
+  units con la distancia (hoja de 2.4m) — ambas veces asomó el canto como "cinta perimetral".
+  La solución final: traslape coplanar SIN sesgo con MATERIAL COMPARTIDO — el z-fight existe
+  pero pinta pixeles idénticos = invisible; (4) la hoja DEFINE el material: celdas fuera de
+  ella no se dibujan (trayectoria que se sale corta aire — se ve el canal morir en el borde);
+  (5) quitar sobrante EN CASCADA (pedazos unidos vía placa se van juntos; la orilla real no
+  conecta: piezas a sangre viven) + **barrido de material delgado huérfano** (el piso de un
+  grabado profundo pertenece a su pieza; el umbral de medio-grosor solo no distingue puente
+  de fondo de grabado — la distinción correcta es "¿a qué queda conectado?"). Bugs 1-5
+  cazados POR JOSE probando en vivo, ronda por ronda. También: "Ver trayectorias" rápido
+  (paralelo + JSON a dieta — el puente pywebview cobra POR VIAJE y por KB) y materiales
+  Phong con paleta de referencias (madera: la veta simple ganó a los anillos "realistas").
+
 ## Auditoría pre-corte (`auditar_gcode.py`, en el repo — 24-jul-2026)
 **Correrla antes de cualquier corte real si se tocó el motor**: `/opt/homebrew/bin/python3
 auditar_gcode.py` (necesita shapely → el Python de Homebrew). **79 verificaciones, 0 fallas**:
