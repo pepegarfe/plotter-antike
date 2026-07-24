@@ -415,6 +415,19 @@ def _ascii(s):
     return ''.join(c if c.isprintable() and c not in '()' else ' ' for c in s).strip()
 
 
+def gear_for(rpm, gears):
+    """Marcha S<n> cuya RPM real (tabla del handle/variador) queda más cerca de `rpm`.
+    0 si no hay tabla válida (8 marchas en el A11E de Jose; se aceptan 8 o 9)."""
+    try:
+        g = [float(x) for x in (gears or [])]
+    except (TypeError, ValueError):
+        return 0
+    if len(g) not in (8, 9) or any(x <= 0 for x in g):
+        return 0
+    r = float(rpm or 0)
+    return min(range(len(g)), key=lambda i: abs(g[i] - r)) + 1
+
+
 def _z_levels(material):
     thick = float(material.get('thickness', 15.0))
     z_top = thick if material.get('z_zero') == 'bed' else 0.0
@@ -533,15 +546,52 @@ def build_jobs(jobs, material, name=''):
     tool = jobs[0]['tool']
     what = jobs[0].get('label', 'perfil') if len(jobs) == 1 else '%d trayectorias' % len(jobs)
     maxd = max(float(j['depth']) for j in jobs)
+    # Velocidad del husillo: con tabla de marchas (RPM reales de S1-S9 del variador) se
+    # emite S<marcha más cercana a las RPM del preset de la fresa> — es lo que entiende
+    # un DSP multi-speed con "S Read = Read S" (el A11E de Jose toma el S como número de
+    # marcha; un S18000 ahí es "marcha 18000" → el husillo NO arranca). Sin tabla se
+    # emiten las RPM (legado / controles que sí leen RPM).
+    rpm = int(float(tool.get('rpm', 18000)))
+    gear = gear_for(rpm, material.get('gears'))
+    if not gear:
+        try:
+            g = int(material.get('gear') or 0)      # campo viejo (marcha manual global)
+            gear = g if 1 <= g <= 9 else 0
+        except (TypeError, ValueError):
+            gear = 0
+    if gear:
+        m03 = 'M03 S%d' % gear
+        s_note = 'marcha S%d = %d RPM' % (gear, rpm)   # ⚠️ sin paréntesis: anidados rompen el comentario
+    else:
+        m03 = 'M03 S%d' % rpm
+        s_note = '%d RPM' % rpm
+    z_note = ('Z0 en la cama - la cara del material queda en Z%s' % _f(z_top)
+              if material.get('z_zero') == 'bed'
+              else 'Z0 en la cara superior del material')
     lines = [
         '( %s - Design Studio )' % _ascii(name or 'diseno'),
-        '( Fresa: %s / O %s mm / %s / hasta %s mm )' %
-        (_ascii(tool.get('name', '?')), _f(float(tool['dia'])), _ascii(what), _f(maxd)),
+        '( Fresa: %s / O %s mm / %s / hasta %s mm / %s )' %
+        (_ascii(tool.get('name', '?')), _f(float(tool['dia'])), _ascii(what), _f(maxd), s_note),
+        '( %s )' % z_note,
         'G90 G21 G17',
         'G00 Z%s' % _f(safe),
-        'M03 S%d' % int(float(tool.get('rpm', 18000))),
+        m03,
     ]
     secs = 0.0
+    # Espera de arranque del husillo (llegar a sus RPM antes de tocar material).
+    # CINTURÓN Y TIRANTES porque la unidad del P de G04 varía por controlador:
+    # (1) G04 P<seg> — si el control lo lee en segundos, pausa exacta; en ms, inocuo.
+    # (2) Respaldo agnóstico: 4 mm de viaje EN EL AIRE (sobre la Z segura) a una F
+    #     calculada para durar exactamente la espera — funciona en cualquier control
+    #     que lea F (mismo requisito que ya tiene todo el archivo: "Read F").
+    spin = float(material.get('spinup', 10.0) or 0)
+    if spin > 0:
+        lines.append('( espera husillo %s s )' % _f(spin))
+        lines.append('G04 P%s' % _f(spin))
+        f_air = max(6.0, 240.0 / spin)
+        lines.append('G01 Z%s F%s' % (_f(safe + 2), _f(f_air)))
+        lines.append('G01 Z%s F%s' % (_f(safe), _f(f_air)))
+        secs += spin
     for j in jobs:
         lines.append('( -- %s -- )' % _ascii(j.get('label', j['op'])))
         if j['op'] == 'drill':

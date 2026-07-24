@@ -275,6 +275,7 @@
     <button class="icobtn" id="btnUndo" title="Deshacer (Ctrl+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
     <button class="icobtn" id="btnRedo" title="Rehacer (Ctrl+Shift+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
     <button class="tbtn" id="btnOpen" title="Abrir un diseño (SVG/DXF/AI) o un proyecto (.dstudio)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Abrir</button>
+    <button class="tbtn" id="btnImport" title="Importar otro diseño (SVG/DXF/AI o .dstudio) SUMÁNDOLO a la mesa — no quita lo que ya está"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6m-3-3h6"/></svg>Importar</button>
     <button class="tbtn" id="btnSaveProject" disabled title="Guardar tu proyecto (.dstudio) para reabrirlo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Guardar</button>
     <button class="tbtn" id="btnSave" disabled title="Exportar el archivo de corte HPGL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg><span id="btnSaveLbl">Exportar HPGL</span></button>
     <button class="conn" id="connPill" title="Abrir panel del plotter"><span class="dot"></span><span id="connText">Desconectado</span></button>
@@ -390,22 +391,24 @@
         <div class="field" title="Grosor de la placa a cortar"><label>Grosor</label><input id="matThick" value="15"><span class="u">mm</span></div>
         <div class="field" title="Diámetro de la fresa elegida (se edita en Fresas…)"><label>Ø</label><input id="matDia" value="6" disabled><span class="u">mm</span></div>
       </div>
-      <div class="seg" id="zZeroSeg" title="Dónde pusiste el cero de Z al preparar la máquina">
-        <button class="on" data-z="top">Z=0 arriba del material</button>
-        <button data-z="bed">Z=0 en la cama</button>
-      </div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px">
         <select class="selfield" id="matType" title="Material ACTIVO — decide qué juego de datos de corte usa cada fresa"></select>
         <button class="gbtn" id="btnMats" style="width:36px" title="Gestionar la lista de materiales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.9 1.09V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 6 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       </div>
       <div class="grid2" style="margin-top:8px">
         <div class="field" title="Altura segura sobre el material para los viajes en vacío"><label>Z seg.</label><input id="matClear" value="5"><span class="u">mm</span></div>
+        <div class="field" title="Segundos de espera tras encender el husillo, para que llegue a sus RPM antes de tocar material (0 = sin espera)"><label>Husillo</label><input id="matSpin" value="10"><span class="u">s</span></div>
+      </div>
+      <div class="grid2" style="margin-top:8px">
+        <button class="gbtn" id="btnAdv" title="Ajustes que casi nunca se tocan: cero de Z y marchas del husillo">Configuración avanzada…</button>
         <label class="chk" style="height:32px;margin:0" title="Al terminar el trabajo, regresar el cabezal al origen X0 Y0"><input type="checkbox" id="homeEnd" checked> Volver a 0,0</label>
       </div>
       <div class="grp-t sec">Herramienta</div>
-      <select class="selfield" id="toolPick"></select>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+        <select class="selfield" id="toolPick"></select>
+        <button class="gbtn" id="btnTools" style="width:36px" title="Gestionar fresas: alta, baja y datos de corte por material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.9 1.09V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 6 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      </div>
       <div class="toolsum" id="toolSum">—</div>
-      <div class="rowbtns"><button class="gbtn" id="btnTools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.9 1.09V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 6 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Gestionar fresas…</button></div>
       <button class="pbtn acc" id="btnGoCut" style="width:100%;margin-top:14px;height:36px;font-weight:700" title="Con el material y la fresa listos, pasar a generar trayectorias">Continuar a Corte<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin:0 0 0 6px;vertical-align:-2px"><path d="M4 12h14M13 6l6 6-6 6"/></svg></button>
     </div>
 
@@ -478,7 +481,6 @@
       <div class="muted-note" id="tpEmpty">Selecciona objetos (o nada = todo), configura arriba y pulsa <b>Calcular</b>. Arrastra las filas para cambiar el orden de corte.</div>
       <div class="rowbtns">
         <button class="gbtn" id="btnTpPrev" title="Pintar en azul el recorrido del centro de la fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg> Vista previa</button>
-        <button class="gbtn" id="btnRender" title="Simular el corte con el ancho real de la fresa (más profundo = más oscuro)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8.5" y="8.5" width="7" height="7" rx="1" fill="currentColor" stroke="none"/></svg> Render</button>
         <button class="gbtn" id="btnSim3d" title="Simulación 3D del resultado: un bloque de material al que se le come el MISMO G-code que se llevaría la máquina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg> 3D</button>
       </div>
       <button class="pbtn acc" id="btnSaveTap" style="width:100%;margin-top:10px;height:36px;font-weight:700" title="Generar el G-code (.tap) de las trayectorias activas, en el orden de la lista — pásalo a la CNC en una USB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 20h16"/></svg>Guardar G-code (.tap)</button>
@@ -496,6 +498,7 @@
   </footer>
 </div>
 <input type="file" id="fileInput" accept=".svg,.dxf,.ai,.dstudio,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" style="display:none">
+<input type="file" id="importInput" accept=".svg,.dxf,.ai,.dstudio" style="display:none">
 <div class="modal" id="plotterModal" style="display:none">
   <div class="sheet">
     <div class="sheet-h"><h3>Plotter</h3><button id="plotterClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
@@ -633,6 +636,23 @@
   <div class="r"><b id="sendLabel">Enviando al plotter…</b><button class="pbtn" id="sendCancel" style="height:26px;padding:0 10px">Cancelar</button></div>
   <div class="pb"><i id="sendFill"></i></div>
   <div class="r"><span id="sendPct">0 %</span><span id="sendLines"></span></div>
+</div>
+<div class="modal" id="advModal" style="display:none">
+  <div class="sheet" style="width:400px">
+    <div class="sheet-h"><h3>Configuración avanzada</h3><button id="advClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="grp">
+      <div class="grp-t" style="margin-top:0">Cero de Z</div>
+      <div class="muted-note" style="margin-bottom:8px">Dónde fijas el cero de Z en la máquina. El flujo normal del taller es <b>arriba del material</b> — cámbialo solo si palpas la cama. El .tap anota en su encabezado cuál asume.</div>
+      <div class="seg" id="zZeroSeg" style="margin-top:0">
+        <button class="on" data-z="top">Z=0 arriba del material</button>
+        <button data-z="bed">Z=0 en la cama</button>
+      </div>
+      <div class="grp-t sec">Marchas del husillo (S1–S8)</div>
+      <div class="muted-note" style="margin-bottom:8px">RPM reales de cada marcha, como las muestra el handle en <b>MACHINE SETUP → Spindle Setup → Spindle speed</b>. Cada archivo lleva sola la marcha más cercana a las RPM del preset de la fresa. Se recalibra solo si un técnico cambia el variador.</div>
+      <div id="gearsGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"></div>
+      <button class="pbtn acc" id="gearsSave" style="width:100%;margin-top:12px">Guardar marchas</button>
+    </div>
+  </div>
 </div>
 <div class="modal" id="confirmModal" style="display:none">
   <div class="sheet" style="width:350px">
@@ -871,23 +891,19 @@
       for(var j=1;j<e.length;j++){var b2=tp(e[j][0],e[j][1]); ctx.lineTo(b2[0],b2[1]);}
       ctx.stroke();
     }
-    // trayectorias CNC — azul fino, o RENDER: trazo al ancho real de la fresa, más oscuro = más profundo
+    // trayectorias CNC en magenta de marca con flechas de sentido (el render al ancho
+    // de fresa se quitó: la Vista 3D lo dejó obsoleto)
     if(state.machine==='cnc' && cncPrev){
-      var thick=(state.cnc&&state.cnc.material.thickness)||18;
       for(var gi=0; gi<cncPrev.groups.length; gi++){
         var G=cncPrev.groups[gi];
-        if(renderMode){
-          var deep=Math.min(1,(G.depth||thick)/thick);
-          ctx.strokeStyle='rgba('+(150-90*deep)+','+(110-70*deep)+','+(70-45*deep)+',0.92)';   // madera fresada: más hondo, más oscuro
-          ctx.lineWidth=Math.max(1.5, G.dia*view.scale); ctx.lineJoin='round'; ctx.lineCap='round';
-        } else { ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.6; }   // trayectorias en magenta de marca
+        ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.6;
         for(var t=0;t<G.tps.length;t++){ var tpts=G.tps[t]; if(tpts.length<2) continue;
           var sp=new Array(tpts.length);
           for(var u=0;u<tpts.length;u++) sp[u]=tp(tpts[u][0],tpts[u][1]);
           ctx.beginPath(); ctx.moveTo(sp[0][0],sp[0][1]);
           for(u=1;u<sp.length;u++) ctx.lineTo(sp[u][0],sp[u][1]);
           ctx.stroke();
-          if(!renderMode){                       // flechas de SENTIDO de corte cada ~90px
+          {                                      // flechas de SENTIDO de corte cada ~90px
             var acc=0, next=45;
             ctx.fillStyle=ctx.strokeStyle;
             for(u=1;u<sp.length;u++){
@@ -905,11 +921,9 @@
           } }
         var dr=Math.max(2,(G.dia/2)*view.scale);
         for(var q=0;q<G.drills.length;q++){ var dpt=tp(G.drills[q][0],G.drills[q][1]);
-          if(renderMode){ ctx.beginPath(); ctx.arc(dpt[0],dpt[1],dr,0,Math.PI*2);
-            ctx.fillStyle=ctx.strokeStyle; ctx.fill(); }
-          else { ctx.beginPath(); ctx.arc(dpt[0],dpt[1],dr,0,Math.PI*2); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(dpt[0]-4,dpt[1]); ctx.lineTo(dpt[0]+4,dpt[1]);
-            ctx.moveTo(dpt[0],dpt[1]-4); ctx.lineTo(dpt[0],dpt[1]+4); ctx.stroke(); } }
+          ctx.beginPath(); ctx.arc(dpt[0],dpt[1],dr,0,Math.PI*2); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(dpt[0]-4,dpt[1]); ctx.lineTo(dpt[0]+4,dpt[1]);
+          ctx.moveTo(dpt[0],dpt[1]-4); ctx.lineTo(dpt[0],dpt[1]+4); ctx.stroke(); }
       }
     }
     // caja de selección
@@ -1217,6 +1231,88 @@
   el('btnOpenEmpty').addEventListener('click',openDesign);
   el('btnSaveProject').addEventListener('click',saveProject);
 
+  // ===== Importar: SUMA otro archivo a la mesa (no reemplaza) =====
+  function addDoc(res){
+    // Lo existente no se toca (uids intactos → las trayectorias CNC calculadas
+    // sobreviven). Lo nuevo entra como SU PROPIO grupo, pegado a la derecha de lo
+    // que ya hay, y queda seleccionado para acomodarlo de una vez. Deshacible.
+    if(!hasDoc()){ loadDoc(res); return; }
+    var inc=(res.paths||[]).filter(function(p){ return p.pts&&p.pts.length>=2; });
+    if(!inc.length){ toast('Ese archivo no trae trazados'); return; }
+    pushUndo();
+    var ib=[1/0,1/0,-1/0,-1/0];
+    inc.forEach(function(p){ p.pts.forEach(function(q){
+      if(q[0]<ib[0])ib[0]=q[0]; if(q[1]<ib[1])ib[1]=q[1];
+      if(q[0]>ib[2])ib[2]=q[0]; if(q[1]>ib[3])ib[3]=q[1]; }); });
+    var eb=bboxOf(allIdx());
+    var dx=(eb[2]+10)-ib[0], dy=eb[1]-ib[1];   // a la derecha de lo existente, alineado abajo
+    var gid=(inc.length>1)?(++groupSeq):0, start=doc.paths.length;
+    inc.forEach(function(p){
+      var pts=p.pts.map(function(q){ return [q[0],q[1]]; });
+      doc.paths.push({pts:pts});
+      doc.off.push([dx,dy]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0);
+      var bb=bboxOfPts(pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]);
+      doc.grp.push(gid); doc.uid.push(++uidSeq);
+    });
+    sel.idx=-1; sel.set=new Set();
+    for(var i=start;i<doc.paths.length;i++) sel.set.add(i);
+    draw(); refreshInspector(); buildLayers();
+    toast('Importado: '+(res.name||'diseño')+' ('+inc.length+' trazados) — quedó seleccionado');
+  }
+  function addProject(proj){
+    // Importar un .dstudio: entran sus OBJETOS con sus transformaciones, con uids y
+    // grupos NUEVOS (los del archivo chocarían con los de la mesa). Sus trayectorias
+    // CNC no se importan: apuntan a uids que aquí ya no existen.
+    if(!hasDoc()){ loadProject(proj); return; }
+    var objs=(proj.objects||[]).filter(function(o){ return o.pts&&o.pts.length>=2; });
+    if(!objs.length){ toast('Ese proyecto no trae objetos'); return; }
+    pushUndo();
+    var ib=[1/0,1/0,-1/0,-1/0];
+    objs.forEach(function(o){ var off=o.off||[0,0]; o.pts.forEach(function(q){
+      var x=q[0]+off[0], y=q[1]+off[1];
+      if(x<ib[0])ib[0]=x; if(y<ib[1])ib[1]=y; if(x>ib[2])ib[2]=x; if(y>ib[3])ib[3]=y; }); });
+    var eb=bboxOf(allIdx());
+    var dx=(eb[2]+10)-ib[0], dy=eb[1]-ib[1];
+    var gmap={}, start=doc.paths.length;
+    objs.forEach(function(o){
+      doc.paths.push({pts:o.pts.map(function(q){ return [q[0],q[1]]; })});
+      var off=o.off||[0,0];
+      doc.off.push([off[0]+dx,off[1]+dy]);
+      doc.sx.push(o.sx!=null?o.sx:1); doc.sy.push(o.sy!=null?o.sy:1); doc.rot.push(o.rot||0);
+      var bb=bboxOfPts(o.pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]);
+      var g=o.grp||0;
+      if(g){ if(!gmap[g]) gmap[g]=++groupSeq; g=gmap[g]; }
+      doc.grp.push(g); doc.uid.push(++uidSeq);
+    });
+    sel.idx=-1; sel.set=new Set();
+    for(var i=start;i<doc.paths.length;i++) sel.set.add(i);
+    draw(); refreshInspector(); buildLayers();
+    var ntp=(proj.cncTps||[]).length;
+    toast('Importado: '+(proj.name||'proyecto')+' ('+objs.length+' objetos)'+
+          (ntp?' — sus '+ntp+' trayectorias NO se importan (recalcúlalas aquí)':''));
+  }
+  function importDesign(){
+    if(!hasDoc()){ openDesign(); return; }      // mesa vacía: importar = abrir
+    if(api()){ api().import_design().then(function(res){
+        if(!res||!res.ok){ if(res&&res.error) toast(res.error); return; }
+        if(res.kind==='project') addProject(res.project); else addDoc(res);
+      }).catch(function(e){ toast('Error: '+e); }); }
+    else { el('importInput').click(); }
+  }
+  el('importInput').addEventListener('change',function(){
+    var f=this.files&&this.files[0]; if(!f){ this.value=''; return; }
+    var ext=(f.name.split('.').pop()||'').toLowerCase();
+    if(ext==='dstudio'){ var rd=new FileReader();
+      rd.onload=function(){ try{ addProject(JSON.parse(rd.result)); }catch(e){ toast('Proyecto inválido'); } };
+      rd.readAsText(f); this.value=''; return; }
+    var fd=new FormData(); fd.append('file',f); toast('Leyendo '+f.name+'…');
+    fetch('/api/parse',{method:'POST',body:fd}).then(function(r){ return r.json(); }).then(function(res){
+      if(!res||!res.ok){ toast(res&&res.error?res.error:'No se pudo leer'); return; }
+      addDoc(res);
+    }).catch(function(e){ toast('Error: '+e); });
+    this.value=''; });
+  el('btnImport').addEventListener('click',importDesign);
+
   // ===== Área de trabajo (dual) + arranque =====
   function loadWork(){
     var got=function(r){ if(r&&r.work){ state.plotterWork=r.work; if(state.machine==='plotter') state.work=r.work; } view.ready=false; fitView(); };
@@ -1325,6 +1421,7 @@
   function paintCnc(){ if(!state.cnc) return;
     el('matThick').value=state.cnc.material.thickness;
     el('matClear').value=state.cnc.material.clearance!=null?state.cnc.material.clearance:5;
+    el('matSpin').value=state.cnc.material.spinup!=null?state.cnc.material.spinup:10;
     el('homeEnd').checked=state.cnc.material.home_end!==false;
     var mt=el('matType'); mt.innerHTML='';
     (state.cnc.materials||[]).forEach(function(m){ var o=document.createElement('option'); o.value=m.id; o.textContent=m.name; mt.appendChild(o); });
@@ -1342,8 +1439,7 @@
     var cncMode=(m==='cnc');
     el('modeBar').style.display=cncMode?'block':'none';   // el toggle Diseño|CNC solo existe con la CNC activa
     setSideMode(cncMode?'cnc':'design');
-    el('btnSaveLbl').textContent=cncMode?'Exportar G-code':'Exportar HPGL';
-    el('btnSave').title=cncMode?'Generar el G-code (.tap) y guardarlo — pásalo a la CNC en una USB':'Exportar el archivo de corte HPGL';
+    el('btnSave').style.display=cncMode?'none':'';   // en CNC el G-code se guarda desde el panel de Corte
     el('btnSendTop').style.display=cncMode?'none':'';   // la CNC trabaja offline (archivo por USB), no hay envío
     el('connPill').style.display=cncMode?'none':'';
     state.work = cncMode ? ((state.cnc&&state.cnc.work)||[1220,2440]) : state.plotterWork;
@@ -1360,14 +1456,34 @@
              z_zero: zz||m.z_zero,
              clearance: parseFloat(el('matClear').value)||m.clearance||5,
              home_end: el('homeEnd').checked,
+             spinup: (function(v){ return isFinite(v)? Math.max(0,v) : (m.spinup!=null?m.spinup:10); })(parseFloat(el('matSpin').value)),
              type: el('matType').value||m.type }; }
   function commitMat(zz){ if(!state.cnc) return;
     CNC.set({material:matPatch(zz)}).then(function(r){
       if(r&&r.ok){ state.cnc=r; paintCnc(); } else { toast((r&&r.error)||'No se pudo guardar'); paintCnc(); } }); }
-  ['matThick','matClear'].forEach(function(id){
+  ['matThick','matClear','matSpin'].forEach(function(id){
     el(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault(); commitMat(); this.blur();} });
     el(id).addEventListener('blur',function(){ commitMat(); }); });
   el('homeEnd').addEventListener('change',function(){ commitMat(); });
+  function openAdv(){ if(!state.cnc) return;
+    var g=state.cnc.material.gears||[], host=el('gearsGrid'); host.innerHTML='';
+    for(var i=0;i<8;i++){ var d=document.createElement('div'); d.className='field';
+      d.innerHTML='<label>S'+(i+1)+'</label><input id="gearIn'+(i+1)+'" value="'+(g[i]!=null?g[i]:'')+'">';
+      host.appendChild(d); }
+    paintCnc();
+    el('advModal').style.display='flex'; }
+  el('btnAdv').addEventListener('click',openAdv);
+  el('advClose').addEventListener('click',function(){ el('advModal').style.display='none'; });
+  el('advModal').addEventListener('click',function(e){ if(e.target===el('advModal')) el('advModal').style.display='none'; });
+  el('gearsSave').addEventListener('click',function(){
+    var vals=[];
+    for(var i=1;i<=8;i++){ var v=parseFloat(el('gearIn'+i).value);
+      if(!isFinite(v)||v<100){ toast('La marcha S'+i+' necesita sus RPM (número desde 100)'); return; }
+      vals.push(Math.round(v)); }
+    CNC.set({material: Object.assign({}, matPatch(), {gears: vals})}).then(function(r){
+      if(r&&r.ok){ state.cnc=r; paintCnc(); el('advModal').style.display='none';
+        toast('Marchas guardadas — cada archivo llevará la más cercana a las RPM del preset'); }
+      else toast((r&&r.error)||'No se pudo guardar'); }).catch(function(e){ toast('Error: '+e); }); });
   el('matType').addEventListener('change',function(){ commitMat(); toast('Material activo: '+matName(this.value)+' — las fresas usan sus datos'); });
   el('zZeroSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b||!state.cnc) return;
     commitMat(b.getAttribute('data-z')); });
@@ -1679,28 +1795,25 @@
   var CNCB={ prev:function(d){ return api()? api().cnc_toolpath(d) : postJSON('/api/cnc_toolpath',d); },
              tap: function(d){ return api()? api().save_tap(d)     : postJSON('/api/tap',d); } };
   // --- previsualización (todas las activas; sin lista = lo del formulario sobre la selección/todo) ---
-  var renderMode=false;
   function computePreview(){
     if(!hasDoc()||!state.cnc) return;
     var list=activeTps();
     if(!list.length){ toast('No hay trayectorias que previsualizar — configura la operación y pulsa Calcular.'); return; }
     var pls=list.map(tpPayloadOf);
-    var groups=[], secs=0, skipped=0, bad=null;
+    var groups=[], secs=0, skipped=0, bad=null, gearsSeen={};
     (function next(k){
       if(k>=pls.length){
         if(!groups.length){ toast(bad||'No se pudieron calcular las trayectorias'); return; }
         cncPrev={groups:groups}; el('btnTpPrev').classList.add('on'); draw();
         var n=0; groups.forEach(function(g){ n+=g.tps.length+g.drills.length; });
-        toast('Trayectorias: '+n+' · ≈ '+Math.floor(secs/60)+' min '+(secs%60)+' s'+(skipped?' · '+skipped+' trazo(s) abierto(s) fuera':'')+(bad?' · ⚠ '+bad:''));
+        var gk=Object.keys(gearsSeen);
+        toast('Trayectorias: '+n+' · ≈ '+Math.floor(secs/60)+' min '+(secs%60)+' s'+(gk.length?' · marcha '+gk.join('/'):'')+(skipped?' · '+skipped+' trazo(s) abierto(s) fuera':'')+(bad?' · ⚠ '+bad:''));
         return; }
       CNCB.prev(pls[k]).then(function(r){
-        if(r&&r.ok){ groups.push({tps:r.toolpaths||[], drills:r.drills||[], dia:r.dia||6, depth:(pls[k].start||0)+(pls[k].depth||0)}); secs+=r.secs||0; skipped+=r.skipped||0; }
+        if(r&&r.ok){ groups.push({tps:r.toolpaths||[], drills:r.drills||[], dia:r.dia||6, depth:(pls[k].start||0)+(pls[k].depth||0)}); secs+=r.secs||0; skipped+=r.skipped||0; if(r.gear) gearsSeen['S'+r.gear]=1; }
         else bad=(pls[k].label?pls[k].label+': ':'')+((r&&r.error)||'error');
         next(k+1); }).catch(function(e){ bad=String(e); next(k+1); });
     })(0); }
-  el('btnRender').addEventListener('click',function(){ renderMode=!renderMode;
-    el('btnRender').classList.toggle('on',renderMode);
-    if(renderMode && !cncPrev){ prevOn=true; computePreview(); } else draw(); });
   el('btnSaveTap').addEventListener('click',function(){ saveTap(); });
   el('btnTpPrev').addEventListener('click',function(){
     if(cncPrev){ prevOn=false; killPrev(); draw(); return; }   // toggle: apagar (y recordar que se apagó)
@@ -2301,7 +2414,7 @@
   el('traceApply').addEventListener('click',doTrace);
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
-  window.__DS={ load:loadDoc, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject };
+  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject };
 })();
 </script>
 </body>

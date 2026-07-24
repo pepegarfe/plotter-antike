@@ -75,6 +75,12 @@ CNC_DEFAULTS = {
     'work': [1220.0, 2440.0],                          # cama de la CNC de Jose (122×244 cm)
     'material': {'thickness': 15.0, 'z_zero': 'top',   # z_zero: 'top' (cara superior) | 'bed' (cama)
                  'clearance': 5.0, 'home_end': True,   # Z segura (mm) y "volver a X0 Y0 al terminar"
+                 'spinup': 10.0,                       # seg de espera tras M03 (RPM del husillo)
+                 # RPM reales de las marchas S1-S8, LEÍDAS DEL HANDLE de Jose (24-jul:
+                 # MACHINE SETUP → Spindle Setup → Spindle speed). ⚠️ S1 es la MÁS RÁPIDA
+                 # (18000) y baja 1000 por marcha hasta S8=11000 — el orden no importa:
+                 # el archivo elige por CERCANÍA de RPM, no por número.
+                 'gears': [18000, 17000, 16000, 15000, 14000, 13000, 12000, 11000],
                  'type': 'mdf'},                       # material ACTIVO (id de `materials`)
     'materials': [
         {'id': 'mdf', 'name': 'MDF / triplay'},
@@ -101,7 +107,7 @@ CNC_DEFAULTS = {
         {'id': 't6-2f', 'name': 'Fresa 6 mm · 2 filos (espiral)', 'dia': 6.0,
          'notes': 'El caballo de batalla en MDF, triplay y madera. En acrílico tiende a derretir: mejor la de 1 filo.',
          'cut': {
-            'mdf': {'pass_depth': 5.0, 'feed': 3600, 'plunge': 1000, 'rpm': 18000, 'stepover_pct': 40},
+            'mdf': {'pass_depth': 5.0, 'feed': 4000, 'plunge': 1000, 'rpm': 18000, 'stepover_pct': 40},
             'acr': {'pass_depth': 2.5, 'feed': 1800, 'plunge': 450,  'rpm': 16000, 'stepover_pct': 35},
             'pvc': {'pass_depth': 6.0, 'feed': 3000, 'plunge': 900,  'rpm': 14000, 'stepover_pct': 45},
             'mad': {'pass_depth': 4.0, 'feed': 2800, 'plunge': 800,  'rpm': 18000, 'stepover_pct': 40},
@@ -128,7 +134,7 @@ CNC_DEFAULTS = {
             'mdf': {'pass_depth': 2.0, 'feed': 2200, 'plunge': 600, 'rpm': 18000, 'stepover_pct': 40},
             'acr': {'pass_depth': 1.2, 'feed': 1200, 'plunge': 350, 'rpm': 16000, 'stepover_pct': 35},
             'pvc': {'pass_depth': 2.5, 'feed': 2200, 'plunge': 700, 'rpm': 15000, 'stepover_pct': 45},
-            'mad': {'pass_depth': 1.8, 'feed': 1800, 'plunge': 500, 'rpm': 18000, 'stepover_pct': 40},
+            'mad': {'pass_depth': 1.8, 'feed': 1600, 'plunge': 500, 'rpm': 18000, 'stepover_pct': 40},
          }},
     ],
 }
@@ -233,8 +239,22 @@ def cnc_set(patch):
             cl = float(m.get('clearance', old.get('clearance', 5.0)))
             if not (1 <= cl <= 200):
                 return {'ok': False, 'error': 'La Z segura debe estar entre 1 y 200 mm.'}
+            sp = float(m.get('spinup', old.get('spinup', 10.0)))
+            if not (0 <= sp <= 120):
+                return {'ok': False, 'error': 'La espera del husillo debe estar entre 0 y 120 s.'}
+            gears = m.get('gears', old.get('gears'))
+            if gears is not None:
+                try:
+                    gears = [round(float(x)) for x in gears]
+                except (TypeError, ValueError):
+                    return {'ok': False, 'error': 'Las marchas deben ser números (RPM).'}
+                if len(gears) not in (8, 9) or any(not (100 <= g <= 60000) for g in gears):
+                    return {'ok': False, 'error': 'Las marchas son 8 valores de RPM (100–60000).'}
+            # ⚠️ dict RECONSTRUIDO con lista blanca: toda llave nueva del material debe
+            # añadirse AQUÍ o se pierde en cada guardado (así se perdía spinup al inicio)
             cur['material'] = {'thickness': t, 'z_zero': zz, 'clearance': cl,
                                'home_end': bool(m.get('home_end', old.get('home_end', True))),
+                               'spinup': sp, 'gears': gears,
                                'type': str(m.get('type', old.get('type', mat_ids[0])))}
         if cur['material'].get('type') not in mat_ids:
             cur['material']['type'] = mat_ids[0]
@@ -354,8 +374,10 @@ def cnc_toolpaths_preview(data):
         job, op, tps, drills, skipped, tool, material, name = _as_job(data)
         _, secs = cnc_gcode.build_jobs([job], material, name)
         flat = [cnc_gcode._rpts(t) for t in tps]   # sin banderas de acabado: el lienzo solo pinta puntos
+        gear = cnc_gcode.gear_for(tool.get('rpm', 18000), (material or {}).get('gears'))
         return {'ok': True, 'op': op, 'toolpaths': flat, 'drills': drills,
-                'dia': float(tool.get('dia', 6.0)), 'skipped': skipped, 'secs': round(secs)}
+                'dia': float(tool.get('dia', 6.0)), 'skipped': skipped, 'secs': round(secs),
+                'gear': gear or None}
     except Exception as e:
         return {'ok': False, 'error': f'Trayectorias: {e}'}
 

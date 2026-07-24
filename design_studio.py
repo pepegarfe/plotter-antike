@@ -36,6 +36,39 @@ def _load_workarea():
     return 3000.0, 600.0
 
 
+def _load_vector(path):
+    """Lee un vector (SVG/DXF/AI) y lo entrega como lo espera la UI: trazados en mm
+    con Y hacia ARRIBA (el volteo del SVG va aquí, POR FORMATO — ver flip_paths_y)."""
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == '.svg':
+            styled = core.SVGParser().parse(path)
+        elif ext == '.dxf':
+            styled = core.DXFParser().parse(path)
+        elif ext == '.ai':
+            styled = core.AIParser().parse(path)
+        else:
+            return {'ok': False, 'error': 'Formato no soportado (usa SVG, DXF, AI o .dstudio).'}
+    except Exception as e:
+        return {'ok': False, 'error': f'No se pudo leer el archivo: {e}'}
+    paths = []
+    xs, ys = [], []
+    for d in styled:
+        pts = d.get('pts') or []
+        if len(pts) < 2:
+            continue
+        rp = [[round(float(x), 3), round(float(y), 3)] for (x, y) in pts]
+        paths.append({'pts': rp})
+        for x, y in rp:
+            xs.append(x); ys.append(y)
+    bbox = [min(xs), min(ys), max(xs), max(ys)] if xs else [0, 0, 0, 0]
+    if ext == '.svg':
+        flip_paths_y(paths)   # solo SVG viene Y-abajo; AI/DXF ya llegan Y-arriba
+    ww, wh = _load_workarea()
+    return {'ok': True, 'name': os.path.basename(path),
+            'paths': paths, 'bbox': bbox, 'work': [ww, wh]}
+
+
 class Api:
     """Métodos que la interfaz web puede llamar (window.pywebview.api.*)."""
 
@@ -176,34 +209,26 @@ class Api:
                         'name': os.path.basename(path)}
             except Exception as e:
                 return {'ok': False, 'error': f'No se pudo abrir el proyecto: {e}'}
-        try:
-            if ext == '.svg':
-                styled = core.SVGParser().parse(path)
-            elif ext == '.dxf':
-                styled = core.DXFParser().parse(path)
-            elif ext == '.ai':
-                styled = core.AIParser().parse(path)
-            else:
-                return {'ok': False, 'error': 'Formato no soportado (usa SVG, DXF, AI o .dstudio).'}
-        except Exception as e:
-            return {'ok': False, 'error': f'No se pudo leer el archivo: {e}'}
+        return _load_vector(path)
 
-        paths = []
-        xs, ys = [], []
-        for d in styled:
-            pts = d.get('pts') or []
-            if len(pts) < 2:
-                continue
-            rp = [[round(float(x), 3), round(float(y), 3)] for (x, y) in pts]
-            paths.append({'pts': rp})
-            for x, y in rp:
-                xs.append(x); ys.append(y)
-        bbox = [min(xs), min(ys), max(xs), max(ys)] if xs else [0, 0, 0, 0]
-        if ext == '.svg':
-            flip_paths_y(paths)   # solo SVG viene Y-abajo; AI/DXF ya llegan Y-arriba
-        ww, wh = _load_workarea()
-        return {'ok': True, 'name': os.path.basename(path),
-                'paths': paths, 'bbox': bbox, 'work': [ww, wh]}
+    def import_design(self):
+        """Como open_design pero para SUMAR a la mesa (no reemplaza): solo vectores
+        y proyectos. Las imágenes van por Abrir — el calco siempre reemplaza."""
+        res = self.window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=('Diseños y proyectos (*.svg;*.dxf;*.ai;*.dstudio)',
+                        'Todos los archivos (*.*)'))
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        if os.path.splitext(path)[1].lower() == '.dstudio':
+            try:
+                proj = json.loads(open(path, encoding='utf-8').read())
+                return {'ok': True, 'kind': 'project', 'project': proj,
+                        'name': os.path.basename(path)}
+            except Exception as e:
+                return {'ok': False, 'error': f'No se pudo abrir el proyecto: {e}'}
+        return _load_vector(path)
 
     def _hpgl(self, data):
         conv = core.HPGLConverter(
