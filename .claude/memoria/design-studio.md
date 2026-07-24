@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T04:38:42.573Z
+  modified: 2026-07-24T05:11:07.947Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -189,6 +189,46 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   + 23 de UI simulada + e2e (14 anclas para círculo de 200 pts por el servidor real).
   ⚠️ Limitación consciente v1: no hay "sacar manijas" de una esquina recta (convertir recta en
   curva) — se suple insertando nodos en la curva vecina; retomar si Jose lo pide.
+
+- **5. Rondas 1+2 de diseño (9 funciones) — ⚑ CONSTRUIDAS 24-jul, SIN COMMIT, falta vistazo.**
+  Pedidas por Jose en bloque ("adelante con las dos rondas"). Qué entró:
+  · **Texto en arco**: campo "Curva" (±grados) en el modal — cada glifo se coloca RÍGIDO sobre el
+    círculo (rota, no se deforma; + = arco, − = valle; por línea, R = ancho/θ); viaja en la
+    receta textMeta. ⚠️ El ancho total PUEDE crecer con el arco (las letras inclinadas
+    sobresalen) — el invariante correcto es que la ALTURA crece.
+  · **Pluma (P — le QUITÓ el atajo al polígono, que quedó solo en el flyout)**: clic=esquina,
+    arrastre=ancla suave con manijas simétricas, clic en el 1º=cerrar, Esc/Enter=terminar,
+    Cmd+Z quita el último punto; liga elástica curva al cursor; hornea con nodePts (la cocina
+    del editor de nodos) vía `insertPath()` (helper nuevo que también usan formas y tijeras).
+  · **Tijeras (C)**: clic sobre un trazado → abierto queda en DOS (mismo grupo, puntas
+    coincidentes en el corte); cerrado se ABRE por ahí (arranca y termina en el corte).
+    ⚠️ Limitación: el anillo abierto conserva puntas coincidentes → el criterio de cierre por
+    distancia lo sigue viendo "cerrado"; un 2º corte re-abre en otro punto, no parte en dos.
+  · **Imanes (snapping)**: al ARRASTRAR, bordes/centros de la selección se pegan (6 px) a
+    bordes/centros de las demás unidades + hoja + guías; líneas de imán en acento; Alt lo
+    apaga. El arrastre se REHIZO de incremental a delta-total (orig+delta) para que el imán no
+    acumule deriva — moving ahora guarda A/orig/candidatos.
+  · **Reglas y guías**: reglas en mm (22 px, paso adaptativo 1–1000 según zoom); arrastrar
+    DESDE la regla crea guía (izq=vertical, arriba=horizontal), re-arrastrable, soltarla en la
+    regla la borra, clic en la ESQUINA borra todas; van en el .dstudio (`guides`).
+  · **Copias en círculo**: el modal Copias ganó segmentado Rejilla|Círculo (N, radio, ángulo);
+    pivote a "radio" mm BAJO el centro de la selección, sentido horario, 360=n reparte /
+    parcial=/(n−1) — coronas/relojes.
+  · **Engrosar línea** (`expand_op`, LineString.buffer): abiertos → cápsula cerrada con grosor
+    total; REEMPLAZA la línea. Botón en Contorno (activo solo con abiertos en la selección).
+  · **Esquinas redondeadas** (`round_op`, apertura+cierre morfológicos −r/+2r/−r): redondea
+    convexas Y cóncavas, por unidad (vecinas no se funden), figura devorada por el radio se
+    devuelve INTACTA con aviso; REEMPLAZA. Botón en sección Esquinas.
+  · **Imagen de referencia** (riel): foto tenue (40%) centrada a la hoja, bloqueada, debajo de
+    todo; clic de nuevo la quita; solo de la SESIÓN (no viaja al .dstudio a propósito — base64
+    inflaría el archivo). Escritorio: Api `ref_image` (data-URL); web: `refInput`+FileReader.
+  Rutas nuevas `/api/expand` `/api/round` + Api geo_expand/geo_round/ref_image; `geoRemove()`
+  (helper de borrado+poda de textMeta) y `GEO_API` (mapa de geoCall). __DS ganó pen/guides/
+  refImg/snapGuides. ⚠️ Gotcha de arranque: las vars nuevas que draw() pinta (guides/RUL/
+  refImg) deben declararse ANTES de draw() en el archivo — draw corre durante la carga.
+  Verificado: 34 checks nuevos de UI + 18 de motores Python + regresión completa (125 checks
+  UI en 5 arneses) + e2e real (expand/round/texto-arco). El arnés aprendió: E(id) crea el
+  elemento falso al vuelo y `_segBtns` generaliza los segmentados.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
