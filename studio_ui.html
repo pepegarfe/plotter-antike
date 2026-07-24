@@ -57,6 +57,14 @@
   .tool.on{background:var(--accent-soft);color:var(--accent);}
   .tool.on::before{content:"";position:absolute;left:-8px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--accent);}
   .rail .sep{width:24px;height:1px;background:var(--line);margin:6px 0;}
+  /* botón de figuras con menú desplegable (estilo Illustrator) */
+  .tool .flyarrow{position:absolute;right:3px;bottom:3px;width:0;height:0;border-left:4px solid transparent;border-bottom:4px solid currentColor;opacity:.55;}
+  .flyout{position:absolute;left:calc(100% + 8px);top:0;display:none;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:4px;gap:2px;box-shadow:0 6px 18px -6px #0007;z-index:30;}
+  .flyout.open{display:flex;}
+  .flyitem{width:34px;height:34px;border-radius:7px;display:grid;place-content:center;color:var(--muted);cursor:pointer;}
+  .flyitem:hover{background:var(--hover);color:var(--ink);}
+  .flyitem.on{background:var(--accent-soft);color:var(--accent);}
+  .flyitem svg{width:18px;height:18px;}
   .rail .grow{flex:1;}
 
   .canvas{grid-area:canvas;position:relative;background:var(--canvas);overflow:hidden;}
@@ -77,6 +85,12 @@
   .empty p{margin:0;color:var(--faint);font-size:15px;}
   .empty button{pointer-events:auto;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:9px;background:linear-gradient(180deg,var(--accent),var(--accent-dim));color:#fff;border:0;font:inherit;font-size:13.5px;font-weight:650;cursor:pointer;box-shadow:0 3px 14px -4px var(--accent-dim);}
   .empty button svg{width:15px;height:15px;}
+  /* opciones de forma (polígono/estrella) — aparece al elegir esa herramienta */
+  .shapeopts{position:absolute;top:14px;left:14px;z-index:3;display:none;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px 10px;box-shadow:0 4px 14px -6px #0006;font-size:12.5px;color:var(--muted);}
+  .shapeopts input:not([type=checkbox]){width:42px;height:24px;border:1px solid var(--line);background:var(--input);color:var(--ink);border-radius:6px;text-align:center;font:inherit;font-size:12.5px;}
+  .shapeopts input:disabled{opacity:.45;}
+  .shapeopts input[type=checkbox]{accent-color:var(--accent);}
+  .shapeopts label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;color:var(--muted);}
 
   .inspect{grid-area:inspect;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column;}
   .tabs{display:flex;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2;}
@@ -286,6 +300,17 @@
     <div class="tool on" id="toolSelect" title="Seleccionar (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 3 7 17 2.5-6.5L20 11z"/></svg></div>
     <div class="tool" id="toolPan" title="Mover / Panear (barra espaciadora)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-3-4"/></svg></div>
     <div class="sep"></div>
+    <div class="tool" id="toolShape" title="Figuras — clic para elegir (R/E/P/L)">
+      <span id="shapeIco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="6" width="15" height="12" rx="1.5"/></svg></span>
+      <span class="flyarrow"></span>
+      <div class="flyout" id="shapeFly">
+        <div class="flyitem" id="flyRect" data-t="rect" title="Rectángulo (R) — arrastra; Shift = cuadrado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="6" width="15" height="12" rx="1.5"/></svg></div>
+        <div class="flyitem" id="flyEllipse" data-t="ellipse" title="Elipse (E) — arrastra; Shift = círculo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="7.5"/></svg></div>
+        <div class="flyitem" id="flyPoly" data-t="poly" title="Polígono / Estrella (P) — arrastra desde el centro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3.5 2.4 5 5.4.7-4 3.8 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.8 5.4-.7z"/></svg></div>
+        <div class="flyitem" id="flyLine" data-t="line" title="Línea (L) — arrastra; Shift = ángulos de 45°"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 19 19 5"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="5" r="1.6"/></svg></div>
+      </div>
+    </div>
+    <div class="sep"></div>
     <div class="tool" id="toolCut" title="Ver vectores de corte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg></div>
     <div class="tool" id="toolMirror" title="Espejo horizontal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 8 4 12l4 4M16 8l4 4-4 4" opacity=".6"/></svg></div>
     <div class="tool" id="toolTrace" title="Calcar imagen (vectorizar foto)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>
@@ -300,6 +325,11 @@
       <svg class="ill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13h6M12 10v6"/></svg>
       <p>Abre un diseño para empezar</p>
       <button id="btnOpenEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Abrir diseño…</button>
+    </div>
+    <div class="shapeopts" id="shapeOpts">
+      <span>Lados</span><input id="shpSides" value="5">
+      <label><input type="checkbox" id="shpStar"> Estrella</label>
+      <span>Interior</span><input id="shpInner" value="50" disabled><span>%</span>
     </div>
     <div class="pillbar"><div class="wapill"><button id="btnSettings" title="Tamaño del área de trabajo…"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="11" rx="1.5"/><path d="M4.5 17.5v3.5M19.5 17.5v3.5M4.5 19.25h15"/><path d="M8 17.6 4.9 19.25 8 20.9M16 17.6l3.1 1.65L16 20.9"/></svg></button></div><div class="zoompill"><button id="zOut">−</button><span id="zoomTxt">Ajustar</span><button id="zIn">+</button></div></div>
   </main>
@@ -890,6 +920,12 @@
       for(var j=1;j<e.length;j++){var b2=tp(e[j][0],e[j][1]); ctx.lineTo(b2[0],b2[1]);}
       ctx.stroke();
     }
+    // borrador de la forma en curso (punteado en acento)
+    if(draft){ var dpts=shapePts(draft); if(dpts&&dpts.length>1){
+      ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+      ctx.beginPath(); var q0=tp(dpts[0][0],dpts[0][1]); ctx.moveTo(q0[0],q0[1]);
+      for(var dz=1;dz<dpts.length;dz++){ var qz=tp(dpts[dz][0],dpts[dz][1]); ctx.lineTo(qz[0],qz[1]); }
+      ctx.stroke(); ctx.setLineDash([]); } }
     // trayectorias CNC en magenta de marca con flechas de sentido (el render al ancho
     // de fresa se quitó: la Vista 3D lo dejó obsoleto)
     if(state.machine==='cnc' && cncPrev){
@@ -1103,7 +1139,7 @@
   // grupo, sin desagrupar) pero NO editar la geometría — para eso está el paso Diseño.
   function cncStep(){ return state.machine==='cnc' && sideMode==='cnc'; }
   function cncLock(){ if(cncStep()){ toast('Estás en el paso CNC — cambia a Diseño para editar las figuras'); return true; } return false; }
-  var pan=null, moving=null, marquee=null, spaceDown=false;
+  var pan=null, moving=null, marquee=null, spaceDown=false, draft=null;   // draft = forma en curso (herramientas de dibujo)
   function hitPath(sx,sy){ // índice del trazado bajo el cursor (o -1). Recorre de arriba (último) a abajo.
     var thr=6; for(var i=doc.paths.length-1;i>=0;i--){ var e=effPts(i); for(var k=0;k<e.length-1;k++){ var a=tp(e[k][0],e[k][1]), b=tp(e[k+1][0],e[k+1][1]); if(distSeg(sx,sy,a[0],a[1],b[0],b[1])<=thr) return i; } if(e.length===1){var a2=tp(e[0][0],e[0][1]); if(Math.hypot(sx-a2[0],sy-a2[1])<=thr) return i;} } return -1; }
   function distSeg(px,py,x1,y1,x2,y2){ var dx=x2-x1,dy=y2-y1; var L=dx*dx+dy*dy; if(L===0) return Math.hypot(px-x1,py-y1); var t=((px-x1)*dx+(py-y1)*dy)/L; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x1+t*dx),py-(y1+t*dy)); }
@@ -1115,6 +1151,8 @@
     var r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
     var panMode = (tool==='pan') || spaceDown || e.button===1;
     if(panMode){ pan={x:e.clientX,y:e.clientY,ox:view.ox,oy:view.oy}; cv.style.cursor='grabbing'; userZoomed=true; return; }
+    if(DRAW_TOOLS[tool]){ if(cncLock()) return; var m0=sp(sx,sy);
+      draft={tool:tool, x0:m0[0], y0:m0[1], x1:m0[0], y1:m0[1], shift:e.shiftKey}; return; }
     if(!hasDoc()) return;
     var addMode = e.shiftKey || e.metaKey || e.ctrlKey;   // Shift / Cmd / Ctrl = sumar a la selección
     var hit=hitPath(sx,sy);
@@ -1135,11 +1173,14 @@
   });
   window.addEventListener('mousemove',function(e){
     if(pan){ view.ox=pan.ox+(e.clientX-pan.x); view.oy=pan.oy+(e.clientY-pan.y); draw(); return; }
+    if(draft){ var rd=cv.getBoundingClientRect(); var dm=sp(e.clientX-rd.left, e.clientY-rd.top);
+      draft.x1=dm[0]; draft.y1=dm[1]; draft.shift=e.shiftKey; draw(); return; }
     if(moving){ var dxmm=(e.clientX-moving.x)/view.scale, dymm=-(e.clientY-moving.y)/view.scale; if(dxmm||dymm){ moveBy(dxmm,dymm); moving.x=e.clientX; moving.y=e.clientY; moving.moved=true; draw(); refreshInspector(); } return; }
     if(marquee){ var r=cv.getBoundingClientRect(); marquee.x1=e.clientX-r.left; marquee.y1=e.clientY-r.top; draw(); }
   });
   window.addEventListener('mouseup',function(){
     if(pan){ pan=null; cv.style.cursor=(tool==='pan'||spaceDown)?'grab':'default'; return; }
+    if(draft){ var d0=draft; draft=null; commitDraft(d0); return; }
     if(moving){ if(!moving.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; } moving=null; cv.style.cursor=(tool==='pan')?'grab':'default'; refreshUI(); return; }
     if(marquee){ var mnx=Math.min(marquee.x0,marquee.x1),mny=Math.min(marquee.y0,marquee.y1),mxx=Math.max(marquee.x0,marquee.x1),mxy=Math.max(marquee.y0,marquee.y1);
       var moved=Math.abs(marquee.x1-marquee.x0)>3||Math.abs(marquee.y1-marquee.y0)>3;
@@ -1171,7 +1212,12 @@
     else if(e.key==='ArrowRight'){ nudge(1,0,e.shiftKey); e.preventDefault(); }
     else if(e.key==='ArrowUp'){ nudge(0,1,e.shiftKey); e.preventDefault(); }
     else if(e.key==='ArrowDown'){ nudge(0,-1,e.shiftKey); e.preventDefault(); }
+    else if(e.key==='Escape'){ if(draft){ draft=null; draw(); } if(tool!=='select') setTool('select'); }
     else if(e.key.toLowerCase()==='v'){ setTool('select'); }
+    else if(e.key.toLowerCase()==='r'){ setTool('rect'); }
+    else if(e.key.toLowerCase()==='e'){ setTool('ellipse'); }
+    else if(e.key.toLowerCase()==='p'){ setTool('poly'); }
+    else if(e.key.toLowerCase()==='l'){ setTool('line'); }
     else if(e.key.toLowerCase()==='f'){ e.preventDefault(); zoomSelection(); }
   });
   window.addEventListener('keyup',function(e){ if(e.code==='Space'){ spaceDown=false; if(!pan) cv.style.cursor=(tool==='pan')?'grab':'default'; } });
@@ -1182,9 +1228,84 @@
   function doDelete(){ if(cncLock()) return; var A=activeIdx().slice().sort(function(a,b){return b-a;}); pushUndo(); for(var n=0;n<A.length;n++){var i=A[n]; doc.paths.splice(i,1); doc.off.splice(i,1); doc.sx.splice(i,1); doc.sy.splice(i,1); doc.rot.splice(i,1); doc.oc.splice(i,1); doc.grp.splice(i,1); doc.uid.splice(i,1);} sel.idx=-1; sel.set=new Set(); paintTps(); refreshUI(); toast('Eliminado'); }
 
   // ===== Herramientas del riel =====
-  function setTool(t){ tool=t; el('toolSelect').classList.toggle('on',t==='select'); el('toolPan').classList.toggle('on',t==='pan'); cv.style.cursor=(t==='pan')?'grab':'default'; }
+  var DRAW_TOOLS={rect:1,ellipse:1,poly:1,line:1};
+  var SHAPE_FLY={rect:'flyRect',ellipse:'flyEllipse',poly:'flyPoly',line:'flyLine'};
+  var lastShapeTool='rect';   // la que muestra el botón de figuras (estilo Illustrator)
+  function setTool(t){ tool=t; if(draft){ draft=null; draw(); }
+    el('toolSelect').classList.toggle('on',t==='select');
+    el('toolPan').classList.toggle('on',t==='pan');
+    el('toolShape').classList.toggle('on',!!DRAW_TOOLS[t]);
+    if(DRAW_TOOLS[t]){ lastShapeTool=t; el('shapeIco').innerHTML=el(SHAPE_FLY[t]).innerHTML; }
+    Object.keys(SHAPE_FLY).forEach(function(k){ el(SHAPE_FLY[k]).classList.toggle('on',k===t); });
+    cv.style.cursor=(t==='pan')?'grab':(DRAW_TOOLS[t]?'crosshair':'default');
+    el('shapeOpts').style.display=(t==='poly')?'flex':'none'; }
   el('toolSelect').addEventListener('click',function(){setTool('select');});
   el('toolPan').addEventListener('click',function(){setTool('pan');});
+  // Botón único de figuras: clic = activar la última usada Y desplegar el menú con las demás
+  function closeFly(){ el('shapeFly').classList.remove('open'); }
+  el('toolShape').addEventListener('click',function(e){ e.stopPropagation();
+    setTool(lastShapeTool); el('shapeFly').classList.toggle('open'); });
+  Object.keys(SHAPE_FLY).forEach(function(t){ el(SHAPE_FLY[t]).addEventListener('click',function(e){ e.stopPropagation();
+    setTool(t); closeFly(); }); });
+  document.addEventListener('mousedown',function(e){ if(!e.target.closest || !e.target.closest('#toolShape')) closeFly(); });
+
+  // ===== Formas básicas (dibujo por arrastre) =====
+  // Devuelve los puntos en mm de la forma que describe el borrador d (o null si es muy chica).
+  function shapePts(d){
+    var x0=d.x0, y0=d.y0, x1=d.x1, y1=d.y1, dx=x1-x0, dy=y1-y0;
+    if(d.tool==='line'){
+      if(d.shift){ var L=Math.hypot(dx,dy), a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4);
+        x1=x0+L*Math.cos(a); y1=y0+L*Math.sin(a); }
+      if(Math.hypot(x1-x0,y1-y0)<0.5) return null;
+      return [[x0,y0],[x1,y1]];
+    }
+    if(d.tool==='rect'){
+      if(d.shift){ var s=Math.max(Math.abs(dx),Math.abs(dy)); x1=x0+(dx<0?-s:s); y1=y0+(dy<0?-s:s); }
+      var ax=Math.min(x0,x1), bx=Math.max(x0,x1), ay=Math.min(y0,y1), by=Math.max(y0,y1);
+      if(bx-ax<0.5||by-ay<0.5) return null;
+      return [[ax,ay],[bx,ay],[bx,by],[ax,by],[ax,ay]];
+    }
+    if(d.tool==='ellipse'){
+      if(d.shift){ var s2=Math.max(Math.abs(dx),Math.abs(dy)); x1=x0+(dx<0?-s2:s2); y1=y0+(dy<0?-s2:s2); }
+      var rx=Math.abs(x1-x0)/2, ry=Math.abs(y1-y0)/2, cx=(x0+x1)/2, cy=(y0+y1)/2;
+      if(rx<0.25||ry<0.25) return null;
+      // segmentos por sagita (~0.002 mm): la forma sigue lisa aunque luego la escalen (no usar N fijo burdo)
+      var n=Math.max(48,Math.min(720,Math.ceil(Math.PI*Math.sqrt(Math.max(rx,ry)/0.002))));
+      var out=new Array(n+1);
+      for(var i=0;i<=n;i++){ var t=2*Math.PI*i/n; out[i]=[cx+rx*Math.cos(t), cy+ry*Math.sin(t)]; }
+      return out;
+    }
+    if(d.tool==='poly'){   // centro = inicio del arrastre; el ángulo del arrastre gira la figura
+      var R=Math.hypot(dx,dy); if(R<0.5) return null;
+      var a0=Math.atan2(dy,dx); if(d.shift) a0=Math.round(a0/(Math.PI/12))*(Math.PI/12);
+      var sides=Math.max(3,Math.min(60,parseInt(el('shpSides').value,10)||5));
+      var star=el('shpStar').checked, inner=Math.max(5,Math.min(95,parseFloat(el('shpInner').value)||50))/100;
+      var n2=star?sides*2:sides, out2=[];
+      for(var k=0;k<n2;k++){ var r=(star&&k%2===1)?R*inner:R, ak=a0+2*Math.PI*k/n2;
+        out2.push([x0+r*Math.cos(ak), y0+r*Math.sin(ak)]); }
+      out2.push([out2[0][0],out2[0][1]]);
+      return out2;
+    }
+    return null;
+  }
+  function commitDraft(d){
+    // clic o temblor (<4 px de pantalla): no crear una figura fantasma
+    var spanPx=Math.max(Math.abs(d.x1-d.x0),Math.abs(d.y1-d.y0))*view.scale;
+    if(spanPx<4){ draw(); return; }
+    var pts=shapePts(d);
+    if(!pts){ draw(); return; }   // arrastre demasiado chico: no crear basura
+    pushUndo();
+    var idx=doc.paths.length;
+    doc.paths.push({pts:pts}); doc.off.push([0,0]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0);
+    var bb=bboxOfPts(pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]);
+    doc.grp.push(0); doc.uid.push(++uidSeq);
+    if(!state.name) state.name='nuevo-diseno';   // ASCII: el nombre viaja a archivos .tap/.hpgl
+    el('empty').style.display='none';
+    sel.set=new Set(); sel.idx=idx;
+    refreshUI();
+  }
+  ['shpSides','shpInner'].forEach(function(id){ el(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); this.blur(); } }); });
+  el('shpStar').addEventListener('change',function(){ el('shpInner').disabled=!this.checked; });
   el('toolMirror').addEventListener('click',function(){ if(hasDoc()) op(function(){mirrorActive('h');}); });
   el('toolFit').addEventListener('click',function(){ userZoomed=false; view.ready=false; fitView(); });
   el('toolCut').addEventListener('click',function(){ showCut=!showCut; el('toolCut').classList.toggle('on',showCut); draw(); toast(showCut?'Vectores de corte (magenta)':'Vista normal'); });

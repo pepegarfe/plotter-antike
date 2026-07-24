@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T03:41:21.354Z
+  modified: 2026-07-24T03:53:35.037Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -123,10 +123,15 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   Se puede dibujar sobre la mesa VACÍA (el overlay tiene pointer-events:none; al crear la 1ª
   forma se asigna nombre 'nuevo-diseno' ASCII). Umbral anti-fantasma: arrastres <4 px de PANTALLA
   no crean nada (en mm engañaba: alejado, medio píxel ya era >1 mm). Bloqueado en paso CNC
-  (cncLock). Verificado con el arnés node de DOM falso (22 checks: bbox exacto, deshacer/rehacer,
-  radios de estrella, snap 45°, uids únicos). Arnés en scratchpad de la sesión (`test_shapes.js`);
-  al arnés le hicieron falta `lastChild`/`dataset` en los elementos falsos y disparar toolFit
-  para que la vista esté lista antes de simular.
+  (cncLock). **Jose las probó y pidió el patrón Illustrator: UN solo botón de figuras**
+  (`toolShape`, con triangulito de "hay más") que al clic activa la última usada Y despliega el
+  flyout con las 4 (`shapeFly`/`flyRect…`); elegir una cambia el icono del botón; clic fuera o
+  mousedown en el lienzo lo cierra; los atajos R/E/P/L siguen y marcan la opción. ⚠️ El clic de
+  cada opción lleva stopPropagation (son HIJAS del botón: sin él, el clic rebota al padre y
+  reabre el menú). Verificado con el arnés node de DOM falso (29 checks: bbox exacto,
+  deshacer/rehacer, radios de estrella, snap 45°, uids únicos, flyout). Arnés en scratchpad de
+  la sesión (`test_shapes.js`); al arnés le hicieron falta `lastChild`/`dataset` en los
+  elementos falsos y disparar toolFit para que la vista esté lista antes de simular.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
