@@ -373,7 +373,9 @@ def cnc_toolpaths_preview(data):
     try:
         job, op, tps, drills, skipped, tool, material, name = _as_job(data)
         _, secs = cnc_gcode.build_jobs([job], material, name)
-        flat = [cnc_gcode._rpts(t) for t in tps]   # sin banderas de acabado: el lienzo solo pinta puntos
+        # sin banderas de acabado, y redondeado a 0.01mm: solo se PINTA (el puente
+        # JS<->Python de pywebview serializa JSON — floats completos lo engordan 2.4x)
+        flat = [[[round(x, 2), round(y, 2)] for x, y in cnc_gcode._rpts(t)] for t in tps]
         gear = cnc_gcode.gear_for(tool.get('rpm', 18000), (material or {}).get('gears'))
         return {'ok': True, 'op': op, 'toolpaths': flat, 'drills': drills,
                 'dia': float(tool.get('dia', 6.0)), 'skipped': skipped, 'secs': round(secs),

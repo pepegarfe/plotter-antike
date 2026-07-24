@@ -265,7 +265,7 @@
     <div class="brand">
       <span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg></span>
       Design Studio
-      <small>ANTIKE&nbsp;·&nbsp;<b id="fileName">sin diseño</b></small>
+      <small>Built By Jose&nbsp;·&nbsp;<b id="fileName">sin diseño</b></small>
     </div>
     <div class="seg mach" id="machSeg" title="Máquina de trabajo">
       <button class="on" data-m="plotter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>Plotter</button>
@@ -473,7 +473,7 @@
       <div class="tplist" id="tpList"></div>
       <div class="muted-note" id="tpEmpty">Selecciona objetos (o nada = todo), configura arriba y pulsa <b>Calcular</b>. Arrastra las filas para cambiar el orden de corte.</div>
       <div class="rowbtns">
-        <button class="gbtn" id="btnTpPrev" title="Pintar en azul el recorrido del centro de la fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg> Ver/esconder trayectorias</button>
+        <button class="gbtn" id="btnTpPrev" title="Pintar en azul el recorrido del centro de la fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg> <span id="tpPrevLbl">Ver trayectorias</span></button>
         <button class="gbtn" id="btnSim3d" title="Simulación 3D del resultado: un bloque de material al que se le come el MISMO G-code que se llevaría la máquina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg> Ver render</button>
       </div>
       <button class="pbtn acc" id="btnSaveTap" style="width:100%;margin-top:10px;height:36px;font-weight:700" title="Generar el G-code (.tap) de las trayectorias activas, en el orden de la lista — pásalo a la CNC en una USB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 20h16"/></svg>Guardar G-code (.tap)</button>
@@ -808,7 +808,8 @@
   var showCut=false;
   var cncPrev=null;   // trayectorias CNC previsualizadas (se invalidan al cambiar la geometría)
   var prevOn=false;   // intención del usuario: vista previa encendida (aunque momentáneamente no haya nada que pintar)
-  function killPrev(){ if(cncPrev){ cncPrev=null; el('btnTpPrev').classList.remove('on'); } }
+  function killPrev(){ if(cncPrev){ cncPrev=null; el('btnTpPrev').classList.remove('on'); }
+    if(el('tpPrevLbl')) el('tpPrevLbl').textContent='Ver trayectorias'; }
   function cutParams(){ return { speed: parseFloat(el('cutSpeed').value)||320, pressure: parseFloat(el('cutPressure').value)||140, overcut: parseFloat(el('cutOvercut').value)||0, corner: parseFloat(el('cutCorner').value)||0 }; }
   function effAll(){ var r=[]; for(var i=0;i<doc.paths.length;i++){ r.push(effPts(i)); } return r; }
   function pathLen(){ var L=0; for(var i=0;i<doc.paths.length;i++){ var e=effPts(i); for(var k=1;k<e.length;k++){ L+=Math.hypot(e[k][0]-e[k-1][0], e[k][1]-e[k-1][1]); } } return L; }
@@ -944,12 +945,15 @@
     // Fuera/Dentro piden contornos CERRADOS; Izq/Der existen para trazos ABIERTOS —
     // cada juego solo aparece si el objetivo (trayectoria en edición o selección) lo trae
     if(!el('sideSeg')) return;
-    var idxs=(typeof tpSel!=='undefined'&&tpSel>=0&&tpaths[tpSel])?tpResolve(tpaths[tpSel])
-             :(mode&&mode()==='all'?allIdx():activeIdx());
+    var editando=(typeof tpSel!=='undefined'&&tpSel>=0&&tpaths[tpSel]);
+    var sinSel=!editando&&mode&&mode()==='all';
+    var idxs=editando?tpResolve(tpaths[tpSel]):(sinSel?allIdx():activeIdx());
     var abiertos=false, cerrados=false;
     idxs.forEach(function(i){ var e=effPts(i); if(e.length<2) return;
       var d=Math.hypot(e[0][0]-e[e.length-1][0], e[0][1]-e[e.length-1][1]);
       if(d<=0.05) cerrados=true; else abiertos=true; });
+    if(sinSel) abiertos=false;   // sin selección explícita: vista clásica (Izq/Der piden
+                                 // elegir trazos abiertos A PROPÓSITO, no "todo el diseño")
     if(!idxs.length){ cerrados=true; abiertos=false; }   // sin diseño: vista clásica
     el('sideSeg').querySelectorAll('button').forEach(function(b){
       var v=b.getAttribute('data-s');
@@ -1811,7 +1815,7 @@
     return cncTool(); }
   function tpResolve(t){ var m={}; doc.uid.forEach(function(u,i){m[u]=i;});
     return t.uids.map(function(u){return m[u];}).filter(function(i){return i!=null;}); }
-  function tpPayloadOf(t){ return { paths: tpResolve(t).map(function(i){return effPts(i);}),
+  function tpPayloadOf(t){ return { paths: tpResolve(t).map(function(i){ return effPts(i).map(function(q){ return [Math.round(q[0]*1000)/1000, Math.round(q[1]*1000)/1000]; }); }),
     name: state.name, label: t.name, op: t.op, side: t.side, direction: t.direction,
     tabs: t.tabs, ramp: t.ramp, start: t.start||0, allowance: t.allowance||0,
     last_pass: t.last_pass||0, last_rev: !!t.last_rev,
@@ -1825,20 +1829,24 @@
     var list=activeTps();
     if(!list.length){ toast('No hay trayectorias que previsualizar — configura la operación y pulsa Calcular.'); return; }
     var pls=list.map(tpPayloadOf);
-    var groups=[], secs=0, skipped=0, bad=null, gearsSeen={};
-    (function next(k){
-      if(k>=pls.length){
-        if(!groups.length){ toast(bad||'No se pudieron calcular las trayectorias'); return; }
-        cncPrev={groups:groups}; el('btnTpPrev').classList.add('on'); draw();
-        var n=0; groups.forEach(function(g){ n+=g.tps.length+g.drills.length; });
-        var gk=Object.keys(gearsSeen);
-        toast('Trayectorias: '+n+' · ≈ '+Math.floor(secs/60)+' min '+(secs%60)+' s'+(gk.length?' · marcha '+gk.join('/'):'')+(skipped?' · '+skipped+' trazo(s) abierto(s) fuera':'')+(bad?' · ⚠ '+bad:''));
-        return; }
-      CNCB.prev(pls[k]).then(function(r){
+    el('tpPrevLbl').textContent='Calculando…';
+    // TODAS a la vez: el puente JS<->Python cobra su renta POR VIAJE — en serie, los
+    // viajes se suman; en paralelo, cuesta como el más lento
+    Promise.all(pls.map(function(pl){
+      return CNCB.prev(pl).catch(function(e){ return {ok:false, error:String(e)}; });
+    })).then(function(rs){
+      var groups=[], secs=0, skipped=0, bad=null, gearsSeen={};
+      rs.forEach(function(r,k){
         if(r&&r.ok){ groups.push({tps:r.toolpaths||[], drills:r.drills||[], dia:r.dia||6, depth:(pls[k].start||0)+(pls[k].depth||0)}); secs+=r.secs||0; skipped+=r.skipped||0; if(r.gear) gearsSeen['S'+r.gear]=1; }
         else bad=(pls[k].label?pls[k].label+': ':'')+((r&&r.error)||'error');
-        next(k+1); }).catch(function(e){ bad=String(e); next(k+1); });
-    })(0); }
+      });
+      if(!groups.length){ el('tpPrevLbl').textContent='Ver trayectorias'; toast(bad||'No se pudieron calcular las trayectorias'); return; }
+      cncPrev={groups:groups}; el('btnTpPrev').classList.add('on');
+      el('tpPrevLbl').textContent='Esconder trayectorias'; draw();
+      var n=0; groups.forEach(function(g){ n+=g.tps.length+g.drills.length; });
+      var gk=Object.keys(gearsSeen);
+      toast('Trayectorias: '+n+' · ≈ '+Math.floor(secs/60)+' min '+(secs%60)+' s'+(gk.length?' · marcha '+gk.join('/'):'')+(skipped?' · '+skipped+' trazo(s) abierto(s) fuera':'')+(bad?' · ⚠ '+bad:''));
+    }); }
   el('btnSaveTap').addEventListener('click',function(){ saveTap(); });
   el('btnTpPrev').addEventListener('click',function(){
     if(cncPrev){ prevOn=false; killPrev(); draw(); return; }   // toggle: apagar (y recordar que se apagó)
@@ -1891,8 +1899,10 @@
     return mv;
   }
   function simGrid(jobs,mat,work){
-    // la hoja = el ÁREA DE TRABAJO configurada (como el bloque de material de Aspire),
-    // ampliada solo si alguna trayectoria se sale de ella (mejor ver el error que taparlo)
+    // HÍBRIDO: la rejilla fina cubre SOLO la zona donde se corta (bbox de las
+    // trayectorias + margen) — el resto de la hoja queda intacto por definición y
+    // se dibuja como placa lisa (simSheet), sin gastar celdas. Repartir las celdas
+    // sobre la cama completa fue lo que cuadriculaba las curvas (~1.1mm/celda).
     var thick=parseFloat(mat.thickness)||15, ztop=(mat.z_zero==='bed')?thick:0;
     var minx=1/0,miny=1/0,maxx=-1/0,maxy=-1/0, any=false;
     jobs.forEach(function(j){ j.moves.forEach(function(v){
@@ -1901,21 +1911,37 @@
       minx=Math.min(minx,v[0],v[3]); maxx=Math.max(maxx,v[0],v[3]);
       miny=Math.min(miny,v[1],v[4]); maxy=Math.max(maxy,v[1],v[4]); }); });
     if(!any) return null;
-    var marg=Math.max.apply(null,jobs.map(function(j){return j.rad;}))+2;
+    var bminx=minx, bminy=miny, bmaxx=maxx, bmaxy=maxy;    // bbox crudo de las trayectorias
+    var marg=Math.max.apply(null,jobs.map(function(j){return j.rad;}))+6;
     minx-=marg; miny-=marg; maxx+=marg; maxy+=marg;
-    if(work&&work[0]>0&&work[1]>0){
-      minx=Math.min(minx,0); miny=Math.min(miny,0);
-      maxx=Math.max(maxx,work[0]); maxy=Math.max(maxy,work[1]);
+    var sheetW=(work&&work[0]>0)?work[0]:0, sheetH=(work&&work[1]>0)?work[1]:0;
+    if(sheetW&&sheetH){
+      // el MARGEN no empuja la rejilla fuera de la hoja (parecía una hoja aparte);
+      // solo las trayectorias mismas pueden salirse — ese error sí se muestra
+      minx=Math.max(minx, Math.min(bminx, 0));  miny=Math.max(miny, Math.min(bminy, 0));
+      maxx=Math.min(maxx, Math.max(bmaxx, sheetW)); maxy=Math.min(maxy, Math.max(bmaxy, sheetH));
     }
     var W=maxx-minx, H=maxy-miny;
-    // resolución adaptativa: celdas finas en trabajos chicos, tope de ~2.4M celdas en la cama completa
     var cell=Math.max(0.15, Math.sqrt(W*H/2.4e6));
     var nx=Math.max(2,Math.round(W/cell)), ny=Math.max(2,Math.round(H/cell));
     var hm=new Float32Array(nx*ny); hm.fill(thick);
     var owner=new Uint8Array(nx*ny); owner.fill(255);       // qué trayectoria cortó cada celda
     var removed=new Uint8Array(nx*ny);                      // sobrantes quitados con doble clic
-    return {hm:hm,owner:owner,removed:removed,nx:nx,ny:ny,cell:cell,minx:minx,miny:miny,
-            w:W,h:H,thick:thick,ztop:ztop};
+    var outside=null;
+    if(sheetW&&sheetH){
+      // la HOJA define dónde hay material: si una trayectoria se sale de ella, la
+      // fresa corta AIRE — esas celdas no se dibujan (dibujarlas como material hacía
+      // ver una "solapa" saliéndose de la hoja)
+      outside=new Uint8Array(nx*ny);
+      for(var gy2=0;gy2<ny;gy2++) for(var gx2=0;gx2<nx;gx2++){
+        var cx2=minx+(gx2+0.5)*cell, cy2=miny+(gy2+0.5)*cell;
+        if(cx2<0||cy2<0||cx2>sheetW||cy2>sheetH){
+          var i2=gy2*nx+gx2; outside[i2]=1; removed[i2]=1; hm[i2]=0;
+        }
+      }
+    }
+    return {hm:hm,owner:owner,removed:removed,outside:outside,nx:nx,ny:ny,cell:cell,
+            minx:minx,miny:miny,w:W,h:H,thick:thick,ztop:ztop,sheetW:sheetW,sheetH:sheetH};
   }
   function stampMove(r,rad,jobIdx,v){
     // estampa un movimiento (o un pedazo) en el mapa; devuelve [fila0,fila1] tocadas o null
@@ -1953,32 +1979,40 @@
     return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
   }
   var SIMLOOKS={
-    // caras vistas DESDE ARRIBA (la superficie de la hoja). El MDF real es liso y
-    // parejo (fibra prensada, casi sin dibujo); el triplay lleva chapa con veta fina.
-    mdf:  function(x,y){ var n=0.965+0.05*noise2(x*3.1,y*3.1);
-      if(hash2(Math.floor(x*4),Math.floor(y*4))>0.99) n*=0.88;       // motitas escasas de fibra
-      return [0.78*n,0.70*n,0.54*n]; },
-    tri:  function(x,y){ var g=noise2(x*0.05,y*1.3), s=Math.sin(y*0.9+g*11)*0.5+0.5;
-      var t=s*0.30+0.25*noise2(x*0.7,y*2.5);
-      var st=noise2(x*0.02,y*0.35); if(st>0.72) t+=0.9*(st-0.72);    // vetas ocasionales marcadas
-      return [0.88-0.16*t, 0.78-0.17*t, 0.58-0.16*t]; },
+    // Colores tomados de referencias reales (el amarillo anterior era exagerado) y
+    // patrones con la técnica estándar: BANDAS distorsionadas por ruido = anillos de
+    // crecimiento; fibra fina encima; manchado de gran escala para que no se vea plano.
+    mdf:  function(x,y){ var m=0.97+0.05*noise2(x*0.12,y*0.12);      // manchado grande
+      var f=0.985+0.03*noise2(x*2.6,y*2.6);                          // fibra fina
+      var n=m*f; if(hash2(Math.floor(x*5),Math.floor(y*5))>0.992) n*=0.86;
+      return [0.70*n,0.63*n,0.51*n]; },                              // tan grisáceo real
+    tri:  function(x,y){ var g=noise2(x*0.02,y*0.5);
+      var veta=Math.sin(y*0.5+g*8)*0.5+0.5;                          // veta suave de chapa
+      var t=veta*0.22+0.10*noise2(x*0.9,y*3);
+      var st=noise2(x*0.012,y*0.2);
+      if(st>0.72) t+=(st-0.72)*2.2;                                  // vetas oscuras ocasionales
+      var m=0.98+0.04*noise2(x*0.08,y*0.08);
+      return [(0.87-0.24*t)*m,(0.72-0.24*t)*m,(0.53-0.20*t)*m]; },   // chapa de PINO cálida
     mad:  function(x,y){ var g=noise2(x*0.045,y*0.6), s=Math.sin(y*1.15+g*13)*0.5+0.5;
-      var t=s*0.55+0.45*noise2(x*0.8,y*2.2);                          // vetas a lo largo de X
+      var t=s*0.55+0.45*noise2(x*0.8,y*2.2);                          // vetas (versión que sí funciona)
       return [0.80-0.20*t, 0.63-0.20*t, 0.42-0.15*t]; },
-    acr:  function(x,y){ var n=0.985+0.015*noise2(x*2,y*2); return [0.79*n,0.86*n,0.90*n]; },
-    pvc:  function(x,y){ var n=0.985+0.015*noise2(x*2.5,y*2.5); return [0.93*n,0.93*n,0.95*n]; },
-    plain:function(){ return [0.85,0.80,0.66]; }
+    acr:  function(x,y){ var n=0.995+0.008*noise2(x*1.5,y*1.5); return [0.86*n,0.90*n,0.92*n]; },
+    pvc:  function(x,y){ var n=0.993+0.01*noise2(x*2,y*2); return [0.95*n,0.95*n,0.96*n]; },
+    plain:function(){ return [0.82,0.79,0.72]; }
   };
+  // acabado (brillo especular Phong) por material: el acrílico BRILLA, la madera no
+  var SIMFINISH={ mdf:{sh:6,sp:0x141210}, tri:{sh:10,sp:0x1a1815}, mad:{sh:12,sp:0x1c1914},
+                  acr:{sh:90,sp:0x777777}, pvc:{sh:35,sp:0x333333}, plain:{sh:8,sp:0x151515} };
   // lo que se ve DENTRO del corte (paredes y fondos), por material. mode: 0=nada,
   // 1=color sólido, 2=chapas alternadas (triplay). Las paredes las pinta el SHADER
   // según la altura real (por eso el triplay muestra sus capas en cualquier pared).
   var SIMSIDE={
-    mdf:  {mode:1, a:[0.70,0.62,0.47]},                              // fibra: pareja, algo más oscura
-    tri:  {mode:2, a:[0.84,0.70,0.48], b:[0.56,0.42,0.28]},          // chapas claras/oscuras apiladas
-    mad:  {mode:1, a:[0.55,0.41,0.27]},
-    acr:  {mode:1, a:[0.90,0.93,0.95]},                              // canto maquinado: esmerilado
-    pvc:  {mode:1, a:[0.90,0.90,0.92]},
-    plain:{mode:0, a:[0.85,0.80,0.66]}
+    mdf:  {mode:1, a:[0.62,0.55,0.44]},                              // fibra prensada, pareja
+    tri:  {mode:2, a:[0.84,0.70,0.51], b:[0.58,0.44,0.30]},          // chapas claras/oscuras
+    mad:  {mode:1, a:[0.58,0.44,0.30]},
+    acr:  {mode:1, a:[0.92,0.94,0.96]},                              // canto esmerilado
+    pvc:  {mode:1, a:[0.92,0.92,0.94]},
+    plain:{mode:0, a:[0.82,0.79,0.72]}
   };
   function plyT(thick){ return thick/Math.max(3,Math.round(thick/1.6)); }   // chapa real ≈1.6 mm
   function matFloor(look,x,y,h,thick){
@@ -2006,12 +2040,35 @@
     if(mode==='tp'&&r.owner[i]!==255) return tpColor(r.owner[i]);
     return matFloor(look,x,y,h,r.thick);                             // material: el fondo del corte real
   }
+  var SIM_TILE=128, _texCache={};
+  function simLookTexture(look){
+    // una IMAGEN de textura (canvas) compartida por TODAS las mallas, mapeada por
+    // coordenadas del mundo: la piel es idéntica sin importar la densidad de la malla
+    // (hornear por vértice hacía que rejilla fina y placa se vieran como materiales
+    // distintos). Espejo-repetible para no ver costuras de mosaico.
+    if(_texCache[look]) return _texCache[look];
+    var N=512, cv2=document.createElement('canvas'); cv2.width=N; cv2.height=N;
+    var cx2=cv2.getContext('2d'), img=cx2.createImageData(N,N);
+    var fn=SIMLOOKS[look]||SIMLOOKS.plain;
+    for(var py=0;py<N;py++) for(var px=0;px<N;px++){
+      var c=fn(px/N*SIM_TILE, py/N*SIM_TILE), o=(py*N+px)*4;
+      img.data[o]=c[0]*255; img.data[o+1]=c[1]*255; img.data[o+2]=c[2]*255; img.data[o+3]=255;
+    }
+    cx2.putImageData(img,0,0);
+    var tex=new THREE.CanvasTexture(cv2);
+    tex.wrapS=tex.wrapT=THREE.MirroredRepeatWrapping;
+    tex.anisotropy=4;
+    _texCache[look]=tex;
+    return tex;
+  }
   function simMaterial(){
     // Lambert + colores por vértice, con un injerto de shader: en las caras casi
     // verticales (paredes de corte y cantos de la hoja) el color sale de la ALTURA
     // real del pixel — así el triplay muestra sus chapas apiladas, cosa imposible
     // con colores por vértice (se interpolarían en un degradado).
-    var m=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+    var m=new THREE.MeshPhongMaterial({vertexColors:true,side:THREE.DoubleSide,
+                                       map:simLookTexture('mdf'),
+                                       shininess:6,specular:0x141210});
     m.onBeforeCompile=function(sh){
       var c=S3.sideCfg||{mode:0,a:[0,0,0],b:[0,0,0],ply:1.6};
       sh.uniforms.uSideMode={value:c.mode};
@@ -2019,10 +2076,12 @@
       sh.uniforms.uSideB={value:new THREE.Vector3(c.b[0],c.b[1],c.b[2])};
       sh.uniforms.uPlyT={value:c.ply};
       sh.vertexShader=sh.vertexShader
-        .replace('#include <common>','#include <common>\nvarying float vWZ; varying float vNz;')
-        .replace('#include <begin_vertex>','#include <begin_vertex>\nvWZ=position.z; vNz=normal.z;');
+        .replace('#include <common>','#include <common>\nvarying float vWZ; varying float vNz;\nattribute float aCut; varying float vCut;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvWZ=position.z; vNz=normal.z; vCut=aCut;');
       sh.fragmentShader=sh.fragmentShader
-        .replace('#include <common>','#include <common>\nvarying float vWZ; varying float vNz;\nuniform float uSideMode; uniform vec3 uSideA; uniform vec3 uSideB; uniform float uPlyT;')
+        .replace('#include <common>','#include <common>\nvarying float vWZ; varying float vNz; varying float vCut;\nuniform float uSideMode; uniform vec3 uSideA; uniform vec3 uSideB; uniform float uPlyT;')
+        .replace('#include <map_fragment>',
+          '#ifdef USE_MAP\n vec4 texelColor = texture2D( map, vUv );\n texelColor = mapTexelToLinear( texelColor );\n diffuseColor.rgb *= mix( vec3(1.0), texelColor.rgb, vCut );\n#endif')
         .replace('#include <color_fragment>','#include <color_fragment>\n'+
           'if(uSideMode>0.5){\n'+
           '  float side=1.0-smoothstep(0.45,0.75,abs(vNz));\n'+
@@ -2035,26 +2094,40 @@
     };
     return m;
   }
+  function simVCut(r,i){ return r.hm[i]>=r.thick-1e-3 ? 1 : 0; }   // 1 = piel de textura
   function simRecolor(){
     if(!S3.mesh||!S3.res) return;
     var r=S3.res, mode=simModeV, look=el('simLook').value;
     var sd=(mode==='mat')?(SIMSIDE[look]||SIMSIDE.plain):{mode:0,a:[0,0,0]};
     S3.sideCfg={mode:sd.mode, a:sd.a, b:sd.b||sd.a, ply:plyT(r.thick)};
-    var sh=S3.surf.material.userData.sh;
+    var mat=S3.surf.material;
+    var tex=simLookTexture(look);
+    if(mat.map!==tex){ mat.map=tex; mat.needsUpdate=true; }           // cambiar look = cambiar mapa
+    var fin=SIMFINISH[look]||SIMFINISH.plain;
+    mat.shininess=fin.sh; mat.specular.setHex(fin.sp);                // acabado: brillo por material
+    var sh=mat.userData.sh;
     if(sh){ sh.uniforms.uSideMode.value=S3.sideCfg.mode;
       sh.uniforms.uSideA.value.set(S3.sideCfg.a[0],S3.sideCfg.a[1],S3.sideCfg.a[2]);
       sh.uniforms.uSideB.value.set(S3.sideCfg.b[0],S3.sideCfg.b[1],S3.sideCfg.b[2]);
       sh.uniforms.uPlyT.value=S3.sideCfg.ply; }
     var col=S3.surf.geometry.attributes.color, arr=col.array, ud=S3.surf.userData;
+    var act=S3.surf.geometry.attributes.aCut, aar=act.array;
     for(var i=0;i<r.nx*r.ny;i++){
-      var c=simVColor(r,i,mode,look);
-      arr[3*i]=c[0]; arr[3*i+1]=c[1]; arr[3*i+2]=c[2];
+      var vc=simVCut(r,i); aar[i]=vc;
+      if(vc){ arr[3*i]=1; arr[3*i+1]=1; arr[3*i+2]=1; }               // intacto: blanco × textura
+      else { var c=simVColor(r,i,mode,look);
+        arr[3*i]=c[0]; arr[3*i+1]=c[1]; arr[3*i+2]=c[2]; }
     }
-    ud.wallSrc.forEach(function(vi,k){ var w=ud.wallStart+k;          // paredes: su celda de orilla, sombreada
-      arr[3*w]=arr[3*vi]*0.8; arr[3*w+1]=arr[3*vi+1]*0.8; arr[3*w+2]=arr[3*vi+2]*0.8; });
-    col.needsUpdate=true;
+    ud.wallSrc.forEach(function(vi,k){ var w=ud.wallStart+k;          // paredes: tono del canto
+      var sa=(SIMSIDE[look]||SIMSIDE.plain).a; aar[w]=0;
+      arr[3*w]=sa[0]*0.85; arr[3*w+1]=sa[1]*0.85; arr[3*w+2]=sa[2]*0.85; });
+    col.needsUpdate=true; act.needsUpdate=true;
     if(S3.bot){ var ba=(SIMSIDE[look]||SIMSIDE.plain).a;              // cara de abajo: tono del material
-      S3.bot.material.color.setRGB(ba[0]*0.75,ba[1]*0.75,ba[2]*0.75); }
+      S3.bot.material.color.setRGB(ba[0]*0.75,ba[1]*0.75,ba[2]*0.75);
+      if(S3.sheetBotMat) S3.sheetBotMat.color.copy(S3.bot.material.color); }
+    if(S3.sheet){ S3.sheet.children.forEach(function(o){              // costados de la hoja
+        if(o.userData.sheetSide){ var sdc=(SIMSIDE[look]||SIMSIDE.plain).a;
+          o.material.color.setRGB(sdc[0]*0.85,sdc[1]*0.85,sdc[2]*0.85); } }); }
   }
   function simGridNormals(r,nrm,y0,y1){
     // normal por gradiente del mapa (rápido y actualizable por filas, a diferencia
@@ -2077,6 +2150,22 @@
     // queda dibujada en rojo como advertencia.
     return r.removed[i]===1 || (r.hm[i]<=0.02 && r.hm[i]>=-SIM_OVER);
   }
+  function simInteriorEdges(r){
+    // bordes de la rejilla con PLACA enfrente (interiores) vs orilla real de la hoja
+    var hay=!!(r.sheetW&&r.sheetH);
+    return [ hay&&r.miny>0.01, hay&&r.miny+r.h<r.sheetH-0.01,
+             hay&&r.minx>0.01, hay&&r.minx+r.w<r.sheetW-0.01 ];
+  }
+  function simPlacaSeeds(r){
+    // celdas de los bordes INTERIORES: por ahí el material de la rejilla continúa
+    // hacia la placa (misma lámina física)
+    var ie=simInteriorEdges(r), nx=r.nx, seeds=[], x, y;
+    if(ie[0]) for(x=0;x<nx;x++) seeds.push(x);
+    if(ie[1]) for(x=0;x<nx;x++) seeds.push((r.ny-1)*nx+x);
+    if(ie[2]) for(y=0;y<r.ny;y++) seeds.push(y*nx);
+    if(ie[3]) for(y=0;y<r.ny;y++) seeds.push(y*nx+nx-1);
+    return seeds;
+  }
   function simTopIndex(r){
     // triángulos de la superficie + paredes de la orilla, saltándose los huecos
     var nx=r.nx, ny=r.ny, idx=[], gx, gy;
@@ -2085,9 +2174,13 @@
       if(simEmpty(r,a)&&simEmpty(r,b)&&simEmpty(r,cc)&&simEmpty(r,dd)) continue;
       idx.push(a,b,dd, a,dd,cc);
     }
-    var W=S3.wallIds;                                        // [ids orilla, base en el buffer] por pared
-    for(var w=0;w<W.length;w++){
-      var ids=W[w][0], st=W[w][1];
+    // cortinas del borde de la rejilla POR LADO: se omiten SOLO donde la placa está
+    // enfrente (costura doble); donde la rejilla llega a la ORILLA de la hoja, la
+    // cortina es el canto real de la lámina y debe dibujarse
+    var interior=simInteriorEdges(r);
+    for(var w=0;w<S3.wallIds.length;w++){
+      if(interior[w]) continue;
+      var ids=S3.wallIds[w][0], st=S3.wallIds[w][1];
       for(var k=0;k<ids.length-1;k++){
         if(r.removed[ids[k]]||r.removed[ids[k+1]]) continue;
         idx.push(ids[k],ids[k+1],st+k+1, ids[k],st+k+1,st+k);
@@ -2137,6 +2230,10 @@
     g.setAttribute('position',new THREE.BufferAttribute(pos,3));
     g.setAttribute('color',new THREE.BufferAttribute(col,3));
     g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
+    var uv=new Float32Array((nv+extra)*2), act=new Float32Array(nv+extra);
+    for(var vi=0;vi<nv+extra;vi++){ uv[2*vi]=pos[3*vi]/SIM_TILE; uv[2*vi+1]=pos[3*vi+1]/SIM_TILE; }
+    g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+    g.setAttribute('aCut',new THREE.BufferAttribute(act,1));
     g.setIndex(simTopIndex(r));
     var surf=new THREE.Mesh(g,simMaterial());
     surf.userData={wallStart:wallStart,wallSrc:wallSrc};
@@ -2169,44 +2266,116 @@
       if(a>b2){ tmp=a; a=b2; b2=tmp; }
       if(a>t0)t0=a; if(b2<t1)t1=b2;
     });
-    if(t0>=t1) return null;
-    var horiz=Math.hypot(d.x,d.y);
-    var dt=horiz>1e-6? r.cell*0.5/horiz : (r.thick/40)/Math.max(Math.abs(d.z),1e-9);
-    for(var t=Math.max(t0,0); t<=t1; t+=dt){
-      var gx=Math.floor((o.x+d.x*t-r.minx)/r.cell), gy=Math.floor((o.y+d.y*t-r.miny)/r.cell);
-      if(gx<0||gy<0||gx>=r.nx||gy>=r.ny) continue;
-      if(o.z+d.z*t<=r.hm[gy*r.nx+gx]) return gy*r.nx+gx;
+    if(t0<t1){
+      var horiz=Math.hypot(d.x,d.y);
+      var dt=horiz>1e-6? r.cell*0.5/horiz : (r.thick/40)/Math.max(Math.abs(d.z),1e-9);
+      for(var t=Math.max(t0,0); t<=t1; t+=dt){
+        var gx=Math.floor((o.x+d.x*t-r.minx)/r.cell), gy=Math.floor((o.y+d.y*t-r.miny)/r.cell);
+        if(gx<0||gy<0||gx>=r.nx||gy>=r.ny) continue;
+        if(o.z+d.z*t<=r.hm[gy*r.nx+gx]) return {kind:'cell', i:gy*r.nx+gx};
+      }
+    }
+    // ¿pegó en la PLACA? (cara superior de la hoja, fuera de la rejilla)
+    if(r.sheetW&&r.sheetH&&S3.sheet&&S3.sheet.visible&&Math.abs(d.z)>1e-9){
+      var tt=(r.thick-o.z)/d.z;
+      if(tt>0){
+        var px=o.x+d.x*tt, py=o.y+d.y*tt;
+        var dentroHoja=px>=0&&py>=0&&px<=r.sheetW&&py<=r.sheetH;
+        var dentroRejilla=px>=r.minx&&py>=r.miny&&px<=r.minx+r.w&&py<=r.miny+r.h;
+        if(dentroHoja&&!dentroRejilla) return {kind:'sheet'};
+      }
     }
     return null;
   }
-  function simDeleteWaste(i){
-    // como el "delete waste" de Aspire: quita el PEDAZO conectado de material donde
-    // se hizo doble clic. La conexión solo cuenta a través de material de MÁS de
-    // medio grosor: los PUENTES (3mm de 15) sí conectan físicamente, pero al sacar
-    // el sobrante se rompen — la inundación no debe cruzarlos.
+  function simAfterRemoval(){
+    var r=S3.res, g=S3.surf.geometry, pos=g.attributes.position.array;
+    for(var k=0;k<r.nx*r.ny;k++) pos[3*k+2]=r.hm[k];
+    g.setIndex(simTopIndex(r));
+    S3.bot.geometry.setIndex(simBotIndex(r));
+    simGridNormals(r,g.attributes.normal.array,0,r.ny-1);
+    simRecolor();
+    ['position','normal'].forEach(function(kk){ var a=g.attributes[kk];
+      a.updateRange={offset:0,count:-1}; a.needsUpdate=true; });
+  }
+  function simFloodFrom(seeds){
+    // inundación de material SÓLIDO (>medio grosor — los puentes se "rompen") → removed
     var r=S3.res, nx=r.nx, hm=r.hm, solid=r.thick*0.5;
-    if(hm[i]<solid){ toast('Ahí no hay material sólido que quitar'); return; }
-    var stack=[i], seen=new Uint8Array(hm.length), n=0;
-    seen[i]=1;
+    var stack=[], seen=new Uint8Array(hm.length), n=0;
+    seeds.forEach(function(k){ if(k>=0&&k<hm.length&&!seen[k]&&hm[k]>=solid){ seen[k]=1; stack.push(k); } });
+    var borde=false, ie=simInteriorEdges(r);
     while(stack.length){
-      var c=stack.pop(); n++; hm[c]=0;
+      var c=stack.pop(); n++; hm[c]=0; r.removed[c]=1;
       var cx=c%nx, cy=(c/nx)|0;
+      if((cy===0&&ie[0])||(cy===r.ny-1&&ie[1])||(cx===0&&ie[2])||(cx===nx-1&&ie[3])) borde=true;
       if(cx>0     &&!seen[c-1]  &&hm[c-1]>=solid){ seen[c-1]=1;  stack.push(c-1); }
       if(cx<nx-1  &&!seen[c+1]  &&hm[c+1]>=solid){ seen[c+1]=1;  stack.push(c+1); }
       if(cy>0     &&!seen[c-nx] &&hm[c-nx]>=solid){ seen[c-nx]=1; stack.push(c-nx); }
       if(cy<r.ny-1&&!seen[c+nx] &&hm[c+nx]>=solid){ seen[c+nx]=1; stack.push(c+nx); }
     }
-    for(var k=0;k<seen.length;k++) if(seen[k]) r.removed[k]=1;
-    var g=S3.surf.geometry;
-    g.setIndex(simTopIndex(r));                              // el pedazo quitado deja de EXISTIR (se ve la cuadrícula)
-    S3.bot.geometry.setIndex(simBotIndex(r));
-    simGridNormals(r,g.attributes.normal.array,0,r.ny-1);
-    simRecolor();
-    g.attributes.normal.updateRange={offset:0,count:-1}; g.attributes.normal.needsUpdate=true;
-    // reenfocar sobre lo que quedó
+    return {n:n, borde:borde};
+  }
+  function simSweepThin(r){
+    // Tras una inundación: el material DELGADO (< medio grosor — fondos de grabado,
+    // muñones) que quedó SIN NINGÚN vecino sólido vivo pertenecía al pedazo quitado
+    // (p.ej. el piso de un grabado profundo dentro de la pieza) — se va con él.
+    // Un muñón de puente que sí toca material sólido vivo se queda, como en la vida.
+    var nx=r.nx, ny=r.ny, hm=r.hm, solid=r.thick*0.5;
+    var seen=new Uint8Array(hm.length), n=0;
+    for(var i=0;i<hm.length;i++){
+      if(seen[i]||r.removed[i]||hm[i]<=0.02||hm[i]>=solid) continue;
+      var comp=[i], stack=[i]; seen[i]=1;
+      var vivo=false, quitado=false;
+      while(stack.length){
+        var c=stack.pop(), cx=c%nx, cy=(c/nx)|0;
+        for(var d=0;d<4;d++){
+          var qx=cx+(d===0?1:d===1?-1:0), qy=cy+(d===2?1:d===3?-1:0);
+          if(qx<0||qy<0||qx>=nx||qy>=ny) continue;
+          var k=qy*nx+qx;
+          if(r.removed[k]){ quitado=true; continue; }
+          if(hm[k]>=solid){ vivo=true; continue; }
+          if(!seen[k]&&hm[k]>0.02){ seen[k]=1; stack.push(k); comp.push(k); }
+        }
+      }
+      if(quitado&&!vivo){ for(var j=0;j<comp.length;j++){ hm[comp[j]]=0; r.removed[comp[j]]=1; n++; } }
+    }
+    return n;
+  }
+  function simOuterWaste(){
+    // doble clic en la PLACA: el sobrante exterior es la placa + todo el material de la
+    // rejilla conectado a su borde — se van juntos, como al retirar la lámina
+    var r=S3.res;
+    simFloodFrom(simPlacaSeeds(r));
+    simSweepThin(r);
+    if(S3.sheet) S3.sheet.visible=false;
+    simAfterRemoval();
+    // reenfocar a lo que quedó
     var bx0=1/0,by0=1/0,bx1=-1/0,by1=-1/0;
-    for(var q=0;q<hm.length;q++){
-      if(hm[q]<=0.02||r.removed[q]) continue;
+    for(var q=0;q<r.hm.length;q++){
+      if(r.hm[q]<=0.02||r.removed[q]) continue;
+      var qx=q%nx, qy=(q/nx)|0;
+      if(qx<bx0)bx0=qx; if(qx>bx1)bx1=qx; if(qy<by0)by0=qy; if(qy>by1)by1=qy;
+    }
+    if(isFinite(bx0))
+      simFrame(r.minx+bx0*r.cell, r.miny+by0*r.cell, (bx1-bx0+1)*r.cell, (by1-by0+1)*r.cell);
+    toast('Sobrante exterior quitado — se restaura al reabrir o al animar');
+  }
+  function simDeleteWaste(i){
+    // como el "delete waste" de Aspire: quita el PEDAZO conectado de material donde
+    // se hizo doble clic (los puentes se "rompen": solo conecta material > medio grosor)
+    var r=S3.res;
+    if(r.hm[i]<r.thick*0.5){ toast('Ahí no hay material sólido que quitar'); return; }
+    var f=simFloodFrom([i]);
+    if(f.borde){
+      // el pedazo continúa por la PLACA: se va la placa Y todos los demás pedazos
+      // que también tocan bordes interiores (misma lámina — sin divisiones fantasma)
+      simFloodFrom(simPlacaSeeds(r));
+      if(S3.sheet) S3.sheet.visible=false;
+    }
+    simSweepThin(r);
+    simAfterRemoval();
+    var nx=r.nx, bx0=1/0,by0=1/0,bx1=-1/0,by1=-1/0;
+    for(var q=0;q<r.hm.length;q++){
+      if(r.hm[q]<=0.02||r.removed[q]) continue;
       var qx=q%nx, qy=(q/nx)|0;
       if(qx<bx0)bx0=qx; if(qx>bx1)bx1=qx; if(qy<by0)by0=qy; if(qy>by1)by1=qy;
     }
@@ -2222,13 +2391,65 @@
     S3.camera.near=Math.max(D/500,0.5); S3.camera.far=D*30; S3.camera.updateProjectionMatrix();
     S3.controls.update();
   }
+  function simSheet(r){
+    // el resto de la hoja con el MISMO material (misma textura, misma luz) que la zona
+    // de detalle: continuidad exacta. Cara superior + FONDO (para la vista inferior)
+    // + costados exteriores. Empata contra la línea de vértices de la rejilla (sin
+    // hueco de media celda).
+    if(!r.sheetW||!r.sheetH) return null;
+    function marcos(inset){ // 4 rectángulos de la hoja alrededor de la rejilla (encogida `inset`)
+      var x0=Math.max(0,Math.min(r.minx+inset,r.sheetW)), x1=Math.max(0,Math.min(r.minx+r.w-inset,r.sheetW));
+      var y0=Math.max(0,Math.min(r.miny+inset,r.sheetH)), y1=Math.max(0,Math.min(r.miny+r.h-inset,r.sheetH));
+      return [ [0,0,x0,r.sheetH], [x1,0,r.sheetW,r.sheetH], [x0,0,x1,y0], [x0,y1,x1,r.sheetH] ];
+    }
+    var grp=new THREE.Group();
+    // La placa COMPARTE material con el bloque y se traslapa COPLANAR sin sesgo:
+    // la pelea de profundidad existe pero es INVISIBLE — en la zona traslapada ambas
+    // superficies pintan pixeles IDÉNTICOS (misma textura por mundo, misma luz).
+    // (polygonOffset probado y descartado 2 veces: su sesgo depende de la pendiente
+    // o de la precisión del buffer según la distancia, y el canto del borde asomaba
+    // como "cinta perimetral" en ángulos rasantes o en hojas grandes.)
+    var topMat=S3.surf.material, botMat2=S3.bot.material;
+    function plano(q,z,mat2,texturado,rot){
+      var w=q[2]-q[0], h=q[3]-q[1];
+      if(w<=0.01||h<=0.01) return null;
+      var cx3=q[0]+w/2, cy3=q[1]+h/2;
+      var pg=new THREE.PlaneGeometry(w,h,1,1);
+      if(texturado){
+        var pp=pg.attributes.position, n2=pp.count;
+        var uv2=new Float32Array(n2*2), co2=new Float32Array(n2*3), ac2=new Float32Array(n2);
+        for(var i2=0;i2<n2;i2++){
+          uv2[2*i2]=(pp.getX(i2)+cx3)/SIM_TILE; uv2[2*i2+1]=(pp.getY(i2)+cy3)/SIM_TILE;
+          co2[3*i2]=1; co2[3*i2+1]=1; co2[3*i2+2]=1; ac2[i2]=1;
+        }
+        pg.setAttribute('uv',new THREE.BufferAttribute(uv2,2));
+        pg.setAttribute('color',new THREE.BufferAttribute(co2,3));
+        pg.setAttribute('aCut',new THREE.BufferAttribute(ac2,1));
+      }
+      var mm=new THREE.Mesh(pg,mat2);
+      mm.position.set(cx3,cy3,z); if(rot) mm.rotation.x=Math.PI;
+      grp.add(mm); return mm;
+    }
+    // caras y fondos: traslapados 1.5 celdas bajo la rejilla, a la MISMA altura
+    marcos(1.5*r.cell).forEach(function(q){
+      var t=plano(q, r.thick, topMat, true, false); if(t) t.userData.sheetTop=true;
+      var b=plano(q, 0, botMat2, false, true); if(b) b.userData.sheetBot=true; });
+    var sideMat=new THREE.MeshLambertMaterial({color:0xB0A184});
+    [[r.sheetW/2, 0, r.sheetW, 0.02],[r.sheetW/2, r.sheetH, r.sheetW, 0.02],
+     [0, r.sheetH/2, 0.02, r.sheetH],[r.sheetW, r.sheetH/2, 0.02, r.sheetH]].forEach(function(q){
+      var box=new THREE.Mesh(new THREE.BoxGeometry(q[2],q[3],r.thick), sideMat);
+      box.position.set(q[0],q[1],r.thick/2); box.userData.sheetSide=true; grp.add(box);
+    });
+    return grp.children.length?grp:null;
+  }
   function simScene(){
     if(S3.renderer) return;
     S3.renderer=new THREE.WebGLRenderer({antialias:true});
     S3.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
     el('simView').appendChild(S3.renderer.domElement);
     S3.renderer.domElement.addEventListener('dblclick',function(ev){
-      var i=simPick(ev); if(i!=null) simDeleteWaste(i); });
+      var hit=simPick(ev); if(!hit) return;
+      if(hit.kind==='sheet') simOuterWaste(); else simDeleteWaste(hit.i); });
     S3.scene=new THREE.Scene();
     S3.camera=new THREE.PerspectiveCamera(45,1,1,50000);
     S3.camera.up.set(0,0,1);                                 // en la CNC la Z es la altura
@@ -2260,23 +2481,29 @@
     if(!res){ simStat('Ninguna trayectoria baja al material'); return; }
     S3.res=res; S3.anim=null; animBtn(false);
     if(S3.mesh){ S3.scene.remove(S3.mesh);
-      S3.mesh.children.forEach(function(c){ c.geometry.dispose(); c.material.dispose(); });
-      S3.mesh=null; S3.surf=null; S3.bot=null; }
+      S3.mesh.traverse(function(c){ if(c.geometry) c.geometry.dispose(); });
+      if(S3.surf) S3.surf.material.dispose();
+      if(S3.bot) S3.bot.material.dispose();
+      S3.mesh=null; S3.surf=null; S3.bot=null; S3.sheet=null; }
     if(S3.aux){ S3.scene.remove(S3.aux); S3.aux=null; }
     if(S3.tool){ S3.scene.remove(S3.tool); S3.tool=null; }
-    S3.mesh=simMesh(res); S3.scene.add(S3.mesh);
+    S3.mesh=simMesh(res);
+    S3.sheet=simSheet(res); if(S3.sheet) S3.mesh.add(S3.sheet);
+    S3.scene.add(S3.mesh);
     simRecolor();
-    var span=Math.max(res.w,res.h)*1.7;
-    var grid=new THREE.GridHelper(span,Math.max(4,Math.round(span/25)),0x888888,0x888888);
+    var fw=res.sheetW||res.w, fh=res.sheetH||res.h;
+    var span=Math.max(fw,fh)*1.25;
+    var grid=new THREE.GridHelper(span,Math.max(4,Math.round(span/50)),0x888888,0x888888);
     grid.material.transparent=true; grid.material.opacity=0.18;
     grid.rotation.x=Math.PI/2;                               // GridHelper nace horizontal en XZ; aquí el piso es XY
-    grid.position.set(res.minx+res.w/2,res.miny+res.h/2,-0.15);
+    grid.position.set(res.sheetW?fw/2:res.minx+res.w/2, res.sheetH?fh/2:res.miny+res.h/2, -0.15);
     S3.aux=new THREE.Group(); S3.aux.add(grid); S3.aux.add(new THREE.AxesHelper(25)); S3.scene.add(S3.aux);
-    simFrame(res.minx,res.miny,res.w,res.h);
+    if(res.sheetW&&res.sheetH) simFrame(0,0,res.sheetW,res.sheetH);
+    else simFrame(res.minx,res.miny,res.w,res.h);
     var hmin=1/0;
     for(var hq=0;hq<res.hm.length;hq++) if(res.hm[hq]<hmin) hmin=res.hm[hq];
     var over=(hmin<-0.01)? ' · pasa la cama '+(Math.round(-hmin*100)/100)+' mm'+(hmin<-SIM_OVER?' ⚠':'') : '';
-    simStat('hoja '+Math.round(res.w)+'×'+Math.round(res.h)+' mm · '+res.nx+'×'+res.ny+' celdas ('+(Math.round(res.cell*100)/100)+' mm)'+over);
+    simStat('hoja '+Math.round(res.sheetW||res.w)+'×'+Math.round(res.sheetH||res.h)+' mm · detalle '+Math.round(res.w)+'×'+Math.round(res.h)+' mm a '+(Math.round(res.cell*100)/100)+' mm/celda'+over);
   }
   // --- R4: animación — reinicia el bloque y estampa los movimientos al paso elegido ---
   function animBtn(on){ el('simPlay').innerHTML=on?'&#10073;&#10073; Pausa':'&#9654; Animar'; }
@@ -2292,7 +2519,11 @@
   }
   function animStart(){
     var r=S3.res; if(!r||!S3.jobs) return;
-    r.hm.fill(r.thick); r.owner.fill(255); r.removed.fill(0);
+    r.hm.fill(r.thick); r.owner.fill(255);
+    if(r.outside){ r.removed.set(r.outside);
+      for(var oi=0;oi<r.hm.length;oi++) if(r.outside[oi]) r.hm[oi]=0; }
+    else r.removed.fill(0);
+    if(S3.sheet) S3.sheet.visible=true;
     S3.surf.geometry.setIndex(simTopIndex(r));               // hoja completa otra vez
     S3.bot.geometry.setIndex(simBotIndex(r));
     var pos=S3.surf.geometry.attributes.position.array;
@@ -2334,12 +2565,16 @@
       var g=S3.surf.geometry, pos=g.attributes.position, col=g.attributes.color, nr=g.attributes.normal;
       var mode=simModeV, look=el('simLook').value;
       var yA=Math.max(0,ry0-1), yB=Math.min(r.ny-1,ry1+1);
+      var act=g.attributes.aCut;
       for(var gy=yA;gy<=yB;gy++) for(var gx=0;gx<r.nx;gx++){
         var i=gy*r.nx+gx;
         pos.array[3*i+2]=r.hm[i];
-        var c=simVColor(r,i,mode,look);
-        col.array[3*i]=c[0]; col.array[3*i+1]=c[1]; col.array[3*i+2]=c[2];
+        var vc=simVCut(r,i); act.array[i]=vc;
+        if(vc){ col.array[3*i]=1; col.array[3*i+1]=1; col.array[3*i+2]=1; }
+        else { var c=simVColor(r,i,mode,look);
+          col.array[3*i]=c[0]; col.array[3*i+1]=c[1]; col.array[3*i+2]=c[2]; }
       }
+      act.updateRange={offset:yA*r.nx,count:(yB-yA+1)*r.nx}; act.needsUpdate=true;
       simGridNormals(r,nr.array,yA,yB);
       var off=yA*r.nx*3, cnt=(yB-yA+1)*r.nx*3;
       pos.updateRange={offset:off,count:cnt}; col.updateRange={offset:off,count:cnt};
