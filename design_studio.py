@@ -19,6 +19,7 @@ import img_trace as tracer
 import text_vector as texter
 import geo_ops as geo
 import curve_fit as fitter
+import nest_ops as nester
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -211,6 +212,10 @@ class Api:
 
     def geo_round(self, data):
         return geo.round_op(data or {})
+
+    def geo_nest(self, data):
+        """Acomodo de piezas en la hoja (nesting BLF con rotaciones)."""
+        return nester.nest_op(data or {})
 
     def ref_image(self):
         """Imagen de referencia: diálogo nativo → data-URL para pintarla de fondo."""

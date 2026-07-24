@@ -433,6 +433,13 @@
         <button class="gbtn" id="btnRound" disabled title="Redondear las esquinas de las figuras cerradas seleccionadas (las reemplaza)">Redondear</button>
       </div>
 
+      <div class="grp-t sec">Acomodar en la hoja</div>
+      <div class="grid2">
+        <div class="field" title="Espacio mínimo entre piezas"><label>Sep.</label><input id="nstGap" value="5"><span class="u">mm</span></div>
+        <div class="field" title="Margen desde los bordes de la hoja"><label>Margen</label><input id="nstMar" value="5"><span class="u">mm</span></div>
+      </div>
+      <button class="gbtn" id="btnNest" disabled style="width:100%;margin-top:8px" title="Acomodar las piezas seleccionadas (o todas) en la hoja: prueba giros de 90/45/15 grados y varios órdenes, y se queda con el MEJOR acomodo; las bloqueadas se respetan como estorbos">Acomodar piezas</button>
+
     </div>
 
     <div class="pane" id="paneLayers" style="display:none">
@@ -987,6 +994,8 @@
   var snapGuides=null;                          // líneas del imán mientras arrastras
   var refImg=null;                              // imagen de referencia {img,x,y,w,h} (solo sesión)
   var outlineMode=false;                        // Cmd+Y estilo Illustrator: esqueleto sin adornos
+  var rotating=null;                            // giro libre con el mouse {A,pivot,start,applied,deg,moved}
+  var ROTH=22;                                  // alto del tallo de la manija de rotación (px)
   function fitScale(W,H){ return Math.min((W-108)/state.work[0], (H-108)/state.work[1]); }
   function fitView(){ var r=cv.getBoundingClientRect(); if(r.width<10||r.height<10) return; var s=fitScale(r.width,r.height); view.scale=s; view.ox=(r.width-state.work[0]*s)/2; view.oy=(r.height+state.work[1]*s)/2; view.ready=true; draw(); }
   function tp(x,y){ return [view.ox+x*view.scale, view.oy-y*view.scale]; }
@@ -1121,6 +1130,15 @@
       var hs=[[bb[0],bb[1]],[bb[2],bb[1]],[bb[0],bb[3]],[bb[2],bb[3]]];
       ctx.fillStyle=cvar('--canvas');
       for(var h=0;h<4;h++){var ph=tp(hs[h][0],hs[h][1]); ctx.beginPath(); ctx.rect(ph[0]-4,ph[1]-4,8,8); ctx.fill(); ctx.stroke();}
+      // manija de ROTACIÓN libre: tallo + perilla arriba del centro de la caja
+      var rc=tp((bb[0]+bb[2])/2, bb[3]);
+      ctx.beginPath(); ctx.moveTo(rc[0],rc[1]); ctx.lineTo(rc[0],rc[1]-ROTH); ctx.stroke();
+      ctx.beginPath(); ctx.arc(rc[0],rc[1]-ROTH,4.5,0,Math.PI*2);
+      ctx.fillStyle=cvar('--canvas'); ctx.fill(); ctx.stroke();
+      if(rotating && rotating.deg!=null){
+        ctx.fillStyle=cvar('--accent'); ctx.font='11px '+cvar('--mono');
+        ctx.fillText(Math.round(rotating.deg)+'°', rc[0]+10, rc[1]-ROTH-4);
+      }
     }
     // marquee en curso
     if(marquee){ ctx.strokeStyle=selC; ctx.fillStyle=cvar('--accent-soft'); ctx.lineWidth=1; ctx.setLineDash([3,2]);
@@ -1195,7 +1213,7 @@
     sideSegRefresh();
     var has=hasDoc();
     ['fx','fy','fw','fh','fr','fs'].forEach(function(id){el(id).disabled=!has;});
-    ['lockAspect','rotPreset','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','btnOffset','offDist','btnExpand','expW','btnRound','rndR'].forEach(function(id){el(id).disabled=!has;});
+    ['lockAspect','rotPreset','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','btnOffset','offDist','btnExpand','expW','btnRound','rndR','btnNest','nstGap','nstMar'].forEach(function(id){el(id).disabled=!has;});
     el('alignTo').querySelectorAll('button').forEach(function(b){b.disabled=!has;});   // segmentado: apagar sus botones
     if(has){ var actIdx=activeIdx(); var nUnits=activeUnits().length; el('disH').disabled = nUnits<3; el('disV').disabled = nUnits<3;
       ['boolU','boolD','boolI'].forEach(function(id){ el(id).disabled = nUnits<2; });   // combinar pide 2+ figuras
@@ -1390,6 +1408,20 @@
     if(DRAW_TOOLS[tool]){ if(cncLock()) return; var m0=sp(sx,sy);
       draft={tool:tool, x0:m0[0], y0:m0[1], x1:m0[0], y1:m0[1], shift:e.shiftKey}; return; }
     if(!hasDoc()) return;
+    if(mode()!=='all'){   // ¿agarró la manija de rotación de la selección?
+      var Ar=activeIdx();
+      if(Ar.length){
+        var br=bboxOf(Ar), rh=tp((br[0]+br[2])/2, br[3]);
+        if(Math.hypot(sx-rh[0], sy-(rh[1]-ROTH))<=8){
+          if(cncStep()){ cncLock(); return; }
+          pushUndo();
+          var mmr=sp(sx,sy), pvx=(br[0]+br[2])/2, pvy=(br[1]+br[3])/2;
+          rotating={A:Ar.slice(), pivot:[pvx,pvy],
+            start:Math.atan2(mmr[1]-pvy, mmr[0]-pvx), applied:0, deg:0, moved:false};
+          return;
+        }
+      }
+    }
     var addMode = e.shiftKey || e.metaKey || e.ctrlKey;   // Shift / Cmd / Ctrl = sumar a la selección
     var hit=hitPath(sx,sy);
     if(hit>=0){
@@ -1433,6 +1465,25 @@
   });
   window.addEventListener('mousemove',function(e){
     if(pan){ view.ox=pan.ox+(e.clientX-pan.x); view.oy=pan.oy+(e.clientY-pan.y); draw(); return; }
+    if(rotating){
+      var rrct=cv.getBoundingClientRect(); var mr=sp(e.clientX-rrct.left, e.clientY-rrct.top);
+      var deg=(Math.atan2(mr[1]-rotating.pivot[1], mr[0]-rotating.pivot[0])-rotating.start)*180/Math.PI;
+      if(e.shiftKey) deg=Math.round(deg/15)*15;   // Shift = saltos de 15°
+      var delta=deg-rotating.applied;
+      if(delta){
+        var rad=delta*Math.PI/180, cosr=Math.cos(rad), sinr=Math.sin(rad);
+        rotating.A.forEach(function(i){
+          var ecx=doc.oc[i][0]+doc.off[i][0], ecy=doc.oc[i][1]+doc.off[i][1];
+          var vx=ecx-rotating.pivot[0], vy=ecy-rotating.pivot[1];
+          doc.off[i][0]=rotating.pivot[0]+vx*cosr-vy*sinr-doc.oc[i][0];
+          doc.off[i][1]=rotating.pivot[1]+vx*sinr+vy*cosr-doc.oc[i][1];
+          doc.rot[i]+=delta;
+        });
+        rotating.applied=deg; rotating.moved=true;
+      }
+      rotating.deg=deg;
+      draw(); refreshInspector(); return;
+    }
     if(guideDrag){
       var rg=cv.getBoundingClientRect(); var gsx=e.clientX-rg.left, gsy=e.clientY-rg.top;
       var gm=sp(gsx,gsy);
@@ -1500,6 +1551,10 @@
   });
   window.addEventListener('mouseup',function(){
     if(pan){ pan=null; cv.style.cursor=(tool==='pan'||spaceDown)?'grab':'default'; return; }
+    if(rotating){
+      if(!rotating.moved){ undoStack.pop(); updateUndoBtns(); } else { redoStack.length=0; }
+      rotating=null; refreshUI(); return;
+    }
     if(guideDrag){
       var gd=guideDrag; guideDrag=null;
       var arr=gd.o==='v'?guides.v:guides.h;
@@ -1858,7 +1913,8 @@
       rings:u.filter(isClosedIdx).map(function(i){ return effPts(i); }) }; });
   }
   var GEO_API={boolean:['geo_boolean','/api/boolean'], offset:['geo_offset','/api/offset'],
-               expand:['geo_expand','/api/expand'], round:['geo_round','/api/round']};
+               expand:['geo_expand','/api/expand'], round:['geo_round','/api/round'],
+               nest:['geo_nest','/api/nest']};
   function geoCall(kind, payload, done){
     var m=GEO_API[kind];
     if(api()){ api()[m[0]](payload).then(done).catch(function(e){ toast('Error: '+e); }); }
@@ -1944,6 +2000,56 @@
       refreshUI(); toast('Esquinas redondeadas a '+rr+' mm'+(r.eaten?(' · '+r.eaten+' figura(s) muy chicas quedaron igual'):''));
     });
   }
+  // ===== Acomodar en la hoja (nesting) =====
+  function doNest(){
+    if(!hasDoc()||cncLock()) return;
+    var myUnits=activeUnits().map(function(u){ return {idxs:u, b:bboxOf(u)}; });
+    if(!myUnits.length){ toast('No hay piezas que acomodar'); return; }
+    var payloadUnits=[], mapa=[];
+    myUnits.forEach(function(u,k){
+      var rings=[], open=[];
+      u.idxs.forEach(function(i){ var e=effPts(i); if(e.length<2) return;
+        (isClosedIdx(i)?rings:open).push(e); });
+      if(!rings.length&&!open.length) return;
+      payloadUnits.push({rings:rings, open:open, pivot:[(u.b[0]+u.b[2])/2,(u.b[1]+u.b[3])/2]});
+      mapa.push(k);
+    });
+    if(!payloadUnits.length){ toast('No hay piezas que acomodar'); return; }
+    // las piezas BLOQUEADAS se quedan quietas y estorban (obstáculos)
+    var obst=[];
+    for(var i2=0;i2<doc.paths.length;i2++){ if(!isLocked(i2)) continue;
+      var e2=effPts(i2); if(e2.length<2) continue;
+      obst.push(isClosedIdx(i2)?{rings:[e2],open:[]}:{rings:[],open:[e2]}); }
+    var payload={ sheet:[state.work[0],state.work[1]],
+      margin:parseFloat(el('nstMar').value)||0, gap:parseFloat(el('nstGap').value)||0,
+      units:payloadUnits, obstacles:obst };   // sin ángulos: el motor prueba 90°→45°→15° y gana el mejor
+    el('btnNest').disabled=true; el('btnNest').textContent='Acomodando…';
+    geoCall('nest', payload, function(r){
+      el('btnNest').disabled=false; el('btnNest').textContent='Acomodar piezas';
+      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo acomodar'); return; }
+      pushUndo();
+      r.placed.forEach(function(p){
+        var u=myUnits[mapa[p.i]];
+        if(p.rot){   // girar la unidad alrededor de su centro (mismo pivote que usó el motor)
+          var pv=[(u.b[0]+u.b[2])/2,(u.b[1]+u.b[3])/2];
+          var rad=p.rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+          u.idxs.forEach(function(i){
+            var ecx=doc.oc[i][0]+doc.off[i][0], ecy=doc.oc[i][1]+doc.off[i][1];
+            var vx=ecx-pv[0], vy=ecy-pv[1];
+            doc.off[i][0]=pv[0]+vx*cos-vy*sin-doc.oc[i][0];
+            doc.off[i][1]=pv[1]+vx*sin+vy*cos-doc.oc[i][1];
+            doc.rot[i]+=p.rot;
+          });
+        }
+        u.idxs.forEach(function(i){ doc.off[i][0]+=p.dx; doc.off[i][1]+=p.dy; });
+      });
+      refreshUI();
+      toast(r.placed.length+' pieza(s) acomodadas · aprovechamiento '+Math.round(r.util*100)+'%'+
+        (r.skipped?(' · '+r.skipped+' NO cupieron (quedaron donde estaban)'):''));
+    });
+  }
+  el('btnNest').addEventListener('click',doNest);
+
   el('boolU').addEventListener('click',function(){ doBoolean('union'); });
   el('boolD').addEventListener('click',function(){ doBoolean('difference'); });
   el('boolI').addEventListener('click',function(){ doBoolean('intersection'); });

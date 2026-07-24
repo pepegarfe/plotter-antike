@@ -24,6 +24,7 @@ import img_trace as tracer
 import text_vector as texter
 import geo_ops as geo
 import curve_fit as fitter
+import nest_ops as nester
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8765
@@ -152,6 +153,11 @@ def api_expand():
 @app.post('/api/round')
 def api_round():
     return _json(geo.round_op(request.json or {}))
+
+
+@app.post('/api/nest')
+def api_nest():
+    return _json(nester.nest_op(request.json or {}))
 
 
 @app.post('/api/parse')
