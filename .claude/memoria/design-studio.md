@@ -250,7 +250,14 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   · ⚠️ **Gotcha cazado**: el mousedown del lienzo NO distinguía botón — el clic derecho
     arrancaba un arrastre (pushUndo+moving) antes del contextmenu. Guardia `e.button===2 →
     return` al inicio. Señal: menú contextual sobre canvas SIEMPRE necesita esa guardia.
-  Verificado: arnés nuevo `test_ctx_ui.js` (25 checks) + regresión total 150 checks en 6 arneses.
+  · **2ª tanda del menú (mismo día)**: sección Acomodo (Voltear H/V, Rotar 90°, Centrar en la
+    hoja, Copias…, Zoom a esto) + **Restablecer transformación** (quita giro/escala SIN mover el
+    centro: recoloca off para conservar el centro del bbox) + **Bloquear** (NUEVO: `lockedUids`
+    Set por uid — invisible para hitPath/marquee/selectHit/activeIdx-"todos", se pinta en
+    --faint, viaja en snapshot/undo y .dstudio `locked`; el grupo no arrastra a sus miembros
+    bloqueados; se libera con "Desbloquear todo (N)" del menú de VACÍO — el clic derecho encima
+    no lo ve, a propósito). El corte/export SÍ incluye bloqueados (es candado de EDICIÓN).
+  Verificado: arnés `test_ctx_ui.js` (38 checks) + regresión total 163 checks en 6 arneses.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
