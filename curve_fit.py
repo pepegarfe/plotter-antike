@@ -188,31 +188,41 @@ def fit_nodes(data):
         return {'ok': False, 'error': 'El trazado es demasiado corto para editar.'}
 
     corners = _corners(pts, closed)
+    seam_suave = closed and not corners         # cortes ARTIFICIALES: la costura debe quedar lisa
     if closed:
         if not corners:
             corners = [0, n // 2]              # curva lisa: dos cortes artificiales
         r = corners[0]                          # rotar para arrancar en una esquina
         pts = pts[r:] + pts[:r]
         corners = [c - r for c in corners]
-        runs = []
+        runs, bordes = [], []
         cs = corners + [n]                      # el último tramo cierra al inicio
         ring = pts + [pts[0]]
         for k in range(len(corners)):
             runs.append(ring[cs[k]:cs[k + 1] + 1])
+            bordes.append((cs[k] % n, cs[k + 1] % n))
     else:
         cs = [0] + corners + [n - 1]
         runs = [pts[cs[k]:cs[k + 1] + 1] for k in range(len(cs) - 1)]
+        bordes = [None] * len(runs)
 
     err2 = tol * tol
     segs = []                                   # lista de cúbicas (p0,c1,c2,p3); recta = manijas en las puntas
-    for run in runs:
+    for ri, run in enumerate(runs):
         if len(run) < 2:
             continue
         if len(run) == 2:
             segs.append((run[0], run[0], run[1], run[1]))     # recta exacta
         else:
-            t1 = _norm(_sub(run[1], run[0]))
-            t2 = _norm(_sub(run[-2], run[-1]))
+            if seam_suave and bordes[ri] is not None:
+                # costura artificial: tangente CENTRAL (mirando ambos lados del corte)
+                # para que el empalme no herede el quiebre de la faceta local
+                i0, i1 = bordes[ri]
+                t1 = _norm(_sub(pts[(i0 + 1) % n], pts[(i0 - 1) % n]))
+                t2 = _norm(_sub(pts[(i1 - 1) % n], pts[(i1 + 1) % n]))
+            else:
+                t1 = _norm(_sub(run[1], run[0]))
+                t2 = _norm(_sub(run[-2], run[-1]))
             segs.extend(_fit_cubic(run, t1, t2, err2))
     if not segs:
         return {'ok': False, 'error': 'No se pudo ajustar el trazado.'}
@@ -229,3 +239,18 @@ def fit_nodes(data):
                       'hin': [last[2][0], last[2][1]],
                       'hout': [last[3][0], last[3][1]]})
     return {'ok': True, 'closed': closed, 'nodes': nodes}
+
+
+def fit_nodes_many(data):
+    """Lote de re-ajustes (para SUAVIZAR importaciones facetadas): cada item
+    {pts, closed} se ajusta con la tolerancia dada (más alta que la de edición:
+    debe TRAGARSE las facetas, no respetarlas) y devuelve sus nodos Bézier.
+    La UI los hornea de vuelta a puntitos finos con nodePts."""
+    o = data or {}
+    tol = float(o.get('tol') or 0.1)
+    out = []
+    for it in o.get('items') or []:
+        r = fit_nodes({'pts': it.get('pts'), 'closed': bool(it.get('closed')), 'tol': tol})
+        out.append(r if r.get('ok') else {'ok': False})
+    return {'ok': True, 'results': out}
+

@@ -605,3 +605,43 @@ class PlotterService:
 
 # Instancia única compartida
 SERVICE = PlotterService()
+
+
+# ------------------------------------------------------------ autoguardado
+# Respaldo periódico del proyecto (autosave.dstudio junto a la config): si la
+# app muere, al reabrir se ofrece recuperar. Se limpia al guardar de verdad.
+
+def _autosave_path():
+    return _cnc_path().parent / 'autosave.dstudio'
+
+
+def autosave_save(data):
+    try:
+        _autosave_path().write_text(json.dumps(data or {}, ensure_ascii=False))
+        return {'ok': True}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
+def autosave_load():
+    p = _autosave_path()
+    if not p.exists():
+        return {'ok': True, 'exists': False}
+    try:
+        import datetime
+        proj = json.loads(p.read_text(encoding='utf-8'))
+        if not proj.get('objects'):
+            return {'ok': True, 'exists': False}
+        hhmm = datetime.datetime.fromtimestamp(p.stat().st_mtime).strftime('%H:%M')
+        return {'ok': True, 'exists': True, 'project': proj, 'time': hhmm}
+    except Exception:
+        return {'ok': True, 'exists': False}
+
+
+def autosave_clear():
+    try:
+        _autosave_path().unlink(missing_ok=True)
+    except Exception:
+        pass
+    return {'ok': True}
+

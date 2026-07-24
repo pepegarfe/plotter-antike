@@ -207,6 +207,10 @@ class Api:
         """Polilínea → anclas+manijas Bézier, para la edición de nodos."""
         return fitter.fit_nodes(data or {})
 
+    def fit_many(self, data):
+        """Suavizar en lote: re-ajusta curvas sobre polilíneas facetadas."""
+        return fitter.fit_nodes_many(data or {})
+
     def geo_expand(self, data):
         return geo.expand_op(data or {})
 
@@ -223,6 +227,19 @@ class Api:
 
     def geo_nest_status(self, data):
         return nester.nest_status(data or {})
+
+    # --- Autoguardado ---
+    def autosave_save(self, data):
+        from studio_backend import autosave_save as f
+        return f(data or {})
+
+    def autosave_load(self):
+        from studio_backend import autosave_load as f
+        return f()
+
+    def autosave_clear(self):
+        from studio_backend import autosave_clear as f
+        return f()
 
     def ref_image(self):
         """Imagen de referencia: diálogo nativo → data-URL para pintarla de fondo."""

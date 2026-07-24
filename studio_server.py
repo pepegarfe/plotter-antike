@@ -145,6 +145,11 @@ def api_fit():
     return _json(fitter.fit_nodes(request.json or {}))
 
 
+@app.post('/api/fit_many')
+def api_fit_many():
+    return _json(fitter.fit_nodes_many(request.json or {}))
+
+
 @app.post('/api/expand')
 def api_expand():
     return _json(geo.expand_op(request.json or {}))
@@ -168,6 +173,24 @@ def api_nest_start():
 @app.post('/api/nest_status')
 def api_nest_status():
     return _json(nester.nest_status(request.json or {}))
+
+
+@app.post('/api/autosave_save')
+def api_autosave_save():
+    from studio_backend import autosave_save as f
+    return _json(f(request.json or {}))
+
+
+@app.get('/api/autosave_load')
+def api_autosave_load():
+    from studio_backend import autosave_load as f
+    return _json(f())
+
+
+@app.post('/api/autosave_clear')
+def api_autosave_clear():
+    from studio_backend import autosave_clear as f
+    return _json(f())
 
 
 @app.post('/api/parse')
