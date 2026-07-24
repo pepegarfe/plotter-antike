@@ -310,8 +310,15 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   REPRODUCE como fantasmas (acento; ganador en verde --good) con marcador (intento i/N, giros,
   orden, piezas, util%) a 380ms/cuadro + 3 cuadros de pausa en el ganador; clic o Esc saltan y
   aplican; el doc NO se toca hasta el final (cache de effPts previo). `finishNestAnim`/
-  `applyNestPlacements`; __DS ganó `nestAnim`. Verificado: 14 checks nest-UI (doc intacto
-  durante la función, salto con clic aplica exacto) + regresión 202. Mejora futura consciente: capa genética (orden+rotación evolutivos)
+  `applyNestPlacements`; __DS ganó `nestAnim`. Jose preguntó si era en vivo o repetición →
+  se hizo **EN VIVO de verdad**: `nest_start` (hilo daemon + `_JOBS`, poda a 4) / `nest_status`
+  (runs desde `from`, al terminar placed/best/util/skipped; error del hilo se reporta) + Api
+  geo_nest_start/status + rutas; la UI SONDEA cada 300ms y anima MIENTRAS el motor trabaja
+  (HUD "Calculando…" sin intentos aún; el tick avanza hasta el último intento disponible);
+  saltar ANTES de terminar deja `skip=true` y aplica solo al llegar el ganador. `nest_op`
+  síncrono sigue para compatibilidad. Verificado: 16 checks nest-UI (parciales sin done, doc
+  intacto, salto pendiente que aplica al terminar) + e2e real con lecturas parciales +
+  regresión 204. Mejora futura consciente: capa genética (orden+rotación evolutivos)
   estilo SVGnest si el taller pide más aprovechamiento.
 
 - **9. Rotación LIBRE con el mouse — ✅ COMMIT 423f65f (24-jul).**
