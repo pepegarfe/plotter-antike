@@ -266,6 +266,7 @@
   .conn.ok .dot{background:var(--good);}
   .modal{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:40;}
   .sheet{background:var(--panel);border:1px solid var(--line-2);border-radius:14px;width:340px;max-width:92vw;box-shadow:0 24px 64px -12px #000b;overflow:hidden;}
+  .sheet.canspill{overflow:visible;}   /* el desplegable de fuentes rebasa el modal sin decapitarse */
   .sheet-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--line);}
   .sheet-h h3{margin:0;font-size:15px;font-weight:700;}
   .sheet-h button{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:15px;}
@@ -692,7 +693,7 @@
   </div>
 </div>
 <div class="modal" id="textModal" style="display:none">
-  <div class="sheet" style="width:390px">
+  <div class="sheet canspill" style="width:390px">
     <div class="sheet-h"><h3 id="txTitle">Texto</h3><button id="txClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     <div class="grp">
       <textarea class="selfield" id="txText" rows="3" placeholder="Escribe aquí…" style="height:auto;min-height:64px;resize:vertical;padding:7px 9px;cursor:text;line-height:1.4"></textarea>
@@ -1713,13 +1714,16 @@
     }
     applyFontPreview();
   }
+  var fpVisible=[];   // índices que pasan el filtro actual (para navegar con flechas)
   function fillFontList(filtro){
-    var L=el('fpList'); L.innerHTML='';
-    var q=(filtro||'').toLowerCase();
+    var L=el('fpList'); L.innerHTML=''; fpVisible=[];
+    var q=(filtro||'').toLowerCase(), onRow=null;
     (fontsCache||[]).forEach(function(f,i){
       if(q && f.name.toLowerCase().indexOf(q)<0) return;
+      fpVisible.push(i);
       var d=document.createElement('div');
       d.className='fprow'+(i===fontSel?' on':'');
+      if(i===fontSel) onRow=d;
       d.textContent=f.name;
       var c=cssFontOf(f);
       d.style.fontFamily='"'+c.fam+'"'; d.style.fontWeight=c.w; d.style.fontStyle=c.it;
@@ -1727,13 +1731,35 @@
         fontSel=i; applyFontPreview(); el('fpDD').style.display='none'; });
       L.appendChild(d);
     });
+    if(onRow && onRow.scrollIntoView) onRow.scrollIntoView({block:'nearest'});
+  }
+  // ↑/↓ recorren las fuentes con vista previa EN VIVO (dentro del filtro si hay búsqueda)
+  function fontStep(dir){
+    var fonts=fontsCache||[]; if(!fonts.length) return;
+    var abierto=el('fpDD').style.display!=='none';
+    if(abierto && fpVisible.length){
+      var pos=fpVisible.indexOf(fontSel)+dir;
+      if(pos<0) pos=fpVisible.length-1;
+      if(pos>=fpVisible.length) pos=0;
+      fontSel=fpVisible[pos];
+    } else {
+      fontSel=((fontSel<0?0:fontSel)+dir+fonts.length)%fonts.length;
+    }
+    applyFontPreview();
+    if(abierto) fillFontList(el('fpSearch').value);
   }
   el('fpBtn').addEventListener('click',function(e){ e.stopPropagation();
     var dd=el('fpDD');
     if(dd.style.display!=='none'){ dd.style.display='none'; return; }
     dd.style.display='block'; el('fpSearch').value=''; fillFontList('');
     setTimeout(function(){ el('fpSearch').focus(); },30); });
+  el('fpBtn').addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); fontStep(e.key==='ArrowDown'?1:-1); } });
   el('fpSearch').addEventListener('input',function(){ fillFontList(this.value); });
+  el('fpSearch').addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); fontStep(e.key==='ArrowDown'?1:-1); }
+    else if(e.key==='Enter'){ e.preventDefault(); el('fpDD').style.display='none'; }
+    else if(e.key==='Escape'){ el('fpDD').style.display='none'; } });
   document.addEventListener('mousedown',function(e){ if(!e.target.closest || !e.target.closest('#fontPick')) el('fpDD').style.display='none'; });
   function txAlignVal(){ var b=el('txAlign').querySelector('.on'); return b?b.getAttribute('data-a'):'left'; }
   function setTxAlign(a){ el('txAlign').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===a); }); }
