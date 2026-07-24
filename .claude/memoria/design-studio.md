@@ -281,7 +281,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   overflow:hidden de .sheet lo recortaba → clase .sheet.canspill (overflow visible) SOLO en el
   modal de texto. Señal: flotante que se corta en un borde = overflow:hidden en un padre.
 
-- **8. NESTING (acomodar piezas en la hoja) — ⚑ CONSTRUIDO 24-jul, SIN COMMIT, falta vistazo.**
+- **8. NESTING (acomodar piezas en la hoja) — ✅ COMMIT 423f65f (24-jul, Jose lo probó).**
   Investigación previa (pedida por Jose): el óptimo académico es NFP+algoritmo genético
   (SVGnest/Deepnest); libnest2d haría NFP exacto pero arrastra Boost/Clipper/NLopt (mal para
   PyInstaller). **Decisión: Bottom-Left-Fill (Burke et al.) sobre shapely** — grandes primero,
@@ -308,7 +308,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   máquina, no entre máquinas. Mejora futura consciente: capa genética (orden+rotación evolutivos)
   estilo SVGnest si el taller pide más aprovechamiento.
 
-- **9. Rotación LIBRE con el mouse — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo.**
+- **9. Rotación LIBRE con el mouse — ✅ COMMIT 423f65f (24-jul).**
   Manija estilo Illustrator: tallo+perilla arriba del centro de la caja de selección
   (ROTH=22px); arrastrarla gira la selección alrededor del CENTRO FIJO capturado al agarrar
   (no el bbox vivo — se recalcularía y derivaría), aplicando deltas incrementales a off/rot;
