@@ -154,7 +154,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   al escribir; ahora ignora INPUT|TEXTAREA|SELECT; (2) volvió a morder el **servidor viejo en
   8765** (los curl devolvían 404-HTML: matar el proceso, como ya documentaba esta nota).
 
-- **3. Booleanas + contorno-offset — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de Jose.**
+- **3. Booleanas + contorno-offset — ✅ COMMIT c9d2434 (24-jul).**
   Módulo nuevo **`geo_ops.py`** (shapely opcional, mismas convenciones que cnc_gcode: unidad =
   anillos par-impar con symmetric_difference, la O conserva su hueco): `boolean_op`
   (union/difference/intersection entre unidades) y `offset_op` (unión de las unidades +
@@ -172,8 +172,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   una herramienta hay que Escape antes de hacer marco — si no, el "marco" dibuja otra figura
   (dos checks fallaron por eso; no era bug de la app).
 
-- **4. Edición de nodos (anclas + manijas) — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de
-  Jose.** El reto: los trazos viven APLANADOS en puntitos. Solución pro (la de Vectric): módulo
+- **4. Edición de nodos (anclas + manijas) — ✅ COMMIT e856837 (24-jul, Jose la probó). Con esto la ÉPICA v1 QUEDA COMPLETA (formas → texto → booleanas/contorno → nodos).** El reto: los trazos viven APLANADOS en puntitos. Solución pro (la de Vectric): módulo
   **`curve_fit.py`** (Schneider de Graphics Gems, puro Python, sin dependencias) **re-ajusta
   Béziers** sobre la polilínea al entrar — detección de esquinas >35°, tramos de 2 pts = rectas
   exactas con manijas CERO, re-parametrización de Newton; rect→4 anclas exactas, círculo de
