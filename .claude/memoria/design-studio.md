@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T05:11:07.947Z
+  modified: 2026-07-24T15:22:37.898Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -229,6 +229,28 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   Verificado: 34 checks nuevos de UI + 18 de motores Python + regresión completa (125 checks
   UI en 5 arneses) + e2e real (expand/round/texto-arco). El arnés aprendió: E(id) crea el
   elemento falso al vuelo y `_segBtns` generaliza los segmentados.
+
+- **6. Menú contextual (clic derecho) + retoques de UI — ⚑ CONSTRUIDOS 24-jul, SIN COMMIT,
+  falta vistazo.** Pedidos de Jose tras probar las rondas:
+  · **Retoques**: Ajustar vista salió del riel a una PÍLDORA PROPIA junto al zoom (id `toolFit`
+    intacto — los arneses lo usan); botón "Calcar imagen" ELIMINADO del riel (el calco vive en
+    Abrir→imagen y en "Otra imagen" del modal; `pickImage` borrado); **al abrir la app siempre
+    aterriza en el paso Diseño** (setSideMode('design') tras el applyMachine del arranque; el
+    cambio manual de máquina conserva su flujo a Configuración).
+  · **Menú contextual** (`ctxMenu`, construido por contexto): sobre un trazado → Editar texto…
+    (si es texto) / Editar nodos / **Cortar aquí** (tijeras en el punto del clic, sin cambiar de
+    herramienta) / booleanas (solo con 2+ unidades) / contorno-engrosar-redondear (con los mm
+    del panel; solo si aplican) / Copiar-Duplicar-Eliminar / Agrupar-Desagrupar / **Traer al
+    frente / Enviar atrás**. En vacío → Pegar (des habilitado sin portapapeles), Deseleccionar,
+    Ajustar vista. Cierra con Escape/clic fuera/rueda; sin menú en paso CNC o en medio de
+    pluma/nodos/dibujo.
+  · **Z-ORDER nuevo** (`reorderActive`): reordena los ARREGLOS del doc (paths/off/…/uid) — el
+    índice de dibujo ES el orden de encimado y el de "la de abajo manda en Restar"; selección
+    re-mapeada, undo normal, uids viajan con la figura (trayectorias CNC intactas).
+  · ⚠️ **Gotcha cazado**: el mousedown del lienzo NO distinguía botón — el clic derecho
+    arrancaba un arrastre (pushUndo+moving) antes del contextmenu. Guardia `e.button===2 →
+    return` al inicio. Señal: menú contextual sobre canvas SIEMPRE necesita esa guardia.
+  Verificado: arnés nuevo `test_ctx_ui.js` (25 checks) + regresión total 150 checks en 6 arneses.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
