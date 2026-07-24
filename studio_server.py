@@ -283,6 +283,8 @@ def _lan_ip():
 
 
 def main():
+    import threading
+    threading.Thread(target=texter.list_fonts, daemon=True).start()   # calienta el caché de fuentes
     ip = _lan_ip()
     print(f"Design Studio en:")
     print(f"  · esta Mac:        http://localhost:{PORT}")

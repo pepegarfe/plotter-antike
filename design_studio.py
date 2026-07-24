@@ -342,6 +342,11 @@ class Api:
 
 
 def main():
+    # Calentar el listado de fuentes en segundo plano: cuando el usuario abra el
+    # modal de Texto ya está listo (con caché de disco es instantáneo; sin él,
+    # el escaneo de ~5 s corre mientras la ventana arranca).
+    import threading
+    threading.Thread(target=texter.list_fonts, daemon=True).start()
     api = Api()
     win = webview.create_window(
         'Design Studio', os.path.join(HERE, 'studio_ui.html'),

@@ -13,3 +13,4 @@ cnc_config.json
 
 # Spec auto-generado por PyInstaller (el comando de build está en .claude/memoria/design-studio.md)
 DesignStudio.spec
+fonts_cache.json

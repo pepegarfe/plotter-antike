@@ -48,7 +48,9 @@ def _font_dirs():
 
 
 def _font_name(font):
-    """Nombre familia + estilo legible, o None si no se puede leer."""
+    """(nombre legible, familia, estilo) o None si no se puede leer.
+    La familia y el estilo por separado permiten a la UI previsualizar con CSS
+    (font-family + font-weight/style)."""
     try:
         name = font['name']
         fam = name.getDebugName(16) or name.getDebugName(1)
@@ -56,9 +58,10 @@ def _font_name(font):
         if not fam:
             return None
         fam = fam.strip()
-        if sub and sub.strip().lower() not in ('regular', 'normal', ''):
-            return fam + ' ' + sub.strip()
-        return fam
+        sub = (sub or '').strip()
+        if sub and sub.lower() not in ('regular', 'normal', ''):
+            return (fam + ' ' + sub, fam, sub)
+        return (fam, fam, '')
     except Exception:
         return None
 
@@ -73,6 +76,29 @@ def _usable(font):
 
 
 _FONT_CACHE = None
+_CACHE_V = 2          # subirlo invalida cachés viejos en disco (p.ej. al agregar campos)
+
+
+def _cache_file():
+    """El caché de fuentes vive junto a la config del CNC (mismo criterio: carpeta
+    de configuración de la app, no /tmp)."""
+    try:
+        from studio_backend import _cnc_path
+        return os.path.join(os.path.dirname(_cnc_path()), 'fonts_cache.json')
+    except Exception:
+        return os.path.join(os.path.expanduser('~'), '.antike_fonts_cache.json')
+
+
+def _dirs_sig():
+    """Firma barata de las carpetas de fuentes (mtime + nº de archivos del nivel
+    raíz): si nadie instaló/quitó fuentes, el caché de disco sigue siendo válido."""
+    sig = []
+    for d in _font_dirs():
+        try:
+            sig.append([d, os.path.getmtime(d), len(os.listdir(d))])
+        except Exception:
+            sig.append([d, 0, 0])
+    return sig
 
 
 def list_fonts(refresh=False):
@@ -81,6 +107,17 @@ def list_fonts(refresh=False):
         return {'ok': False, 'error': 'Falta la librería fontTools (pip install fonttools).'}
     if _FONT_CACHE is not None and not refresh:
         return {'ok': True, 'fonts': _FONT_CACHE}
+    import json
+    # 1) caché de DISCO: el escaneo completo tarda ~5 s; con caché el arranque es instantáneo
+    if not refresh:
+        try:
+            data = json.load(open(_cache_file(), encoding='utf-8'))
+            if data.get('v') == _CACHE_V and data.get('sig') == _dirs_sig() and data.get('fonts'):
+                _FONT_CACHE = data['fonts']
+                return {'ok': True, 'fonts': _FONT_CACHE}
+        except Exception:
+            pass
+    # 2) escaneo real
     out = {}
     for d in _font_dirs():
         if not os.path.isdir(d):
@@ -95,19 +132,26 @@ def list_fonts(refresh=False):
                     if ext in ('.ttf', '.otf'):
                         f = TTFont(path, lazy=True)
                         nm = _font_name(f)
-                        if nm and not nm.startswith('.') and _usable(f):
-                            out.setdefault(nm, {'name': nm, 'path': path, 'index': 0})
+                        if nm and not nm[0].startswith('.') and _usable(f):
+                            out.setdefault(nm[0], {'name': nm[0], 'family': nm[1], 'sub': nm[2],
+                                                   'path': path, 'index': 0})
                         f.close()
                     elif ext == '.ttc':
                         coll = TTCollection(path, lazy=True)
                         for i, f in enumerate(coll.fonts):
                             nm = _font_name(f)
-                            if nm and not nm.startswith('.') and _usable(f):
-                                out.setdefault(nm, {'name': nm, 'path': path, 'index': i})
+                            if nm and not nm[0].startswith('.') and _usable(f):
+                                out.setdefault(nm[0], {'name': nm[0], 'family': nm[1], 'sub': nm[2],
+                                                       'path': path, 'index': i})
                         coll.close()
                 except Exception:
                     continue   # fuente corrupta o rara: se salta, no se truena
     _FONT_CACHE = sorted(out.values(), key=lambda e: e['name'].lower())
+    try:
+        json.dump({'v': _CACHE_V, 'sig': _dirs_sig(), 'fonts': _FONT_CACHE},
+                  open(_cache_file(), 'w', encoding='utf-8'))
+    except Exception:
+        pass   # sin permisos de escritura: se queda el caché de memoria y ya
     return {'ok': True, 'fonts': _FONT_CACHE}
 
 

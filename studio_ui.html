@@ -98,6 +98,16 @@
   .ctxmenu .mi.dis{opacity:.4;pointer-events:none;}
   .ctxmenu .mi small{margin-left:auto;padding-left:18px;color:var(--faint);font-family:var(--mono);font-size:11px;}
   .ctxmenu .msep{height:1px;background:var(--line);margin:4px 6px;}
+  /* selector visual de fuentes (cada una dibujada con ella misma) */
+  .fontpick{position:relative;margin-top:8px;}
+  .fontpick-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;cursor:pointer;}
+  .fontpick-btn #fpName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;}
+  .fontpick-btn svg{width:11px;height:11px;flex:none;color:var(--muted);}
+  .fontpick-dd{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:70;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px;box-shadow:0 12px 30px -8px #0008;}
+  .fontpick-list{max-height:236px;overflow:auto;margin-top:6px;}
+  .fprow{padding:6px 9px;border-radius:6px;cursor:pointer;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
+  .fprow:hover{background:var(--hover);}
+  .fprow.on{background:var(--accent-soft);color:var(--accent);}
 
   .inspect{grid-area:inspect;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column;}
   .tabs{display:flex;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2;}
@@ -108,7 +118,6 @@
   .tabcount{font-family:var(--mono);font-size:10px;color:var(--faint);background:var(--input);border:1px solid var(--line);border-radius:9px;padding:0 6px;line-height:16px;}
   .tabs .tab.on .tabcount{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);}
   .pane{padding:15px 16px;}
-  .ctxrow{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;text-align:right;min-height:14px;}
   .sect{border-bottom:1px solid var(--line);padding:15px 16px;}
   .sect h4{margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:8px;}
   .sect h4 svg{width:13px;height:13px;color:var(--accent);}
@@ -357,8 +366,6 @@
     </div>
 
     <div class="pane" id="paneTransform">
-      <div class="ctxrow"><span class="ctx" id="ctxLabel"></span></div>
-
       <div class="grp-t sec">Transformar</div>
       <div class="xform-row">
         <div class="anchor" id="anchorGrid" title="Punto de referencia">
@@ -689,7 +696,13 @@
     <div class="sheet-h"><h3 id="txTitle">Texto</h3><button id="txClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     <div class="grp">
       <textarea class="selfield" id="txText" rows="3" placeholder="Escribe aquí…" style="height:auto;min-height:64px;resize:vertical;padding:7px 9px;cursor:text;line-height:1.4"></textarea>
-      <select class="selfield" id="txFont" style="margin-top:8px"><option>Cargando fuentes…</option></select>
+      <div class="fontpick" id="fontPick">
+        <button class="selfield fontpick-btn" id="fpBtn" title="Elegir fuente — cada una se muestra dibujada con ella misma"><span id="fpName">Cargando fuentes…</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 9 7 7 7-7"/></svg></button>
+        <div class="fontpick-dd" id="fpDD" style="display:none">
+          <input class="selfield" id="fpSearch" placeholder="Buscar fuente…" style="cursor:text">
+          <div class="fontpick-list" id="fpList"></div>
+        </div>
+      </div>
       <div class="grid2" style="margin-top:8px">
         <div class="field" title="Altura de las letras MAYÚSCULAS en milímetros"><label>Alto</label><input id="txSize" value="30"><span class="u">mm</span></div>
         <div class="field" title="Espacio extra entre letras (0 = el natural de la fuente)"><label>Esp.</label><input id="txTrack" value="0"><span class="u">mm</span></div>
@@ -1200,7 +1213,6 @@
     el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has;
     el('fileName').textContent=state.name||'sin diseño';
     var m=mode();
-    el('ctxLabel').textContent = has ? (m==='ind'?('Objeto '+(sel.idx+1)) : (m==='grp'?('Grupo · '+sel.set.size):'Todos')) : '';
     if(!has){ ['fx','fy','fw','fh'].forEach(function(id){el(id).value='0.0';}); el('fr').value='0'; el('fs').value='100'; el('metaSize').textContent='—'; el('stSel').textContent=''; return; }
     var A=activeIdx(), b=bboxOf(A), w=b[2]-b[0], h=b[3]-b[1];
     if(document.activeElement && document.activeElement.tagName==='INPUT'){} // no pisar mientras editan
@@ -1670,16 +1682,59 @@
     if(api()) api().fonts().then(done).catch(function(e){ toast('Error: '+e); });
     else fetch('/api/fonts').then(function(r){ return r.json(); }).then(done).catch(function(e){ toast('Error: '+e); });
   }
-  function fillFontSel(fonts, wanted){
-    var s=el('txFont'); s.innerHTML='';
-    var pick=0;
-    for(var i=0;i<fonts.length;i++){
-      var o=document.createElement('option'); o.value=String(i); o.textContent=fonts[i].name; s.appendChild(o);
-      if(fonts[i].name===wanted) pick=i;
-      else if(!wanted && fonts[i].name==='Arial') pick=i;
-    }
-    s.value=String(pick);
+  // --- selector visual de fuentes: el navegador ya TIENE las fuentes del sistema,
+  //     así que cada nombre se pinta con su propia fuente vía CSS (family+weight+style)
+  var fontSel=-1;
+  function cssFontOf(f){
+    var sub=(f.sub||'').toLowerCase(), w=400;
+    if(sub.indexOf('thin')>=0) w=100;
+    else if(sub.indexOf('extralight')>=0||sub.indexOf('ultra light')>=0) w=200;
+    else if(sub.indexOf('light')>=0) w=300;
+    else if(sub.indexOf('medium')>=0) w=500;
+    else if(sub.indexOf('semibold')>=0||sub.indexOf('demi')>=0) w=600;
+    else if(sub.indexOf('extrabold')>=0||sub.indexOf('heavy')>=0||sub.indexOf('black')>=0) w=800;
+    else if(sub.indexOf('bold')>=0) w=700;
+    var it=(sub.indexOf('italic')>=0||sub.indexOf('oblique')>=0)?'italic':'normal';
+    return {fam:(f.family||f.name), w:w, it:it};
   }
+  function applyFontPreview(){
+    var f=(fontsCache||[])[fontSel]; if(!f) return;
+    var c=cssFontOf(f);
+    el('fpName').textContent=f.name;
+    [el('fpName'), el('txText')].forEach(function(n){   // el recuadro de texto escribe CON la fuente elegida
+      n.style.fontFamily='"'+c.fam+'"'; n.style.fontWeight=c.w; n.style.fontStyle=c.it; });
+  }
+  function setFontByName(wanted){
+    var fonts=fontsCache||[]; if(!fonts.length) return;
+    fontSel=0;
+    for(var i=0;i<fonts.length;i++){
+      if(wanted && fonts[i].name===wanted){ fontSel=i; break; }
+      if(!wanted && fonts[i].name==='Arial') fontSel=i;
+    }
+    applyFontPreview();
+  }
+  function fillFontList(filtro){
+    var L=el('fpList'); L.innerHTML='';
+    var q=(filtro||'').toLowerCase();
+    (fontsCache||[]).forEach(function(f,i){
+      if(q && f.name.toLowerCase().indexOf(q)<0) return;
+      var d=document.createElement('div');
+      d.className='fprow'+(i===fontSel?' on':'');
+      d.textContent=f.name;
+      var c=cssFontOf(f);
+      d.style.fontFamily='"'+c.fam+'"'; d.style.fontWeight=c.w; d.style.fontStyle=c.it;
+      d.addEventListener('click',function(ev){ ev.stopPropagation();
+        fontSel=i; applyFontPreview(); el('fpDD').style.display='none'; });
+      L.appendChild(d);
+    });
+  }
+  el('fpBtn').addEventListener('click',function(e){ e.stopPropagation();
+    var dd=el('fpDD');
+    if(dd.style.display!=='none'){ dd.style.display='none'; return; }
+    dd.style.display='block'; el('fpSearch').value=''; fillFontList('');
+    setTimeout(function(){ el('fpSearch').focus(); },30); });
+  el('fpSearch').addEventListener('input',function(){ fillFontList(this.value); });
+  document.addEventListener('mousedown',function(e){ if(!e.target.closest || !e.target.closest('#fontPick')) el('fpDD').style.display='none'; });
   function txAlignVal(){ var b=el('txAlign').querySelector('.on'); return b?b.getAttribute('data-a'):'left'; }
   function setTxAlign(a){ el('txAlign').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===a); }); }
   el('txAlign').addEventListener('click',function(e){ var b=e.target.closest('button'); if(b) setTxAlign(b.getAttribute('data-a')); });
@@ -1696,11 +1751,12 @@
     el('txArc').value=m?(m.arc||0):0;
     setTxAlign(m?m.align:'left');
     el('textModal').style.display='flex';
-    fontsLoad(function(fonts){ fillFontSel(fonts, m?m.fontName:lastFontName); });
+    el('fpDD').style.display='none';
+    fontsLoad(function(){ setFontByName(m?m.fontName:lastFontName); });
     setTimeout(function(){ el('txText').focus(); },50);
   }
   function doText(){
-    var fonts=fontsCache||[]; var f=fonts[parseInt(el('txFont').value,10)];
+    var f=(fontsCache||[])[fontSel];
     if(!f){ toast('Espera a que carguen las fuentes'); return; }
     var payload={ text:el('txText').value, path:f.path, index:f.index||0,
       size:parseFloat(el('txSize').value)||30, tracking:parseFloat(el('txTrack').value)||0,
