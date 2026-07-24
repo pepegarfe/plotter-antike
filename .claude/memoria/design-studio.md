@@ -365,8 +365,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   costura en círculos (12 anclas, rect sigue 4 esquinas exactas). Api `fit_many` +
   `/api/fit_many`. Verificado: calidad medida + 5 checks de menú + regresión 228 en 9 arneses.
 
-- **12. Tanda de "reflejos Illustrator" (6 funciones) — ⚑ CONSTRUIDA 24-jul, SIN COMMIT,
-  falta vistazo.** Pedida en bloque (#1,2,4,5,9,10 de la lista de faltantes):
+- **12. Tanda de "reflejos Illustrator" (6 funciones) — ✅ COMMIT 1683124 (24-jul).** Pedida en bloque (#1,2,4,5,9,10 de la lista de faltantes):
   · **Cmd+A** selecciona todo (excluye bloqueados; 1 solo → individual).
   · **Alt+arrastre = jalar una COPIA** (copyWithGroups antes de armar moving; alt+clic sin
     mover se CANCELA restaurando el snapshot — no basta con pop del undo, la copia ya existía).
