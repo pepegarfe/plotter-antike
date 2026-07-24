@@ -349,7 +349,7 @@
         </div>
       </div>
 
-      <div class="grp-t sec">Alinear</div>
+      <div class="grp-t sec">Alinear<span class="opname" id="alignToLbl"></span></div>
       <div class="seg" id="alignTo" style="margin-top:0;margin-bottom:9px">
         <button class="on" data-to="selection" title="Alinear respecto a la selección"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="5" rx="1.2" fill="currentColor"/><rect x="8" y="14" width="8" height="5" rx="1.2" fill="currentColor"/></svg></button>
         <button data-to="workarea" title="Alinear respecto al área de trabajo"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="7" y="14" width="7" height="3.5" rx="1" fill="currentColor"/></svg></button>
@@ -416,7 +416,7 @@
         <div class="seg" id="sideSeg">
           <button class="on" data-s="outside" title="La fresa corre por FUERA de la línea — para recortar piezas a su medida exacta">Fuera</button>
           <button data-s="inside" title="Por DENTRO de la línea — para huecos y ventanas a medida exacta">Dentro</button>
-          <button data-s="on" title="El centro de la fresa va SOBRE la línea (sin compensar). Único modo para trazos abiertos">Sobre</button>
+          <button data-s="on" title="El centro de la fresa va SOBRE la línea (sin compensar)">Sobre</button><button data-s="left" title="Fresa medio diámetro al lado IZQUIERDO de la dirección del trazo — para trazos abiertos con lado definido. Verifica el lado con las flechas de la vista previa">Izq</button><button data-s="right" title="Fresa medio diámetro al lado DERECHO de la dirección del trazo — para trazos abiertos con lado definido. Verifica el lado con las flechas de la vista previa">Der</button>
         </div>
         <label class="chk" style="margin-top:10px"><input type="checkbox" id="tabsOn"> Puentes (sujetan la pieza al soltarse)</label>
         <div id="tabFields">
@@ -473,8 +473,8 @@
       <div class="tplist" id="tpList"></div>
       <div class="muted-note" id="tpEmpty">Selecciona objetos (o nada = todo), configura arriba y pulsa <b>Calcular</b>. Arrastra las filas para cambiar el orden de corte.</div>
       <div class="rowbtns">
-        <button class="gbtn" id="btnTpPrev" title="Pintar en azul el recorrido del centro de la fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg> Vista previa</button>
-        <button class="gbtn" id="btnSim3d" title="Simulación 3D del resultado: un bloque de material al que se le come el MISMO G-code que se llevaría la máquina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg> 3D</button>
+        <button class="gbtn" id="btnTpPrev" title="Pintar en azul el recorrido del centro de la fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg> Ver/esconder trayectorias</button>
+        <button class="gbtn" id="btnSim3d" title="Simulación 3D del resultado: un bloque de material al que se le come el MISMO G-code que se llevaría la máquina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg> Ver render</button>
       </div>
       <button class="pbtn acc" id="btnSaveTap" style="width:100%;margin-top:10px;height:36px;font-weight:700" title="Generar el G-code (.tap) de las trayectorias activas, en el orden de la lista — pásalo a la CNC en una USB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 20h16"/></svg>Guardar G-code (.tap)</button>
     </div>
@@ -940,12 +940,41 @@
 
   // ===== Inspector =====
   function fmt(v){return (Math.round(v*10)/10).toFixed(1);}
+  function sideSegRefresh(){
+    // Fuera/Dentro piden contornos CERRADOS; Izq/Der existen para trazos ABIERTOS —
+    // cada juego solo aparece si el objetivo (trayectoria en edición o selección) lo trae
+    if(!el('sideSeg')) return;
+    var idxs=(typeof tpSel!=='undefined'&&tpSel>=0&&tpaths[tpSel])?tpResolve(tpaths[tpSel])
+             :(mode&&mode()==='all'?allIdx():activeIdx());
+    var abiertos=false, cerrados=false;
+    idxs.forEach(function(i){ var e=effPts(i); if(e.length<2) return;
+      var d=Math.hypot(e[0][0]-e[e.length-1][0], e[0][1]-e[e.length-1][1]);
+      if(d<=0.05) cerrados=true; else abiertos=true; });
+    if(!idxs.length){ cerrados=true; abiertos=false; }   // sin diseño: vista clásica
+    el('sideSeg').querySelectorAll('button').forEach(function(b){
+      var v=b.getAttribute('data-s');
+      var visible=(v==='on')||((v==='left'||v==='right')?abiertos:cerrados);
+      b.style.display=visible?'':'none';
+      if(!visible&&b.classList.contains('on')){ b.classList.remove('on');
+        setSeg('sideSeg','data-s', cerrados?'outside':'on'); }
+    });
+  }
   function refreshInspector(){
+    sideSegRefresh();
     var has=hasDoc();
     ['fx','fy','fw','fh','fr','fs'].forEach(function(id){el(id).disabled=!has;});
     ['btnMirrorH','btnMirrorV','lockAspect','rotPreset','btnDup','btnGrid','btnGroup','btnUngroup','alL','alCH','alR','alT','alMV','alB','disH','disV'].forEach(function(id){el(id).disabled=!has;});
     el('alignTo').querySelectorAll('button').forEach(function(b){b.disabled=!has;});   // segmentado: apagar sus botones
-    if(has){ var actIdx=activeIdx(); el('btnGroup').disabled = actIdx.length<2; el('btnUngroup').disabled = !actIdx.some(function(i){return doc.grp[i]!==0;}); var nUnits=activeUnits().length; el('disH').disabled = nUnits<3; el('disV').disabled = nUnits<3; }
+    if(has){ var actIdx=activeIdx(); el('btnGroup').disabled = actIdx.length<2; el('btnUngroup').disabled = !actIdx.some(function(i){return doc.grp[i]!==0;}); var nUnits=activeUnits().length; el('disH').disabled = nUnits<3; el('disV').disabled = nUnits<3;
+      // una sola UNIDAD (objeto suelto o grupo completo): "a la selección" no significa
+      // nada — se fuerza la hoja de trabajo y se apaga esa opción
+      var selBtn=el('alignTo').querySelector('[data-to="selection"]');
+      if(nUnits<2){ selBtn.disabled=true;
+        if(selBtn.classList.contains('on')){ selBtn.classList.remove('on');
+          el('alignTo').querySelector('[data-to="workarea"]').classList.add('on'); } }
+    }
+    var _on=el('alignTo').querySelector('.on');
+    el('alignToLbl').textContent=(_on&&_on.getAttribute('data-to')==='workarea')?'a la hoja de trabajo':'a la selección';
     el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has;
     el('fileName').textContent=state.name||'sin diseño';
     var m=mode();
@@ -991,7 +1020,8 @@
   el('gridModal').addEventListener('click',function(e){ if(e.target===el('gridModal')) el('gridModal').style.display='none'; });
   el('gridApply').addEventListener('click',function(){ gridCopies(parseInt(el('gCols').value,10)||1, parseInt(el('gRows').value,10)||1, parseFloat(el('gGapX').value)||0, parseFloat(el('gGapY').value)||0); el('gridModal').style.display='none'; });
   [['alL','left'],['alCH','centerH'],['alR','right'],['alT','top'],['alMV','middleV'],['alB','bottom']].forEach(function(p){ el(p[0]).addEventListener('click',function(){ alignActive(p[1]); }); });
-  el('alignTo').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b||b.disabled) return; el('alignTo').querySelectorAll('button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); });
+  el('alignTo').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b||b.disabled) return; el('alignTo').querySelectorAll('button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+    el('alignToLbl').textContent=(b.getAttribute('data-to')==='workarea')?'a la hoja de trabajo':'a la selección'; });
   el('btnGroup').addEventListener('click',doGroup);
   el('btnUngroup').addEventListener('click',doUngroup);
   el('disH').addEventListener('click',function(){ distributeActive('h'); });
@@ -1624,6 +1654,7 @@
     toolId:(el('toolPick').value||(state.cnc&&state.cnc.tool_sel)||null) }; }
   function loadEditor(t){ if(!t) return;
     setSeg('opSeg','data-o',t.op||'profile');
+    sideSegRefresh();
     setSeg('sideSeg','data-s',t.side||'outside');
     setSeg('dirSeg','data-d',t.direction||'climb');
     var tb=t.tabs||{}; el('tabsOn').checked = tb.on!==false && (tb.v||0)>0;

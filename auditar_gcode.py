@@ -280,6 +280,39 @@ def caso_marcha():
     check('tabla real A11E: 14000 RPM → S5', '\nM03 S5\n' in r7['tap'])
 
 
+def caso_izq_der():
+    # línea abierta (20,20)→(120,20) dibujada hacia +X: Izq = +Y (y=23), Der = −Y (y=17)
+    linea = [(20.0, 20.0), (120.0, 20.0)]
+    for side, y_esp in (('left', 23.0), ('right', 17.0)):
+        pl = {'paths': [linea], 'op': 'profile', 'side': side, 'depth': 7.0,
+              'tool': TOOL, 'material': MAT_TOP, 'name': 'x', 'label': side}
+        r = sb.cnc_build_tap(pl)
+        check(f'{side}: genera', r.get('ok'), str(r.get('error')))
+        if not r.get('ok'):
+            continue
+        moves, zmin = parse(r['tap'], MAT_TOP, TOOL, 7.0, side)
+        cortes = [mv for mv in moves if not mv[6] and mv[5] is not None and mv[5] < 0]
+        ys = {round(v, 3) for mv in cortes for v in (mv[1], mv[4])}
+        check(f'{side}: desplazada a y={y_esp} exacto', ys == {y_esp}, str(ys))
+        xs = [v for mv in cortes for v in (mv[0], mv[3])]
+        check(f'{side}: sin extender los extremos (x 20..120)',
+              abs(min(xs) - 20) < 0.01 and abs(max(xs) - 120) < 0.01)
+        check(f'{side}: fondo -7 exacto', abs(zmin - (-7.0)) < 1e-6)
+        # abierta con 2 pasadas (7/5): entre pasadas sube a salvo y REGRESA al inicio
+        check(f'{side}: pasadas de ida con retorno al inicio',
+              '\nG00 Z5\nG00 X20 Y%s\n' % _f_num(y_esp) in r['tap'])
+    # con Izq/Der los trazos abiertos NO se descartan (skipped=0)
+    pl2 = {'paths': [linea], 'op': 'profile', 'side': 'left', 'depth': 3.0,
+           'tool': TOOL, 'material': MAT_TOP, 'name': 'x', 'label': 'x'}
+    check('izq/der: abiertos no cuentan como saltados',
+          sb.cnc_build_tap(pl2).get('skipped') == 0)
+
+
+def _f_num(v):
+    s = ('%.3f' % v).rstrip('0').rstrip('.')
+    return s if s not in ('-0', '') else '0'
+
+
 def caso_fresas_mezcladas():
     otra = dict(TOOL, id='t3-1f', name='3mm')
     j1 = {'paths': [sq(30, 30, 40, 40)], 'op': 'pocket', 'depth': 6.0, 'tool': TOOL,
@@ -299,6 +332,7 @@ caso_cajeado()
 caso_taladro()
 caso_multi()
 caso_marcha()
+caso_izq_der()
 caso_fresas_mezcladas()
 
 

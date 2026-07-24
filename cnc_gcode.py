@@ -28,7 +28,7 @@ Cero de Z: 'top' = cara superior del material, 'bed' = cama (la cara queda en Z=
 import math
 
 try:
-    from shapely.geometry import Polygon
+    from shapely.geometry import Polygon, LineString
     from shapely.geometry.polygon import orient
     HAS_SHAPELY = True
 except ImportError:
@@ -136,6 +136,8 @@ def make_toolpaths(paths, side, tool_dia, direction='climb', allowance=0.0,
     corre en UNA sola pasada a profundidad completa (last_rev lo recorre al revés)."""
     if side == 'on':
         return _order_on(paths), 0
+    if side in ('left', 'right'):
+        return _offset_side(paths, side, tool_dia, allowance, last_pass), 0
     region, skipped = _closed_region(paths)
     if region is None:
         return [], skipped
@@ -185,6 +187,44 @@ def _order_on(paths):
     if opens:
         out.extend(_order_units([[o] for o in opens], start=tuple(cur)))
     return out
+
+
+def _offset_side(paths, side, tool_dia, allowance=0.0, last_pass=0.0):
+    """IZQUIERDA/DERECHA (estilo Aspire para vectores abiertos): desplaza el centro de la
+    fresa medio diámetro al lado elegido DE LA DIRECCIÓN DE DIBUJO del trazo (las flechas
+    de la vista previa la enseñan). Aplica a abiertos Y cerrados (en cerrados, el lado
+    depende del sentido del anillo). Conserva la dirección original del trazo."""
+    if not HAS_SHAPELY:
+        raise RuntimeError('Falta shapely para compensar la fresa. '
+                           'Instálala con: pip install shapely')
+    sgn = 1.0 if side == 'left' else -1.0
+    dist = float(tool_dia) / 2.0 + float(allowance or 0)
+    if dist <= 0.05:
+        raise ValueError('La holgura negativa se come el radio de la fresa.')
+
+    def off(d):
+        outs = []
+        for pts in paths:
+            if len(pts) < 2:
+                continue
+            try:
+                oc = LineString(pts).offset_curve(sgn * d, quad_segs=16)
+            except Exception:
+                continue
+            for g in getattr(oc, 'geoms', [oc]):
+                c = [list(q) for q in g.coords]
+                if len(c) < 2:
+                    continue
+                if _d2(c[0], pts[0]) > _d2(c[-1], pts[0]):
+                    c.reverse()                     # conservar la dirección del dibujo
+                outs.append(c)
+        return outs
+
+    lp = max(0.0, float(last_pass or 0))
+    if lp <= 0:
+        return _order_units([[c] for c in off(dist)])
+    rings = [(c, False) for c in off(dist + lp)] + [(c, True) for c in off(dist)]
+    return _order_units([[r] for r in rings])
 
 
 def make_pocket(paths, tool_dia, stepover_mm, direction='climb', allowance=0.0):

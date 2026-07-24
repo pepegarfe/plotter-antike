@@ -324,7 +324,7 @@ def _cnc_make(data):
         drills, skipped = cnc_gcode.drill_points(paths)
     else:
         op = 'profile'
-        side = data.get('side') if data.get('side') in ('outside', 'inside', 'on') else 'outside'
+        side = data.get('side') if data.get('side') in ('outside', 'inside', 'on', 'left', 'right') else 'outside'
         tps, skipped = cnc_gcode.make_toolpaths(paths, side, dia, direction, allowance,
                                                 last_pass=float(data.get('last_pass') or 0),
                                                 last_rev=bool(data.get('last_rev')))
