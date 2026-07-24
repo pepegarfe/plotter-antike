@@ -409,6 +409,19 @@
         <button class="gbtn" id="btnUngroup" disabled title="Desagrupar (Ctrl/Cmd+Shift+G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/><path d="M14 7h3a2 2 0 0 1 2 2v1M10 17H7a2 2 0 0 1-2-2v-1" opacity=".6"/></svg> Desagrupar</button>
       </div>
 
+      <div class="grp-t sec">Combinar</div>
+      <div class="alignrow">
+        <button class="abtn" id="boolU" disabled title="Unir (soldar): las figuras seleccionadas se funden en una sola"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5A1.5 1.5 0 0 1 5.5 8H10V5.5A1.5 1.5 0 0 1 11.5 4h7A1.5 1.5 0 0 1 20 5.5v7a1.5 1.5 0 0 1-1.5 1.5H14v4.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 18.5z"/></svg></button>
+        <button class="abtn" id="boolD" disabled title="Restar: a la figura de ABAJO (la primera que dibujaste) se le quitan las de encima"><svg viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M4 9.5A1.5 1.5 0 0 1 5.5 8h7A1.5 1.5 0 0 1 14 9.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 16.5zM10 8h4v6h-4z"/><rect x="10" y="4" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".55"/></svg></button>
+        <button class="abtn" id="boolI" disabled title="Intersectar: queda solo la zona donde TODAS se enciman"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="10" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".55"/><rect x="10" y="4" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".55"/><path fill="currentColor" d="M10 8h4v6h-4z"/></svg></button>
+      </div>
+
+      <div class="grp-t sec">Contorno</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+        <div class="field" title="Distancia del contorno: positiva hacia afuera (calcomanías), negativa hacia adentro"><label>Dist.</label><input id="offDist" value="3"><span class="u">mm</span></div>
+        <button class="gbtn" id="btnOffset" disabled title="Crear un contorno alrededor de la selección (las figuras encimadas se envuelven juntas)">Crear</button>
+      </div>
+
     </div>
 
     <div class="pane" id="paneLayers" style="display:none">
@@ -1028,9 +1041,10 @@
     sideSegRefresh();
     var has=hasDoc();
     ['fx','fy','fw','fh','fr','fs'].forEach(function(id){el(id).disabled=!has;});
-    ['btnMirrorH','btnMirrorV','lockAspect','rotPreset','btnDup','btnGrid','btnGroup','btnUngroup','alL','alCH','alR','alT','alMV','alB','disH','disV'].forEach(function(id){el(id).disabled=!has;});
+    ['btnMirrorH','btnMirrorV','lockAspect','rotPreset','btnDup','btnGrid','btnGroup','btnUngroup','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','btnOffset','offDist'].forEach(function(id){el(id).disabled=!has;});
     el('alignTo').querySelectorAll('button').forEach(function(b){b.disabled=!has;});   // segmentado: apagar sus botones
     if(has){ var actIdx=activeIdx(); el('btnGroup').disabled = actIdx.length<2; el('btnUngroup').disabled = !actIdx.some(function(i){return doc.grp[i]!==0;}); var nUnits=activeUnits().length; el('disH').disabled = nUnits<3; el('disV').disabled = nUnits<3;
+      ['boolU','boolD','boolI'].forEach(function(id){ el(id).disabled = nUnits<2; });   // combinar pide 2+ figuras
       // una sola UNIDAD (objeto suelto o grupo completo): "a la selección" no significa
       // nada — se fuerza la hoja de trabajo y se apaga esa opción
       var selBtn=el('alignTo').querySelector('[data-to="selection"]');
@@ -1433,6 +1447,79 @@
     if(hit<0) return; var g=doc.grp[hit];
     if(g && textMeta[g]) openTextModal(g);   // cncLock lo revisa openTextModal
   });
+
+  // ===== Combinar (booleanas) y Contorno (offset) — shapely en el backend =====
+  function isClosedIdx(i){ var e=effPts(i); return e.length>2 &&
+    Math.hypot(e[0][0]-e[e.length-1][0], e[0][1]-e[e.length-1][1])<=0.05; }
+  // Unidades activas con sus anillos CERRADOS en coordenadas efectivas,
+  // ordenadas por orden de dibujo (la primera = la de abajo, importa en Restar).
+  function geoUnits(){
+    var units=activeUnits().slice();
+    units.sort(function(a,b){ return Math.min.apply(null,a)-Math.min.apply(null,b); });
+    return units.map(function(u){ return { idxs:u,
+      rings:u.filter(isClosedIdx).map(function(i){ return effPts(i); }) }; });
+  }
+  function geoCall(kind, payload, done){
+    if(api()){ (kind==='boolean'?api().geo_boolean(payload):api().geo_offset(payload))
+      .then(done).catch(function(e){ toast('Error: '+e); }); }
+    else fetch(kind==='boolean'?'/api/boolean':'/api/offset',
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json(); }).then(done).catch(function(e){ toast('Error: '+e); });
+  }
+  // Inserta anillos nuevos como grupo (o suelto si es uno), seleccionados.
+  function geoInsert(paths){
+    var gid=paths.length>1?(++groupSeq):0, ns=new Set();
+    paths.forEach(function(p){
+      var idx=doc.paths.length;
+      doc.paths.push({pts:p.pts.map(function(q){ return [q[0],q[1]]; })});
+      doc.off.push([0,0]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0);
+      var bb=bboxOfPts(p.pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]);
+      doc.grp.push(gid); doc.uid.push(++uidSeq); ns.add(idx);
+    });
+    if(gid){ sel.idx=-1; sel.set=ns; } else { sel.set=new Set(); sel.idx=doc.paths.length-1; }
+  }
+  var BOOL_LBL={union:'Unidas', difference:'Restadas', intersection:'Intersectadas'};
+  function doBoolean(op){
+    if(!hasDoc()||cncLock()) return;
+    var gu=geoUnits().filter(function(u){ return u.rings.length; });
+    if(gu.length<2){ toast('Selecciona al menos dos figuras cerradas'); return; }
+    var abiertos=0;
+    gu.forEach(function(u){ u.idxs.forEach(function(i){ if(!isClosedIdx(i)) abiertos++; }); });
+    geoCall('boolean', {op:op, units:gu.map(function(u){ return u.rings; })}, function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo combinar'); return; }
+      pushUndo();
+      // fuera los anillos consumidos (los trazos abiertos de esas unidades se quedan)
+      var del=[]; gu.forEach(function(u){ u.idxs.forEach(function(i){ if(isClosedIdx(i)) del.push(i); }); });
+      var gids={}; del.forEach(function(i){ if(doc.grp[i]) gids[doc.grp[i]]=1; });
+      del.sort(function(a,b){ return b-a; }).forEach(function(i){
+        doc.paths.splice(i,1); doc.off.splice(i,1); doc.sx.splice(i,1); doc.sy.splice(i,1);
+        doc.rot.splice(i,1); doc.oc.splice(i,1); doc.grp.splice(i,1); doc.uid.splice(i,1); });
+      Object.keys(gids).forEach(function(g){   // un texto soldado deja de ser texto editable
+        if(doc.grp.indexOf(parseInt(g,10))<0) delete textMeta[g]; });
+      geoInsert(r.paths);
+      refreshUI();
+      toast(BOOL_LBL[op]+(abiertos?(' · '+abiertos+' trazo(s) abiertos quedaron fuera'):''));
+    });
+  }
+  function doOffset(){
+    if(!hasDoc()||cncLock()) return;
+    var dist=parseFloat(el('offDist').value);
+    if(isNaN(dist)||!dist){ toast('Pon la distancia del contorno (± mm)'); return; }
+    var gu=geoUnits().filter(function(u){ return u.rings.length; });
+    if(!gu.length){ toast('Selecciona figuras cerradas'); return; }
+    geoCall('offset', {dist:dist, units:gu.map(function(u){ return u.rings; })}, function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo crear el contorno'); return; }
+      pushUndo();
+      geoInsert(r.paths);   // el contorno se SUMA, el original se queda
+      refreshUI();
+      toast('Contorno a '+dist+' mm ('+r.paths.length+' anillo'+(r.paths.length>1?'s':'')+')');
+    });
+  }
+  el('boolU').addEventListener('click',function(){ doBoolean('union'); });
+  el('boolD').addEventListener('click',function(){ doBoolean('difference'); });
+  el('boolI').addEventListener('click',function(){ doBoolean('intersection'); });
+  el('btnOffset').addEventListener('click',doOffset);
+  el('offDist').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); doOffset(); this.blur(); } });
   el('toolMirror').addEventListener('click',function(){ if(hasDoc()) op(function(){mirrorActive('h');}); });
   el('toolFit').addEventListener('click',function(){ userZoomed=false; view.ready=false; fitView(); });
   el('toolCut').addEventListener('click',function(){ showCut=!showCut; el('toolCut').classList.toggle('on',showCut); draw(); toast(showCut?'Vectores de corte (magenta)':'Vista normal'); });

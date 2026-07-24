@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T04:10:20.559Z
+  modified: 2026-07-24T04:22:49.372Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -153,6 +153,24 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   global de teclado solo ignoraba INPUT — un textarea nuevo habría disparado herramientas/Supr
   al escribir; ahora ignora INPUT|TEXTAREA|SELECT; (2) volvió a morder el **servidor viejo en
   8765** (los curl devolvían 404-HTML: matar el proceso, como ya documentaba esta nota).
+
+- **3. Booleanas + contorno-offset — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de Jose.**
+  Módulo nuevo **`geo_ops.py`** (shapely opcional, mismas convenciones que cnc_gcode: unidad =
+  anillos par-impar con symmetric_difference, la O conserva su hueco): `boolean_op`
+  (union/difference/intersection entre unidades) y `offset_op` (unión de las unidades +
+  `buffer` con quad_segs por sagita ~0.005mm). Api `geo_boolean`/`geo_offset` + rutas
+  `/api/boolean`/`/api/offset`. UI: sección **Combinar** (Unir/Restar/Intersectar, habilitadas
+  con 2+ unidades) y **Contorno** (Dist ± mm + Crear; Enter en el campo dispara) en Propiedades.
+  Reglas: **Restar = la unidad con índice de dibujo MÁS BAJO menos las demás** (la de abajo,
+  como Minus Front de Illustrator — geoUnits ordena por Math.min de índices); las booleanas
+  REEMPLAZAN los anillos consumidos (los trazos abiertos de esas unidades sobreviven y se
+  avisa cuántos quedaron fuera); el contorno se SUMA como grupo nuevo seleccionado sin tocar
+  el original; un texto soldado pierde su receta textMeta (ya no es texto) SOLO si el grupo
+  quedó sin trazos. Verificado: 14 checks Python (áreas exactas, par-impar, contorno envolvente
+  de figuras separadas, offset negativo devorador = error claro, arco de esquina ±0.01mm) +
+  16 checks de UI simulada + e2e por el servidor real. **Gotcha del arnés**: tras dibujar con
+  una herramienta hay que Escape antes de hacer marco — si no, el "marco" dibuja otra figura
+  (dos checks fallaron por eso; no era bug de la app).
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en

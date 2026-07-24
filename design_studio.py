@@ -17,6 +17,7 @@ from studio_backend import (SERVICE, set_workarea as _set_workarea,
                             cnc_toolpaths_preview as _cnc_preview, cnc_build_tap as _cnc_tap)
 import img_trace as tracer
 import text_vector as texter
+import geo_ops as geo
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -192,6 +193,13 @@ class Api:
 
     def text_make(self, data):
         return texter.text_paths(data or {})
+
+    # --- Booleanas y contorno (diseño) ---
+    def geo_boolean(self, data):
+        return geo.boolean_op(data or {})
+
+    def geo_offset(self, data):
+        return geo.offset_op(data or {})
 
     def open_design(self):
         """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI), un proyecto (.dstudio)

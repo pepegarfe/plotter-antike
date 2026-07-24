@@ -22,6 +22,7 @@ from studio_backend import (SERVICE, set_workarea as _set_workarea,
                             cnc_toolpaths_preview as _cnc_preview, cnc_build_tap as _cnc_tap)
 import img_trace as tracer
 import text_vector as texter
+import geo_ops as geo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8765
@@ -125,6 +126,16 @@ def api_fonts():
 @app.post('/api/text')
 def api_text():
     return _json(texter.text_paths(request.json or {}))
+
+
+@app.post('/api/boolean')
+def api_boolean():
+    return _json(geo.boolean_op(request.json or {}))
+
+
+@app.post('/api/offset')
+def api_offset():
+    return _json(geo.offset_op(request.json or {}))
 
 
 @app.post('/api/parse')
