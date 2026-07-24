@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T03:53:35.037Z
+  modified: 2026-07-24T04:10:20.559Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -132,6 +132,27 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   deshacer/rehacer, radios de estrella, snap 45°, uids únicos, flyout). Arnés en scratchpad de
   la sesión (`test_shapes.js`); al arnés le hicieron falta `lastChild`/`dataset` en los
   elementos falsos y disparar toolFit para que la vista esté lista antes de simular.
+
+- **2. Texto con fuentes del sistema — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de Jose.**
+  Módulo nuevo **`text_vector.py`** (fontTools 4.63, ya estaba instalada; dependencia OPCIONAL con
+  `HAS_FONTS` como las demás): `list_fonts()` escanea las carpetas del sistema (413 en la Mac,
+  4.7s la 1ª vez, caché después; filtra emoji/símbolos/ocultas exigiendo A-a en el cmap) y
+  `text_paths()` vectoriza con `BasePen` (resuelve composites, off-curves implícitos y
+  súper-Béziers solos) + De Casteljau adaptativo ~0.003mm + `core._simplify_mm`. **El tamaño es
+  ALTURA DE MAYÚSCULAS en mm** (medida sobre la H real; como Aspire, no puntos tipográficos).
+  Kerning de tabla `kern` (GPOS fuera a propósito); tracking en mm; multilínea con interlineado
+  natural×factor y alineación izq/centro/der. Baseline en Y=0, Y-arriba (la convención de la UI —
+  el texto NO pasa por el volteo de SVG). Api `fonts`/`text_make` + rutas `/api/fonts`/`/api/text`.
+  UI: herramienta T en el riel (atajo T) → modal (frase multilínea, selector de fuente, alto mm,
+  espaciado, interlineado %, alineación) → "Crear texto" lo pone AGRUPADO al centro de la vista;
+  **doble clic encima lo reedita** (regenera conservando el CENTRO del bbox viejo). La receta vive
+  en `textMeta[gid]` y viaja en snapshot/undo y en el **.dstudio v3**; reeditar tras escalar a
+  mano regenera al tamaño de la receta (limitación consciente v1). Verificado: 14 checks Python
+  (H de 20mm=20mm, hueco de la O, kerning AV<AA, .ttc, script), 23 checks de UI en node con
+  backend fingido, y punta a punta por el servidor real. **Gotchas de la sesión:** (1) el atajo
+  global de teclado solo ignoraba INPUT — un textarea nuevo habría disparado herramientas/Supr
+  al escribir; ahora ignora INPUT|TEXTAREA|SELECT; (2) volvió a morder el **servidor viejo en
+  8765** (los curl devolvían 404-HTML: matar el proceso, como ya documentaba esta nota).
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
