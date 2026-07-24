@@ -305,7 +305,13 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   (piezas, área)): apretada 10/16 util 64% en 3.8s; cama grande 30/30 en 5.6s. `rots` explícito
   sigue aceptado (compatibilidad/pruebas). ⚠️ El presupuesto hace el resultado dependiente de
   la VELOCIDAD de la máquina (una lenta puede saltarse etapas) — determinista en la misma
-  máquina, no entre máquinas. Mejora futura consciente: capa genética (orden+rotación evolutivos)
+  máquina, no entre máquinas. **+ ANIMACIÓN de intentos (pedida por Jose, ⚑ SIN COMMIT)**:
+  el motor devuelve `runs` (bitácora: stage/order/placed/util por intento) + `best`; la UI los
+  REPRODUCE como fantasmas (acento; ganador en verde --good) con marcador (intento i/N, giros,
+  orden, piezas, util%) a 380ms/cuadro + 3 cuadros de pausa en el ganador; clic o Esc saltan y
+  aplican; el doc NO se toca hasta el final (cache de effPts previo). `finishNestAnim`/
+  `applyNestPlacements`; __DS ganó `nestAnim`. Verificado: 14 checks nest-UI (doc intacto
+  durante la función, salto con clic aplica exacto) + regresión 202. Mejora futura consciente: capa genética (orden+rotación evolutivos)
   estilo SVGnest si el taller pide más aprovechamiento.
 
 - **9. Rotación LIBRE con el mouse — ✅ COMMIT 423f65f (24-jul).**
