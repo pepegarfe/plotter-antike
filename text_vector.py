@@ -241,6 +241,7 @@ def text_paths(opts):
     tracking = float(o.get('tracking') or 0.0)   # mm extra entre letras
     line_f = float(o.get('line') or 1.0)         # factor de interlineado
     align = o.get('align') or 'left'
+    arc_deg = max(-350.0, min(350.0, float(o.get('arc') or 0.0)))   # curvatura (+arco arriba / −valle)
 
     try:
         font = TTFont(path, fontNumber=int(o.get('index') or 0), lazy=True)
@@ -285,9 +286,10 @@ def text_paths(opts):
                     glyph_set[g].draw(pen)
                 except Exception:
                     pen.contours = []
+                gcx = pen_x + hmtx[g][0] * scale / 2.0    # centro del glifo (para el arco)
                 for cont in pen.contours:
                     pts = [[px * scale + pen_x, py * scale] for (px, py) in cont]
-                    contours_mm.append(pts)
+                    contours_mm.append((pts, gcx))
                 pen_x += hmtx[g][0] * scale + tracking
                 prev_glyph = g
             if ln:
@@ -303,8 +305,28 @@ def text_paths(opts):
             elif align == 'right':
                 dx = maxw - w
             dy = -li * line_adv                   # las líneas bajan (Y-arriba)
-            for pts in contours_mm:
-                moved = [[x + dx, y + dy] for (x, y) in pts]
+            # Arco: cada glifo se coloca RÍGIDO sobre el círculo (se rota, no se deforma),
+            # con la baseline siguiendo el arco. +grados = arco (centro arriba), − = valle.
+            arc_ok = arc_deg and w > 0.5
+            if arc_ok:
+                import math as _m
+                th = _m.radians(abs(arc_deg))
+                R = w / th
+                sgn = 1.0 if arc_deg > 0 else -1.0
+                cx0 = dx + w / 2.0
+            for pts, gcx in contours_mm:
+                if arc_ok:
+                    phi = (gcx + dx - cx0) / R
+                    rot = -sgn * phi
+                    ca, sa = _m.cos(rot), _m.sin(rot)
+                    X = cx0 + R * _m.sin(phi)
+                    Y = sgn * (R * _m.cos(phi) - R)
+                    moved = []
+                    for (x, y) in pts:
+                        lx, ly = (x + dx) - (gcx + dx), y
+                        moved.append([X + lx * ca - ly * sa, Y + lx * sa + ly * ca + dy])
+                else:
+                    moved = [[x + dx, y + dy] for (x, y) in pts]
                 moved = core._simplify_mm(moved, 0.003)
                 if len(moved) >= 2:
                     all_paths.append({'pts': moved})

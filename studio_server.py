@@ -144,6 +144,16 @@ def api_fit():
     return _json(fitter.fit_nodes(request.json or {}))
 
 
+@app.post('/api/expand')
+def api_expand():
+    return _json(geo.expand_op(request.json or {}))
+
+
+@app.post('/api/round')
+def api_round():
+    return _json(geo.round_op(request.json or {}))
+
+
 @app.post('/api/parse')
 def api_parse():
     up = request.files.get('file')

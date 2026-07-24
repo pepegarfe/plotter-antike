@@ -20,7 +20,7 @@ API:
 import math
 
 try:
-    from shapely.geometry import Polygon
+    from shapely.geometry import Polygon, LineString
     from shapely.ops import unary_union
     HAS_SHAPELY = True
 except Exception:
@@ -126,3 +126,76 @@ def offset_op(data):
     if not paths:
         return {'ok': False, 'error': 'El contorno hacia adentro se comió toda la figura.'}
     return {'ok': True, 'paths': paths}
+
+
+def _qs_for(radius):
+    """Segmentos de redondeo por sagita ~0.005 mm."""
+    qs = int(math.pi / 2 / max(1e-6, math.sqrt(2 * 0.005 / max(1e-6, abs(radius))))) + 1
+    return max(16, min(96, qs))
+
+
+def expand_op(data):
+    """Engrosar línea: polilíneas ABIERTAS → figura cerrada con grosor total
+    `width` (media a cada lado, puntas y uniones redondas)."""
+    if not HAS_SHAPELY:
+        return {'ok': False, 'error': _NEED}
+    o = data or {}
+    try:
+        width = float(o.get('width') or 0)
+    except Exception:
+        width = 0.0
+    if width < 0.05:
+        return {'ok': False, 'error': 'Da el grosor de la línea (mm).'}
+    geoms = []
+    for pts in o.get('paths') or []:
+        if pts and len(pts) >= 2:
+            try:
+                geoms.append(LineString(pts).buffer(width / 2.0, quad_segs=_qs_for(width / 2.0)))
+            except Exception:
+                continue
+    if not geoms:
+        return {'ok': False, 'error': 'Se necesita al menos una línea abierta.'}
+    paths = _rings_of(unary_union(geoms))
+    if not paths:
+        return {'ok': False, 'error': 'No salió ninguna figura.'}
+    return {'ok': True, 'paths': paths}
+
+
+def round_op(data):
+    """Esquinas redondeadas con radio r: apertura+cierre morfológicos
+    (erosión r → dilatación 2r → erosión r), que redondea esquinas convexas
+    Y cóncavas. Cada unidad se procesa APARTE (no une figuras vecinas)."""
+    if not HAS_SHAPELY:
+        return {'ok': False, 'error': _NEED}
+    o = data or {}
+    try:
+        r = float(o.get('r') or 0)
+    except Exception:
+        r = 0.0
+    if r < 0.05:
+        return {'ok': False, 'error': 'Da el radio del redondeo (mm).'}
+    qs = _qs_for(r)
+    out = []
+    comidas = 0
+    for u in o.get('units') or []:
+        poly = _poly_of_unit(u)
+        if poly is None or poly.is_empty:
+            continue
+        try:
+            rounded = poly.buffer(-r, quad_segs=qs).buffer(2 * r, quad_segs=qs).buffer(-r, quad_segs=qs)
+        except Exception:
+            continue
+        rings = _rings_of(rounded)
+        if rings:
+            out.extend(rings)
+        else:
+            comidas += 1               # radio más grande que la figura: se devuelve INTACTA
+            for pts in u:
+                if pts and len(pts) >= 3:
+                    out.append({'pts': [[float(x), float(y)] for (x, y) in pts]})
+    if not out or comidas == len(o.get('units') or []):
+        return {'ok': False, 'error': 'Ese radio se come las figuras enteras — usa uno más chico.'}
+    res = {'ok': True, 'paths': out}
+    if comidas:
+        res['eaten'] = comidas
+    return res

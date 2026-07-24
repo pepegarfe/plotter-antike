@@ -206,6 +206,29 @@ class Api:
         """Polilínea → anclas+manijas Bézier, para la edición de nodos."""
         return fitter.fit_nodes(data or {})
 
+    def geo_expand(self, data):
+        return geo.expand_op(data or {})
+
+    def geo_round(self, data):
+        return geo.round_op(data or {})
+
+    def ref_image(self):
+        """Imagen de referencia: diálogo nativo → data-URL para pintarla de fondo."""
+        res = self.window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=('Imágenes (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)', 'Todos los archivos (*.*)'))
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        import base64
+        import mimetypes
+        mime = mimetypes.guess_type(path)[0] or 'image/png'
+        try:
+            data = base64.b64encode(open(path, 'rb').read()).decode()
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo leer la imagen: {e}'}
+        return {'ok': True, 'data': f'data:{mime};base64,{data}'}
+
     def open_design(self):
         """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI), un proyecto (.dstudio)
         o una imagen (PNG/JPG…) que se manda directo al calco."""
