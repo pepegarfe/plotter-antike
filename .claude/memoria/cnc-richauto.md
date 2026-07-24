@@ -368,6 +368,15 @@ M30
   cualquier control con "Read F". Al probar en máquina: si tras M03 espera ~10s, su G04 es de
   segundos (bajar el campo a 2-3s); si ~5s, el G04 fue inocuo y manda el respiro.
 
+- **T. Perfil Izquierda/Derecha — ✅ COMMIT e3df84d (24-jul)**: para trazos ABIERTOS con lado
+  definido (recortar un borde a medida exacta): `_offset_side()` con `offset_curve` de shapely
+  (+izq/−der de la DIRECCIÓN DE DIBUJO — las flechas de la preview la enseñan; extremos sin
+  extender; dirección conservada). El segmentado de lado se adapta a la selección (cerrados →
+  Fuera/Dentro/Sobre · abiertos → Sobre/Izq/Der · mezcla → los 5; mismo criterio de cierre que
+  el motor, ≤0.05mm). También: Alinear con etiqueta viva y 1 unidad → fuerza hoja de trabajo;
+  botones renombrados (Ver/esconder trayectorias · Ver render); Material mínimo con Config
+  avanzada (Z0, Z seg., husillo, 0,0, marchas) — commits afb5ced + e3df84d.
+
 ## Auditoría pre-corte (`auditar_gcode.py`, en el repo — 24-jul-2026)
 **Correrla antes de cualquier corte real si se tocó el motor**: `/opt/homebrew/bin/python3
 auditar_gcode.py` (necesita shapely → el Python de Homebrew). **79 verificaciones, 0 fallas**:
