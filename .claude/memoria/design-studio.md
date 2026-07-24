@@ -264,6 +264,19 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
     no lo ve, a propósito). El corte/export SÍ incluye bloqueados (es candado de EDICIÓN).
   Verificado: arnés `test_ctx_ui.js` (38 checks) + regresión total 163 checks en 6 arneses.
 
+- **7. Fuentes: caché + selector visual — ✅ COMMIT f73dbb9 (24-jul, Jose lo probó; incluye quitar la etiqueta Todos/Objeto/Grupo del panel).**
+  Jose reportó que las fuentes tardaban en cargar. (a) **Caché a DISCO** (`fonts_cache.json`
+  junto a cnc_config, en .gitignore; v2 con firma barata de carpetas mtime+conteo): escaneo
+  frío 2.9s → 0.001s al reabrir; hilo daemon en main() de design_studio y studio_server lo
+  CALIENTA al arrancar. (b) `list_fonts` ahora devuelve `family`/`sub` por separado →
+  (c) **selector VISUAL** (`fontPick`/`fpBtn`/`fpDD`/`fpList`): cada fuente dibujada con ella
+  misma vía CSS (el navegador ya tiene las fuentes del sistema instaladas; `cssFontOf` mapea
+  sub→font-weight/style: bold 700, black 800, italic…), con BUSCADOR, y el TEXTAREA del modal
+  escribe con la fuente elegida en vivo. El `<select id=txFont>` viejo murió; doText usa
+  `fontSel`. ⚠️ Lección del arnés: los elementos falsos necesitan que `innerHTML=''` vacíe
+  `children`, o las listas reconstruidas acumulan filas fantasma. Verificado: 29 checks de
+  texto (visual pick, buscador, payload con la fuente elegida) + regresión 169 total.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
