@@ -230,8 +230,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   UI en 5 arneses) + e2e real (expand/round/texto-arco). El arnés aprendió: E(id) crea el
   elemento falso al vuelo y `_segBtns` generaliza los segmentados.
 
-- **6. Menú contextual (clic derecho) + retoques de UI — ⚑ CONSTRUIDOS 24-jul, SIN COMMIT,
-  falta vistazo.** Pedidos de Jose tras probar las rondas:
+- **6. Menú contextual (clic derecho) + limpieza de barras — ✅ COMMIT b005939 (24-jul, Jose lo probó).** Pedidos de Jose tras probar las rondas:
   · **Retoques y GRAN LIMPIEZA de barras** (la regla: lo que ya vive en el clic derecho sale de
     las barras): Ajustar vista salió del riel a una PÍLDORA PROPIA junto al zoom (id `toolFit`
     intacto — los arneses lo usan); ELIMINADOS del riel "Calcar imagen" (vive en Abrir→imagen y
