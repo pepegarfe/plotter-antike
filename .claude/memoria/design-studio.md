@@ -232,11 +232,17 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
 
 - **6. Menú contextual (clic derecho) + retoques de UI — ⚑ CONSTRUIDOS 24-jul, SIN COMMIT,
   falta vistazo.** Pedidos de Jose tras probar las rondas:
-  · **Retoques**: Ajustar vista salió del riel a una PÍLDORA PROPIA junto al zoom (id `toolFit`
-    intacto — los arneses lo usan); botón "Calcar imagen" ELIMINADO del riel (el calco vive en
-    Abrir→imagen y en "Otra imagen" del modal; `pickImage` borrado); **al abrir la app siempre
-    aterriza en el paso Diseño** (setSideMode('design') tras el applyMachine del arranque; el
-    cambio manual de máquina conserva su flujo a Configuración).
+  · **Retoques y GRAN LIMPIEZA de barras** (la regla: lo que ya vive en el clic derecho sale de
+    las barras): Ajustar vista salió del riel a una PÍLDORA PROPIA junto al zoom (id `toolFit`
+    intacto — los arneses lo usan); ELIMINADOS del riel "Calcar imagen" (vive en Abrir→imagen y
+    "Otra imagen" del modal), "Espejo horizontal" y "Ver vectores de corte" (toolCut + bandera
+    showCut fuera: era un tinte magenta heredado de tkinter sin sentido aquí — todo YA es
+    vector de corte); del panel Propiedades ELIMINADAS las secciones "Acciones rápidas"
+    (Duplicar/Copias/Agrupar/Desagrupar → atajos y clic derecho) y la fila "Voltear" (→ SOLO
+    clic derecho; sin atajo aún). **Al abrir la app siempre aterriza en el paso Diseño**
+    (setSideMode('design') tras el applyMachine del arranque; el cambio manual de máquina
+    conserva su flujo a Configuración). Riel final: flecha, nodos, mano, figuras, pluma, texto,
+    tijeras, imagen de referencia, tema.
   · **Menú contextual** (`ctxMenu`, construido por contexto): sobre un trazado → Editar texto…
     (si es texto) / Editar nodos / **Cortar aquí** (tijeras en el punto del clic, sin cambiar de
     herramienta) / booleanas (solo con 2+ unidades) / contorno-engrosar-redondear (con los mm
