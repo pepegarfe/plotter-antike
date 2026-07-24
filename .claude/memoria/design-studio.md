@@ -114,7 +114,7 @@ Jose quiere diseñar TODO dentro de Design Studio (hoy solo edita lo importado).
 1) formas básicas → 2) texto con fuentes → 3) soldar/booleanas + contorno-offset → 4) edición de
 nodos (al final a propósito: los trazos viven aplanados en puntos; editar anclas estilo
 Illustrator pedirá otra representación). V-carve sigue fuera.
-- **1. Formas básicas — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de Jose.** 4 herramientas
+- **1. Formas básicas — ✅ COMMIT 86765a0 (24-jul, Jose las probó y pidió el botón único).** 4 herramientas
   nuevas en el riel: Rectángulo (R), Elipse (E), Polígono/Estrella (P, con popover Lados/Estrella/
   Interior% arriba-izquierda del lienzo), Línea (L). Arrastre estilo Illustrator con
   previsualización punteada en acento; Shift = cuadrado/círculo/ángulos 45°/rotación a 15°;
@@ -133,7 +133,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   la sesión (`test_shapes.js`); al arnés le hicieron falta `lastChild`/`dataset` en los
   elementos falsos y disparar toolFit para que la vista esté lista antes de simular.
 
-- **2. Texto con fuentes del sistema — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo de Jose.**
+- **2. Texto con fuentes del sistema — ✅ COMMIT c5c34d4 (24-jul).**
   Módulo nuevo **`text_vector.py`** (fontTools 4.63, ya estaba instalada; dependencia OPCIONAL con
   `HAS_FONTS` como las demás): `list_fonts()` escanea las carpetas del sistema (413 en la Mac,
   4.7s la 1ª vez, caché después; filtra emoji/símbolos/ocultas exigiendo A-a en el cmap) y
