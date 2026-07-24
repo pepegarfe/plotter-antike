@@ -298,6 +298,17 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   arneses). Mejora futura consciente: capa genética (orden+rotación evolutivos) estilo
   SVGnest si el taller pide más aprovechamiento.
 
+- **9. Rotación LIBRE con el mouse — ⚑ CONSTRUIDA 24-jul, SIN COMMIT, falta vistazo.**
+  Manija estilo Illustrator: tallo+perilla arriba del centro de la caja de selección
+  (ROTH=22px); arrastrarla gira la selección alrededor del CENTRO FIJO capturado al agarrar
+  (no el bbox vivo — se recalcularía y derivaría), aplicando deltas incrementales a off/rot;
+  **Shift = saltos de 15°**; el ángulo se pinta junto a la perilla. Clic sin mover no ensucia
+  el historial (pop del pushUndo, patrón de moving); giro completo = UN undo; sin manija en
+  modo "Todos"; bloqueada en paso CNC. ⚠️ Lección de arnés (2ª vez): DESHACER LIMPIA LA
+  SELECCIÓN — todo guion que siga tras un undo debe re-seleccionar antes de usar manijas.
+  Verificado: 13 checks (90° exacto con bbox intercambiado y centro quieto, snap 15°, undo,
+  sin-basura, modo todos hace marco) — regresión total 200 checks en 8 arneses.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
