@@ -190,7 +190,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   ⚠️ Limitación consciente v1: no hay "sacar manijas" de una esquina recta (convertir recta en
   curva) — se suple insertando nodos en la curva vecina; retomar si Jose lo pide.
 
-- **5. Rondas 1+2 de diseño (9 funciones) — ⚑ CONSTRUIDAS 24-jul, SIN COMMIT, falta vistazo.**
+- **5. Rondas 1+2 de diseño (9 funciones) — ✅ COMMIT 7279562 (24-jul, Jose las probó).**
   Pedidas por Jose en bloque ("adelante con las dos rondas"). Qué entró:
   · **Texto en arco**: campo "Curva" (±grados) en el modal — cada glifo se coloca RÍGIDO sobre el
     círculo (rota, no se deforma; + = arco, − = valle; por línea, R = ancho/θ); viaja en la
