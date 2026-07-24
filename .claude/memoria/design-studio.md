@@ -276,6 +276,10 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   `fontSel`. ⚠️ Lección del arnés: los elementos falsos necesitan que `innerHTML=''` vacíe
   `children`, o las listas reconstruidas acumulan filas fantasma. Verificado: 29 checks de
   texto (visual pick, buscador, payload con la fuente elegida) + regresión 169 total.
+  **+ COMMIT c38d4e7**: flechas ↑/↓ recorren fuentes con vista previa EN VIVO (vuelta completa,
+  respetan el filtro, Enter confirma, auto-scroll) y fix del desplegable DECAPITADO: el
+  overflow:hidden de .sheet lo recortaba → clase .sheet.canspill (overflow visible) SOLO en el
+  modal de texto. Señal: flotante que se corta en un borde = overflow:hidden en un padre.
 
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
