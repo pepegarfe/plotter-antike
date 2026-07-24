@@ -310,6 +310,7 @@
         <div class="flyitem" id="flyLine" data-t="line" title="Línea (L) — arrastra; Shift = ángulos de 45°"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 19 19 5"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="5" r="1.6"/></svg></div>
       </div>
     </div>
+    <div class="tool" id="toolText" title="Texto (T) — escribir con las fuentes del sistema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg></div>
     <div class="sep"></div>
     <div class="tool" id="toolCut" title="Ver vectores de corte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg></div>
     <div class="tool" id="toolMirror" title="Espejo horizontal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 8 4 12l4 4M16 8l4 4-4 4" opacity=".6"/></svg></div>
@@ -654,6 +655,29 @@
     </div>
   </div>
 </div>
+<div class="modal" id="textModal" style="display:none">
+  <div class="sheet" style="width:390px">
+    <div class="sheet-h"><h3 id="txTitle">Texto</h3><button id="txClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="grp">
+      <textarea class="selfield" id="txText" rows="3" placeholder="Escribe aquí…" style="height:auto;min-height:64px;resize:vertical;padding:7px 9px;cursor:text;line-height:1.4"></textarea>
+      <select class="selfield" id="txFont" style="margin-top:8px"><option>Cargando fuentes…</option></select>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field" title="Altura de las letras MAYÚSCULAS en milímetros"><label>Alto</label><input id="txSize" value="30"><span class="u">mm</span></div>
+        <div class="field" title="Espacio extra entre letras (0 = el natural de la fuente)"><label>Esp.</label><input id="txTrack" value="0"><span class="u">mm</span></div>
+      </div>
+      <div class="grid2" style="margin-top:8px;align-items:center">
+        <div class="field" title="Separación entre líneas (100 % = la natural de la fuente)"><label>Interl.</label><input id="txLine" value="100"><span class="u">%</span></div>
+        <div class="seg" id="txAlign" style="margin:0">
+          <button class="on" data-a="left" title="Alinear a la izquierda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button>
+          <button data-a="center" title="Centrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button>
+          <button data-a="right" title="Alinear a la derecha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg></button>
+        </div>
+      </div>
+      <div class="mrow" style="margin-top:14px"><button class="pbtn" id="txCancel" style="flex:1">Cancelar</button><button class="pbtn acc" id="txApply" style="flex:1">Crear texto</button></div>
+      <div class="cstat">El texto queda como trazos de corte agrupados. Doble clic encima para volver a editarlo.</div>
+    </div>
+  </div>
+</div>
 <div class="sendbar" id="sendbar">
   <div class="r"><b id="sendLabel">Enviando al plotter…</b><button class="pbtn" id="sendCancel" style="height:26px;padding:0 10px">Cancelar</button></div>
   <div class="pb"><i id="sendFill"></i></div>
@@ -799,9 +823,10 @@
     paths: doc.paths.map(function(p){return {pts:p.pts.map(function(q){return [q[0],q[1]];})};}),
     off: doc.off.map(function(o){return [o[0],o[1]];}),
     sx: doc.sx.slice(), sy: doc.sy.slice(), rot: doc.rot.slice(), grp: doc.grp.slice(),
-    oc: doc.oc.map(function(o){return [o[0],o[1]];}), uid: doc.uid.slice()
+    oc: doc.oc.map(function(o){return [o[0],o[1]];}), uid: doc.uid.slice(),
+    tmeta: JSON.parse(JSON.stringify(textMeta))
   };}
-  function restore(s){ doc.paths=s.paths; doc.off=s.off; doc.sx=s.sx; doc.sy=s.sy; doc.rot=s.rot; doc.oc=s.oc; doc.grp=s.grp||[]; doc.uid=s.uid||doc.paths.map(function(){return ++uidSeq;}); sel.idx=-1; sel.set=new Set(); killPrev(); paintTps(); }
+  function restore(s){ doc.paths=s.paths; doc.off=s.off; doc.sx=s.sx; doc.sy=s.sy; doc.rot=s.rot; doc.oc=s.oc; doc.grp=s.grp||[]; doc.uid=s.uid||doc.paths.map(function(){return ++uidSeq;}); textMeta=s.tmeta||{}; sel.idx=-1; sel.set=new Set(); killPrev(); paintTps(); }
   function pushUndo(){ redoStack.length=0; undoStack.push(snapshot()); if(undoStack.length>UNDO_MAX) undoStack.shift(); updateUndoBtns(); killPrev(); }
   function undo(){ if(!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); refreshUI(); toast('Deshecho'); }
   function redo(){ if(!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); refreshUI(); toast('Rehecho'); }
@@ -1195,7 +1220,7 @@
 
   // ===== Teclado =====
   window.addEventListener('keydown',function(e){
-    if(document.activeElement && document.activeElement.tagName==='INPUT') return;
+    if(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
     var meta=e.ctrlKey||e.metaKey;
     if(e.code==='Space'){ spaceDown=true; if(!pan&&!moving&&!marquee) cv.style.cursor='grab'; }
     else if(meta && e.key.toLowerCase()==='z' && !e.shiftKey){ e.preventDefault(); undo(); }
@@ -1218,6 +1243,7 @@
     else if(e.key.toLowerCase()==='e'){ setTool('ellipse'); }
     else if(e.key.toLowerCase()==='p'){ setTool('poly'); }
     else if(e.key.toLowerCase()==='l'){ setTool('line'); }
+    else if(e.key.toLowerCase()==='t'){ openTextModal(0); }
     else if(e.key.toLowerCase()==='f'){ e.preventDefault(); zoomSelection(); }
   });
   window.addEventListener('keyup',function(e){ if(e.code==='Space'){ spaceDown=false; if(!pan) cv.style.cursor=(tool==='pan')?'grab':'default'; } });
@@ -1306,6 +1332,107 @@
   }
   ['shpSides','shpInner'].forEach(function(id){ el(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); this.blur(); } }); });
   el('shpStar').addEventListener('change',function(){ el('shpInner').disabled=!this.checked; });
+
+  // ===== Texto con fuentes del sistema =====
+  // Cada texto es un GRUPO normal + su receta en textMeta[gid] (frase, fuente, tamaño…):
+  // con la receta se puede reeditar (doble clic) regenerando los trazos.
+  var textMeta={};            // gid → {text, fontName, path, index, size, tracking, line, align}
+  var fontsCache=null, textEditGid=0, lastFontName=null;
+  function fontsLoad(cb){
+    if(fontsCache){ cb(fontsCache); return; }
+    var done=function(r){ if(!r||!r.ok){ toast((r&&r.error)||'No pude leer las fuentes del sistema'); return; }
+      fontsCache=r.fonts||[]; cb(fontsCache); };
+    if(api()) api().fonts().then(done).catch(function(e){ toast('Error: '+e); });
+    else fetch('/api/fonts').then(function(r){ return r.json(); }).then(done).catch(function(e){ toast('Error: '+e); });
+  }
+  function fillFontSel(fonts, wanted){
+    var s=el('txFont'); s.innerHTML='';
+    var pick=0;
+    for(var i=0;i<fonts.length;i++){
+      var o=document.createElement('option'); o.value=String(i); o.textContent=fonts[i].name; s.appendChild(o);
+      if(fonts[i].name===wanted) pick=i;
+      else if(!wanted && fonts[i].name==='Arial') pick=i;
+    }
+    s.value=String(pick);
+  }
+  function txAlignVal(){ var b=el('txAlign').querySelector('.on'); return b?b.getAttribute('data-a'):'left'; }
+  function setTxAlign(a){ el('txAlign').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===a); }); }
+  el('txAlign').addEventListener('click',function(e){ var b=e.target.closest('button'); if(b) setTxAlign(b.getAttribute('data-a')); });
+  function openTextModal(gid){
+    if(cncLock()) return;
+    textEditGid=gid||0;
+    var m=gid?textMeta[gid]:null;
+    el('txTitle').textContent=gid?'Editar texto':'Texto';
+    el('txApply').textContent=gid?'Aplicar cambios':'Crear texto';
+    el('txText').value=m?m.text:'';
+    el('txSize').value=m?m.size:30;
+    el('txTrack').value=m?m.tracking:0;
+    el('txLine').value=m?Math.round(m.line*100):100;
+    setTxAlign(m?m.align:'left');
+    el('textModal').style.display='flex';
+    fontsLoad(function(fonts){ fillFontSel(fonts, m?m.fontName:lastFontName); });
+    setTimeout(function(){ el('txText').focus(); },50);
+  }
+  function doText(){
+    var fonts=fontsCache||[]; var f=fonts[parseInt(el('txFont').value,10)];
+    if(!f){ toast('Espera a que carguen las fuentes'); return; }
+    var payload={ text:el('txText').value, path:f.path, index:f.index||0,
+      size:parseFloat(el('txSize').value)||30, tracking:parseFloat(el('txTrack').value)||0,
+      line:(parseFloat(el('txLine').value)||100)/100, align:txAlignVal() };
+    el('txApply').disabled=true;
+    var done=function(r){ el('txApply').disabled=false;
+      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo crear el texto'); return; }
+      placeText(r.paths, payload, f.name); };
+    if(api()) api().text_make(payload).then(done).catch(function(e){ el('txApply').disabled=false; toast('Error: '+e); });
+    else fetch('/api/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json(); }).then(done).catch(function(e){ el('txApply').disabled=false; toast('Error: '+e); });
+  }
+  function placeText(paths, payload, fontName){
+    pushUndo();
+    var gid=textEditGid, target;
+    if(gid){   // reeditar: conservar el CENTRO del texto viejo y quitar sus trazos
+      var old=[]; for(var i=0;i<doc.grp.length;i++) if(doc.grp[i]===gid) old.push(i);
+      var ob=bboxOf(old); target=[(ob[0]+ob[2])/2,(ob[1]+ob[3])/2];
+      old.sort(function(a,b){ return b-a; }).forEach(function(i){
+        doc.paths.splice(i,1); doc.off.splice(i,1); doc.sx.splice(i,1); doc.sy.splice(i,1);
+        doc.rot.splice(i,1); doc.oc.splice(i,1); doc.grp.splice(i,1); doc.uid.splice(i,1); });
+    } else {   // nuevo: al centro de la vista actual, acotado al área de trabajo
+      gid=++groupSeq;
+      var r=cv.getBoundingClientRect(); var c=sp(r.width/2, r.height/2);
+      target=[Math.min(Math.max(c[0],0),state.work[0]), Math.min(Math.max(c[1],0),state.work[1])];
+    }
+    var mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9;
+    paths.forEach(function(p){ p.pts.forEach(function(q){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; if(q[0]>mxx)mxx=q[0]; if(q[1]>mxy)mxy=q[1]; }); });
+    var dx=target[0]-(mnx+mxx)/2, dy=target[1]-(mny+mxy)/2;
+    var ns=new Set();
+    paths.forEach(function(p){
+      var idx=doc.paths.length;
+      doc.paths.push({pts:p.pts.map(function(q){ return [q[0],q[1]]; })});
+      doc.off.push([dx,dy]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0);
+      var bb=bboxOfPts(p.pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]);
+      doc.grp.push(gid); doc.uid.push(++uidSeq); ns.add(idx);
+    });
+    textMeta[gid]={ text:payload.text, fontName:fontName, path:payload.path, index:payload.index,
+                    size:payload.size, tracking:payload.tracking, line:payload.line, align:payload.align };
+    lastFontName=fontName;
+    if(!state.name) state.name='nuevo-diseno';
+    el('empty').style.display='none';
+    sel.idx=-1; sel.set=ns;
+    el('textModal').style.display='none';
+    refreshUI(); toast(textEditGid?'Texto actualizado':'Texto creado');
+    textEditGid=0;
+  }
+  el('toolText').addEventListener('click',function(){ openTextModal(0); });
+  el('txApply').addEventListener('click',doText);
+  el('txClose').addEventListener('click',function(){ el('textModal').style.display='none'; });
+  el('txCancel').addEventListener('click',function(){ el('textModal').style.display='none'; });
+  el('textModal').addEventListener('click',function(e){ if(e.target===el('textModal')) el('textModal').style.display='none'; });
+  cv.addEventListener('dblclick',function(e){
+    if(!hasDoc()) return;
+    var r=cv.getBoundingClientRect(); var hit=hitPath(e.clientX-r.left, e.clientY-r.top);
+    if(hit<0) return; var g=doc.grp[hit];
+    if(g && textMeta[g]) openTextModal(g);   // cncLock lo revisa openTextModal
+  });
   el('toolMirror').addEventListener('click',function(){ if(hasDoc()) op(function(){mirrorActive('h');}); });
   el('toolFit').addEventListener('click',function(){ userZoomed=false; view.ready=false; fitView(); });
   el('toolCut').addEventListener('click',function(){ showCut=!showCut; el('toolCut').classList.toggle('on',showCut); draw(); toast(showCut?'Vectores de corte (magenta)':'Vista normal'); });
@@ -1326,6 +1453,7 @@
     // de todos los formatos fue el bug que puso los .ai/.dxf de cabeza (arreglado 22-jul-2026).
     doc.paths=(res.paths||[]).map(function(p){return {pts:p.pts.map(function(q){return [q[0],q[1]];})};});
     doc.off=[]; doc.sx=[]; doc.sy=[]; doc.rot=[]; doc.oc=[]; doc.grp=[]; doc.uid=[];
+    textMeta={};   // diseño nuevo: recetas de texto viejas fuera
     var gid=doc.paths.length>1?(++groupSeq):0;   // import agrupado por defecto (un diseño = un grupo)
     for(var i=0;i<doc.paths.length;i++){ doc.off.push([0,0]); doc.sx.push(1); doc.sy.push(1); doc.rot.push(0); var bb=bboxOfPts(doc.paths[i].pts); doc.oc.push([(bb[0]+bb[2])/2,(bb[1]+bb[3])/2]); doc.grp.push(gid); doc.uid.push(++uidSeq); }
     tpaths=[]; tpSel=-1; paintTps();   // diseño nuevo: las trayectorias viejas ya no aplican
@@ -1352,6 +1480,7 @@
     doc.uid=objs.map(function(o){return o.uid!=null?o.uid:++uidSeq;});
     doc.uid.forEach(function(u){ if(u>uidSeq) uidSeq=u; });
     doc.oc=doc.paths.map(function(p){var bb=bboxOfPts(p.pts);return [(bb[0]+bb[2])/2,(bb[1]+bb[3])/2];});
+    textMeta=proj.textMeta||{};   // recetas de texto del proyecto (v3)
     tpaths=(proj.cncTps||[]).slice(); tpSeq=proj.tpSeq||tpaths.length; tpSel=tpaths.length?0:-1;
     paintTps(); if(tpSel>=0) loadEditor(tpaths[tpSel]);
     state.name=proj.name||'proyecto';
@@ -1363,8 +1492,8 @@
     userZoomed=false; view.ready=false; fitView(); refreshInspector(); buildLayers(); updateUndoBtns();
     toast('Proyecto abierto: '+state.name+' ('+doc.paths.length+' objetos)');
   }
-  function projectData(){ return { format:'design-studio-project', version:2, name:state.name||'proyecto', work:state.work, cut:cutParams(),
-    cncTps:tpaths, tpSeq:tpSeq,
+  function projectData(){ return { format:'design-studio-project', version:3, name:state.name||'proyecto', work:state.work, cut:cutParams(),
+    cncTps:tpaths, tpSeq:tpSeq, textMeta:textMeta,
     objects: doc.paths.map(function(p,i){ return {pts:p.pts, off:doc.off[i], sx:doc.sx[i], sy:doc.sy[i], rot:doc.rot[i], grp:doc.grp[i], uid:doc.uid[i]}; }) }; }
   function saveProject(){ if(!hasDoc()) return; var data=projectData();
     if(api()){ api().save_project(data).then(function(r){ if(r&&r.ok) toast('Proyecto guardado: '+r.path); else if(r&&r.error&&!r.cancelled) toast(r.error); }).catch(function(e){toast('Error: '+e);}); }

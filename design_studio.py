@@ -16,6 +16,7 @@ from studio_backend import (SERVICE, set_workarea as _set_workarea,
                             cnc_get as _cnc_get, cnc_set as _cnc_set, flip_paths_y,
                             cnc_toolpaths_preview as _cnc_preview, cnc_build_tap as _cnc_tap)
 import img_trace as tracer
+import text_vector as texter
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -184,6 +185,13 @@ class Api:
 
     def trace_apply(self, options):
         return tracer.trace(options or {})
+
+    # --- Texto con fuentes del sistema ---
+    def fonts(self):
+        return texter.list_fonts()
+
+    def text_make(self, data):
+        return texter.text_paths(data or {})
 
     def open_design(self):
         """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI), un proyecto (.dstudio)
