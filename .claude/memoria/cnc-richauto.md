@@ -444,7 +444,19 @@ movimientos" y el hueco tiene 5 puntos vs 69 del exterior) — verificar el orde
 - El manual completo quedó descargable: forsuncnc.com → DSP-A11-User's-Manual.pdf (86 págs;
   G Code Setup en pág 22 del PDF, Spindle Setup en pág 18).
 
-**Protocolo del primer corte real (no saltárselo):** archivo chico (cuadrado 100×100), primero
+## 🎉 PRIMER CORTE REAL — HECHO (24-jul-2026, reportado por Jose)
+- **A MEDIDA** ✓ (la pieza midió lo que pedía el diseño — kerf compensado bien).
+- **Orientación CORRECTA** ✓ — la duda del eje Y queda CERRADA para la CNC (la del plotter
+  sigue abierta, es hardware aparte).
+- **Husillo**: arrancó a las RPM esperadas (marchas OK) y esperó ~10 s antes de bajar —
+  **eso es el Spindle delay del handle (10000 ms) que nosotros configuramos**, no un misterio:
+  se ajusta en MACHINE SETUP → Spindle Setup. Recordar a Jose poner el campo "Husillo" de la
+  app en 0 para no duplicar esperas.
+- **MDF 3mm: la REBABA persiste en ambos lados** pese al preset de 4000 → sigue la prueba A/B
+  pendiente: cambiar cortador (downcut), velocidades, etc.
+- Puentes/rampas/profundidad: todo en orden; la Vista 3D anticipó bien.
+
+**Protocolo del primer corte real (ya ejecutado; útil para máquinas nuevas):** archivo chico (cuadrado 100×100), primero
 "corte en aire" (Z cero muy por encima del material) para verificar recorrido y orientación del
 eje Y (misma duda pendiente que el plotter — [[design-studio]] "Eje Y"), luego corte real en
 material de sacrificio. Revisar en el handle: G Code Setup → F Read = "Read F".
