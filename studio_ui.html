@@ -395,14 +395,7 @@
         <select class="selfield" id="matType" title="Material ACTIVO — decide qué juego de datos de corte usa cada fresa"></select>
         <button class="gbtn" id="btnMats" style="width:36px" title="Gestionar la lista de materiales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.9 1.09V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 6 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       </div>
-      <div class="grid2" style="margin-top:8px">
-        <div class="field" title="Altura segura sobre el material para los viajes en vacío"><label>Z seg.</label><input id="matClear" value="5"><span class="u">mm</span></div>
-        <div class="field" title="Segundos de espera tras encender el husillo, para que llegue a sus RPM antes de tocar material (0 = sin espera)"><label>Husillo</label><input id="matSpin" value="10"><span class="u">s</span></div>
-      </div>
-      <div class="grid2" style="margin-top:8px">
-        <button class="gbtn" id="btnAdv" title="Ajustes que casi nunca se tocan: cero de Z y marchas del husillo">Configuración avanzada…</button>
-        <label class="chk" style="height:32px;margin:0" title="Al terminar el trabajo, regresar el cabezal al origen X0 Y0"><input type="checkbox" id="homeEnd" checked> Volver a 0,0</label>
-      </div>
+      <button class="gbtn" id="btnAdv" style="width:100%;margin-top:8px" title="Ajustes que casi nunca se tocan: cero de Z, Z segura, espera y marchas del husillo, volver a 0,0">Configuración avanzada…</button>
       <div class="grp-t sec">Herramienta</div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
         <select class="selfield" id="toolPick"></select>
@@ -576,8 +569,7 @@
         <div class="field" style="flex:1" title="Velocidad al hundir la fresa en el material (más lenta que el avance)"><label>Bajada</label><input id="tfPlunge"><span class="u">mm/min</span></div>
       </div>
       <div class="mrow">
-        <div class="field" style="flex:1" title="Vueltas por minuto del husillo. Ojo: el controlador puede ignorarlo (ver manual RichAuto, ajuste 'S Read')."><label>Husillo</label><input id="tfRpm"><span class="u">RPM</span></div>
-        <button class="pbtn" id="tfCopyAll" title="Copiar ESTOS datos de corte a todos los demás materiales de esta fresa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h14M13 6l6 6-6 6"/></svg> todos</button>
+        <div class="field" style="flex:1" title="Vueltas por minuto del husillo — de aquí sale la MARCHA (S1-S8) que lleva el archivo"><label>Husillo</label><input id="tfRpm"><span class="u">RPM</span></div>
       </div>
       <div class="mrow" style="margin-top:12px">
         <button class="pbtn" id="toolNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Nueva</button>
@@ -647,6 +639,12 @@
         <button class="on" data-z="top">Z=0 arriba del material</button>
         <button data-z="bed">Z=0 en la cama</button>
       </div>
+      <div class="grp-t sec">Trabajo</div>
+      <div class="grid2">
+        <div class="field" title="Altura segura sobre el material para los viajes en vacío"><label>Z seg.</label><input id="matClear" value="5"><span class="u">mm</span></div>
+        <div class="field" title="Segundos de espera tras encender el husillo, para que llegue a sus RPM antes de tocar material (0 = sin espera; en esta máquina el retardo bueno es el Spindle delay del handle)"><label>Husillo</label><input id="matSpin" value="10"><span class="u">s</span></div>
+      </div>
+      <label class="chk" style="height:32px;margin:8px 0 0" title="Al terminar el trabajo, regresar el cabezal al origen X0 Y0"><input type="checkbox" id="homeEnd" checked> Volver a 0,0 al terminar</label>
       <div class="grp-t sec">Marchas del husillo (S1–S8)</div>
       <div class="muted-note" style="margin-bottom:8px">RPM reales de cada marcha, como las muestra el handle en <b>MACHINE SETUP → Spindle Setup → Spindle speed</b>. Cada archivo lleva sola la marcha más cercana a las RPM del preset de la fresa. Se recalibra solo si un técnico cambia el variador.</div>
       <div id="gearsGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"></div>
@@ -1549,10 +1547,6 @@
     tEdit.cur=tEdit.list.length-1; paintTools(); });
   el('toolDel').addEventListener('click',function(){ if(tEdit.list.length<=1){ toast('Debe quedar al menos una fresa'); return; }
     tEdit.list.splice(tEdit.cur,1); tEdit.cur=Math.max(0,tEdit.cur-1); paintTools(); });
-  el('tfCopyAll').addEventListener('click',function(){ var t=tEdit.list[tEdit.cur]; if(!t) return;
-    pullToolFields(); var c=tCut(t);
-    (state.cnc.materials||[]).forEach(function(m){ t.cut[m.id]=JSON.parse(JSON.stringify(c)); });
-    toast('Datos copiados a los '+(state.cnc.materials||[]).length+' materiales'); });
   el('toolsSave').addEventListener('click',function(){ pullToolFields();
     var curId=(tEdit.list[tEdit.cur]||tEdit.list[0]).id;
     CNC.set({tools:tEdit.list, tool_sel:curId}).then(function(r){
