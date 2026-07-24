@@ -347,7 +347,19 @@ M30
     perforó. **Sobrecorte ≤0.5mm (SIM_OVER) = pasante normal de taller, SIN rojo**; el rojo es
     solo para mordidas mayores (la 1ª versión pintaba rojo el margen intencional y Jose preguntó
     por "la línea roja"). La animación arranca viendo la hoja sólida (0%) ~700ms.
-- **S. Espera de arranque del husillo — ⚠️ SIN COMMIT, pendiente de probar en máquina (24-jul)**:
+- **S2. Integración con la máquina real — ✅ COMMIT db5f141 (24-jul, PROBADO en el A11E)**:
+  Marchas opción B: `material.gears` = RPM reales de S1-S8; `gear_for()` elige la más cercana
+  a las RPM del preset → `M03 S<marcha>`; la vista previa anuncia la marcha; editor en
+  "Configuración avanzada" (junto con el cero de Z — Jose pidió sacar ambos de la vista
+  diaria). Presets ajustados vs tablas publicadas (6mm-2F/mdf 4000 · 1/8-2F/mad 1600).
+  Fix cnc_set (la lista blanca del material PERDÍA spinup/gears al guardar). El encabezado
+  del .tap anota marcha y cero de Z. UI: Render eliminado (obsoleto por la Vista 3D),
+  Exportar superior oculto en modo CNC, Importar junto a Abrir, gestionar-fresas como ícono.
+  `auditar_gcode.py` en el repo (104 checks). Config del handle que quedó: **F Read=Read F,
+  S Read=Read S (funciona porque el archivo ya manda marcha, no RPM), Spindle delay nativo
+  10-12s** (el mecanismo bueno para la espera; el del archivo queda de respaldo — Jose lo
+  pondrá en 0 para no duplicar).
+- **S. Espera de arranque del husillo — construida 24-jul (hoy respaldo del delay nativo)**:
   Jose reportó que la máquina corta antes de que el husillo llegue a sus RPM. Campo **"Husillo"
   (segundos, default 5, 0=off)** en Material (id `matSpin`, llave `spinup` en material). Tras el
   M03 se emite **cinturón y tirantes**: `G04 P<seg>` **y** 4mm de viaje EN EL AIRE (sobre Z

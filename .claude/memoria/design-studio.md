@@ -132,9 +132,12 @@ Todo verificado en vivo (Chrome, modo web) y relanzado en escritorio. **Commit `
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
 
-### Pendientes al 24-jul-2026
-1. **SIN COMMIT** (probados en terminal, falta vistazo/uso de Jose): botón **Importar** y la
-   **espera de husillo** (campo "Husillo" — ver [[cnc-richauto]] fase S).
+### Pendientes (act. 24-jul-2026 — commit db5f141 + push: Importar, husillo/marchas,
+### presets, auditoría y limpieza de UI ya SUBIDOS)
+1. **Rebaba en MDF 3mm** (primera prueba real): diagnóstico en curso — sospechosos: filo
+   cansado (prueba A/B con la 1/8" pendiente), cama comida, mordida baja (preset ya subido
+   a 4000) y fresa upcut. **Recomendación en pie: fresa DOWNCUT para lámina delgada** —
+   al comprarla, alta en "Fresas…" con sus presets.
 2. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
    Necesita hardware; nadie puede cerrarlo desde la Mac.
 3. **Primer corte real de la CNC** — protocolo y checklist en [[cnc-richauto]] (auditoría ya pasada).
