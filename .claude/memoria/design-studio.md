@@ -402,6 +402,21 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   centavo (total=mat+maq+prep exacto, margen ×1.3, persistencia del change, selección vs
   todo) + regresión 255 en 11 arneses.
 
+- **14. ESQUINAS VIVAS (Live Corners de Illustrator) — ⚑ CONSTRUIDAS 24-jul, SIN COMMIT,
+  falta vistazo.** En el editor de nodos (A), cada esquina RECTA (ancla sin manijas entre dos
+  tramos rectos, ángulo <175°) muestra su **widget** (circulito con punto, 14px hacia adentro
+  por la bisectriz). Arrastrarlo redondea EN VIVO: `liveCorner(k)` da la geometría
+  (bisectriz, θ, maxR = tan(θ/2)·mín(lado)/2 — no comerse más de medio lado);
+  `roundLiveCorners(base, infos, r)` reconstruye desde la BASE del drag (sin acumulación):
+  cada esquina → dos anclas tangentes a d=r/tan(θ/2) con manijas h=(4/3)tan(Δ/4)·r (arco
+  circular ≈ cúbica); el radio sigue al cursor con el mapeo r = avance·sin(θ/2)/(1−sin) —
+  el ARCO pasa por donde va el mouse — y se muestra "r X mm" en vivo. **Con varias anclas
+  seleccionadas, un widget redondea todas** (como AI). Clic sin mover no ensucia (dirty en
+  el primer move del drag general). Tras soltar queda horneado en nodos (no re-ajustable —
+  v1; deshacer sí). ⚠️ Verificación con matemática exacta: el punto más cercano del arco al
+  vértice dista r·(√2−1) en 90° — el primer "fallo" del arnés era MI aritmética (esperaba
+  r/2), no el código. 30 checks de nodos ahora; regresión 262 en 11 arneses.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
