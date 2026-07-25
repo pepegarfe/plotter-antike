@@ -389,6 +389,19 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
     sheets. Backend medido: 3 piezas 250 en 3 hojas de 300 → una por hoja (paso 350).
   Verificado: 18 checks nuevos + regresión 246 en 10 arneses.
 
+- **13. COTIZADOR — ⚑ CONSTRUIDO 24-jul, SIN COMMIT, falta vistazo.** Botón "Cotizar" en la
+  barra superior (visible en ambas máquinas; se apaga sin diseño). Cotiza la SELECCIÓN o
+  todo: piezas (activeUnits), metros de corte, tiempo (misma fórmula del pie de página) y
+  material (**plotter: cm de ROLLO** = extensión X del bbox × $/m lineal; **CNC: m² del
+  bbox** × $/m²). Tarifas EDITABLES y PERSISTIDAS en cnc_config llave `quote`
+  (mat_roll/mat_m2/rate_plotter/rate_cnc/setup/margin; cnc_set valida y mezcla parcial;
+  el modal muestra la tarifa de la máquina ACTIVA y guarda en change). Desglose material+
+  máquina+preparación → subtotal → margen % → TOTAL (y precio c/u con 2+ piezas).
+  **"Copiar cotización"** arma texto listo para WhatsApp (clipboard con fallback a
+  execCommand; sin portapapeles avisa, no truena). Verificado: 9 checks con matemática al
+  centavo (total=mat+maq+prep exacto, margen ×1.3, persistencia del change, selección vs
+  todo) + regresión 255 en 11 arneses.
+
 ## Novedades 23–24 jul 2026
 - **`.ai` arreglado EN EL MOTOR (commit 492b1c8)**: los .ai perdían trazados enteros (18 de 39 en
   el logo de chalecos — todo path que empezara con curva se tragaba en silencio) y deformaban las
