@@ -389,7 +389,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
     sheets. Backend medido: 3 piezas 250 en 3 hojas de 300 → una por hoja (paso 350).
   Verificado: 18 checks nuevos + regresión 246 en 10 arneses.
 
-- **13. COTIZADOR — ⚑ CONSTRUIDO 24-jul, SIN COMMIT, falta vistazo.** Botón "Cotizar" en la
+- **13. COTIZADOR — ✅ COMMIT d6c6b77 (24-jul).** Botón "Cotizar" en la
   barra superior (visible en ambas máquinas; se apaga sin diseño). Cotiza la SELECCIÓN o
   todo: piezas (activeUnits), metros de corte, tiempo (misma fórmula del pie de página) y
   material (**plotter: cm de ROLLO** = extensión X del bbox × $/m lineal; **CNC: m² del
@@ -402,8 +402,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   centavo (total=mat+maq+prep exacto, margen ×1.3, persistencia del change, selección vs
   todo) + regresión 255 en 11 arneses.
 
-- **14. ESQUINAS VIVAS (Live Corners de Illustrator) — ⚑ CONSTRUIDAS 24-jul, SIN COMMIT,
-  falta vistazo.** En el editor de nodos (A), cada esquina RECTA (ancla sin manijas entre dos
+- **14. ESQUINAS VIVAS (Live Corners de Illustrator) — ✅ COMMIT d6c6b77 (24-jul; la sección "Esquinas" del panel SE ELIMINÓ — el widget la reemplaza; también: medidas/tiempo del sidebar a la BARRA INFERIOR sin el texto Design Studio, y el NESTING del panel al RIEL con panel desplegable Sep/Margen/Acomodar).** En el editor de nodos (A), cada esquina RECTA (ancla sin manijas entre dos
   tramos rectos, ángulo <175°) muestra su **widget** (circulito con punto, 14px hacia adentro
   por la bisectriz). Arrastrarlo redondea EN VIVO: `liveCorner(k)` da la geometría
   (bisectriz, θ, maxR = tan(θ/2)·mín(lado)/2 — no comerse más de medio lado);
