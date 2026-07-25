@@ -244,7 +244,6 @@
   .send .btn{width:100%;height:44px;border:0;border-radius:10px;color:#fff;font:inherit;font-size:14px;font-weight:700;background:linear-gradient(180deg,var(--accent),var(--accent-dim));cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 5px 18px -5px var(--accent-dim);}
   .send .btn:disabled{opacity:.4;cursor:default;box-shadow:none;}
   .send .btn svg{width:16px;height:16px;}
-  .send .meta{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--faint);font-family:var(--mono);}
 
   .status{grid-area:status;display:flex;align-items:center;gap:16px;padding:0 14px;background:var(--rail);border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--muted);}
   .status .s{display:flex;align-items:center;gap:6px;}
@@ -308,6 +307,7 @@
     <button class="tbtn" id="btnOpen" title="Abrir un diseño (SVG/DXF/AI) o un proyecto (.dstudio)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Abrir</button>
     <button class="tbtn" id="btnImport" title="Importar otro diseño (SVG/DXF/AI o .dstudio) SUMÁNDOLO a la mesa — no quita lo que ya está"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6m-3-3h6"/></svg>Importar</button>
     <button class="tbtn" id="btnSaveProject" disabled title="Guardar tu proyecto (.dstudio) para reabrirlo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Guardar</button>
+    <button class="tbtn" id="btnQuote" disabled title="Cotizar este trabajo: material + tiempo de máquina + margen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"/></svg><span>Cotizar</span></button>
     <button class="tbtn" id="btnSave" disabled title="Exportar el archivo de corte HPGL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg><span id="btnSaveLbl">Exportar HPGL</span></button>
     <button class="conn" id="connPill" title="Abrir panel del plotter"><span class="dot"></span><span id="connText">Desconectado</span></button>
     <button class="cta" id="btnSendTop" disabled><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 3 14 9-14 9z"/></svg>Enviar al plotter</button>
@@ -331,6 +331,7 @@
     <div class="tool" id="toolPen" title="Pluma (P) — clic = esquina · clic y arrastra = curva · clic en el 1º cierra · Esc/Enter termina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 5 5L9 20l-6 1 1-6z"/><path d="m13.5 5.5 5 5"/></svg></div>
     <div class="tool" id="toolText" title="Texto (T) — escribir con las fuentes del sistema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg></div>
     <div class="tool" id="toolScis" title="Tijeras (C) — corta un trazado por donde des clic (cerrado se abre; abierto queda en dos)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M8.2 7.6 20 16M8.2 16.4 20 8M12 12h.01"/></svg></div>
+    <div class="tool" id="toolNest" title="Acomodar en la hoja (nesting): acomoda las piezas solo para desperdiciar menos material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2" opacity=".45"/><rect x="6" y="6" width="5" height="8" rx="1"/><rect x="13.5" y="6" width="4.5" height="5" rx="1"/><rect x="6" y="16" width="7" height="2.5" rx="1"/><rect x="13.5" y="13.5" width="4.5" height="5" rx="1"/></svg></div>
     <div class="tool" id="toolRef" title="Imagen de referencia — foto de fondo, tenue y bloqueada, para dibujar encima (clic de nuevo la quita)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" stroke-dasharray="3 2.2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 17-5-5-9 7"/></svg></div>
     <div class="sep"></div>
     <div class="grow"></div>
@@ -343,6 +344,11 @@
       <svg class="ill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13h6M12 10v6"/></svg>
       <p>Abre un diseño para empezar</p>
       <button id="btnOpenEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Abrir diseño…</button>
+    </div>
+    <div class="shapeopts" id="nestOpts" style="display:none">
+      <span>Sep.</span><input id="nstGap" value="5" title="Espacio mínimo entre piezas"><span>mm</span>
+      <span>Margen</span><input id="nstMar" value="5" title="Margen desde los bordes de la hoja"><span>mm</span>
+      <button class="gbtn" id="btnNest" disabled style="height:26px;padding:0 12px" title="Acomodar las piezas seleccionadas (o todas): prueba giros y órdenes y se queda con el MEJOR; las bloqueadas estorban en su lugar">Acomodar piezas</button>
     </div>
     <div class="shapeopts" id="shapeOpts">
       <span>Lados</span><input id="shpSides" value="5">
@@ -429,19 +435,6 @@
         <div class="field" title="Ancho total de la línea engrosada"><label>Grosor</label><input id="expW" value="2"><span class="u">mm</span></div>
         <button class="gbtn" id="btnExpand" disabled title="Engrosar línea: convierte los trazos ABIERTOS seleccionados en una figura cerrada con este grosor (reemplaza la línea)">Engrosar</button>
       </div>
-
-      <div class="grp-t sec">Esquinas</div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
-        <div class="field" title="Radio del redondeo"><label>Radio</label><input id="rndR" value="3"><span class="u">mm</span></div>
-        <button class="gbtn" id="btnRound" disabled title="Redondear las esquinas de las figuras cerradas seleccionadas (las reemplaza)">Redondear</button>
-      </div>
-
-      <div class="grp-t sec">Acomodar en la hoja</div>
-      <div class="grid2">
-        <div class="field" title="Espacio mínimo entre piezas"><label>Sep.</label><input id="nstGap" value="5"><span class="u">mm</span></div>
-        <div class="field" title="Margen desde los bordes de la hoja"><label>Margen</label><input id="nstMar" value="5"><span class="u">mm</span></div>
-      </div>
-      <button class="gbtn" id="btnNest" disabled style="width:100%;margin-top:8px" title="Acomodar las piezas seleccionadas (o todas) en la hoja: prueba giros de 90/45/15 grados y varios órdenes, y se queda con el MEJOR acomodo; las bloqueadas se respetan como estorbos">Acomodar piezas</button>
 
     </div>
 
@@ -544,15 +537,12 @@
       <button class="pbtn acc" id="btnSaveTap" style="width:100%;margin-top:10px;height:36px;font-weight:700" title="Generar el G-code (.tap) de las trayectorias activas, en el orden de la lista — pásalo a la CNC en una USB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 20h16"/></svg>Guardar G-code (.tap)</button>
     </div>
 
-    <div class="send">
-      <div class="meta"><span id="metaTime">—</span><span id="metaSize">—</span></div>
-    </div>
   </aside>
 
   <footer class="status">
     <span class="s" id="stCoord">Listo</span>
     <span class="s" id="stSel"></span>
-    <span class="r">Design Studio</span>
+    <span class="r"><span id="metaSize">—</span><span style="opacity:.45;margin:0 8px">·</span><span id="metaTime">—</span></span>
   </footer>
 </div>
 <input type="file" id="fileInput" accept=".svg,.dxf,.ai,.dstudio,.png,.jpg,.jpeg,.bmp,.gif,.webp,.tif,.tiff" style="display:none">
@@ -704,6 +694,30 @@
       <input type="range" id="spk" class="rng" min="0" max="12" value="2">
       <div class="mrow" style="margin-top:14px;gap:8px"><button class="pbtn" id="traceNew">Otra imagen</button><button class="pbtn acc" id="traceApply" style="flex:1">Calcar</button></div>
       <div class="cstat">La fidelidad depende de la calidad de la imagen: mejor si es nítida y de alto contraste.</div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="quoteModal" style="display:none">
+  <div class="sheet" style="width:380px">
+    <div class="sheet-h"><h3>Cotizar trabajo</h3><button id="qClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="grp">
+      <div class="grp-t" style="margin-top:0">Este trabajo</div>
+      <div class="cstat" id="qResumen" style="margin-bottom:10px"></div>
+      <div class="grp-t">Tus tarifas <span class="opname">(se recuerdan)</span></div>
+      <div class="grid2">
+        <div class="field" id="qMatField" title="Lo que te cuesta el material"><label>Mat.</label><input id="qMat" value="80"><span class="u" id="qMatU">$/m</span></div>
+        <div class="field" title="Lo que vale una hora de esta máquina (luz, desgaste, tu tiempo)"><label>Máq.</label><input id="qRate" value="300"><span class="u">$/h</span></div>
+      </div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field" title="Cargo fijo por preparar el trabajo (diseño, montar material)"><label>Prep.</label><input id="qSetup" value="50"><span class="u">$</span></div>
+        <div class="field" title="Tu ganancia sobre el costo"><label>Margen</label><input id="qMargin" value="30"><span class="u">%</span></div>
+      </div>
+      <div class="grp-t sec">Desglose</div>
+      <div class="cstat" id="qDesglose" style="line-height:1.7"></div>
+      <div style="font-size:20px;font-weight:750;text-align:right;margin-top:6px" id="qTotal"></div>
+      <div class="mrow" style="margin-top:12px">
+        <button class="pbtn" id="qCopy" style="flex:1">Copiar cotización</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1072,6 +1086,24 @@
             ctx.beginPath(); ctx.moveTo(ps[0],ps[1]); ctx.lineTo(hs[0],hs[1]); ctx.stroke();
             ctx.beginPath(); ctx.arc(hs[0],hs[1],3.5,0,Math.PI*2);
             ctx.fillStyle=cvar('--group'); ctx.fill(); }); });
+        // widgets de esquina viva (el puntito de Illustrator) — no durante su arrastre
+        if(!(nedit.drag&&nedit.drag.kind==='corner')){
+          for(var lw=0;lw<nedit.nodes.length;lw++){
+            var lcw=liveCorner(lw); if(!lcw) continue;
+            var wps=tp(lcw.P[0]+lcw.bis[0]*(14/view.scale), lcw.P[1]+lcw.bis[1]*(14/view.scale));
+            ctx.beginPath(); ctx.arc(wps[0],wps[1],4.5,0,Math.PI*2);
+            ctx.fillStyle=cvar('--canvas'); ctx.fill();
+            ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.3; ctx.stroke();
+            ctx.beginPath(); ctx.arc(wps[0],wps[1],1.4,0,Math.PI*2);
+            ctx.fillStyle=cvar('--accent'); ctx.fill();
+          }
+        }
+        if(nedit.drag&&nedit.drag.kind==='corner'&&nedit.drag.r>0.02){
+          var fpr=nedit.drag.prim;
+          var lps=tp(fpr.P[0]+fpr.bis[0]*(18/view.scale), fpr.P[1]+fpr.bis[1]*(18/view.scale));
+          ctx.fillStyle=cvar('--accent'); ctx.font='11px '+cvar('--mono');
+          ctx.fillText('r '+(Math.round(nedit.drag.r*10)/10)+(unitMode==='in'?'':' mm'), lps[0]+8, lps[1]);
+        }
         // anclas: cuadrito hueco; seleccionada = relleno de acento
         for(var na=0;na<nedit.nodes.length;na++){ var nps=tp(nedit.nodes[na].p[0],nedit.nodes[na].p[1]);
           ctx.beginPath(); ctx.rect(nps[0]-3.5,nps[1]-3.5,7,7);
@@ -1288,13 +1320,13 @@
     sideSegRefresh();
     var has=hasDoc();
     ['fx','fy','fw','fh','fr','fs'].forEach(function(id){el(id).disabled=!has;});
-    ['lockAspect','rotPreset','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','boolX','boolDiv','btnOffset','offDist','btnExpand','expW','btnRound','rndR','btnNest','nstGap','nstMar'].forEach(function(id){el(id).disabled=!has;});
+    ['lockAspect','rotPreset','alL','alCH','alR','alT','alMV','alB','disH','disV','boolU','boolD','boolI','boolX','boolDiv','btnOffset','offDist','btnExpand','expW','btnNest','nstGap','nstMar'].forEach(function(id){el(id).disabled=!has;});
     el('alignTo').querySelectorAll('button').forEach(function(b){b.disabled=!has;});   // segmentado: apagar sus botones
     if(has){ var actIdx=activeIdx(); var nUnits=activeUnits().length; el('disH').disabled = nUnits<3; el('disV').disabled = nUnits<3;
       ['boolU','boolD','boolI','boolX','boolDiv'].forEach(function(id){ el(id).disabled = nUnits<2; });   // combinar pide 2+ figuras
       var hayAb=false, hayCe=false;
       actIdx.forEach(function(i){ if(isClosedIdx(i)) hayCe=true; else hayAb=true; });
-      el('btnExpand').disabled=!hayAb; el('btnRound').disabled=!hayCe;
+      el('btnExpand').disabled=!hayAb;
       // una sola UNIDAD (objeto suelto o grupo completo): "a la selección" no significa
       // nada — se fuerza la hoja de trabajo y se apaga esa opción
       var selBtn=el('alignTo').querySelector('[data-to="selection"]');
@@ -1304,7 +1336,7 @@
     }
     var _on=el('alignTo').querySelector('.on');
     el('alignToLbl').textContent=(_on&&_on.getAttribute('data-to')==='workarea')?'a la hoja de trabajo':'a la selección';
-    el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has;
+    el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has; el('btnQuote').disabled=!has;
     el('fileName').textContent=state.name||'sin diseño';
     var m=mode();
     if(!has){ ['fx','fy','fw','fh'].forEach(function(id){el(id).value='0.0';}); el('fr').value='0'; el('fs').value='100'; el('metaSize').textContent='—'; el('stSel').textContent=''; return; }
@@ -1451,6 +1483,21 @@
     if(tool==='nodes'){
       if(cncLock()) return;
       if(nedit){
+        // ¿agarró un WIDGET de esquina viva? (el puntito junto a la esquina)
+        for(var wk=0;wk<nedit.nodes.length;wk++){
+          var lc=liveCorner(wk); if(!lc) continue;
+          var wp=tp(lc.P[0]+lc.bis[0]*(14/view.scale), lc.P[1]+lc.bis[1]*(14/view.scale));
+          if(Math.hypot(sx-wp[0],sy-wp[1])<=8){
+            var ks=(nedit.sel.size>1&&nedit.sel.has(wk))?Array.from(nedit.sel):[wk];
+            var infos=[]; ks.forEach(function(kx){ var f=liveCorner(kx); if(f) infos.push(f); });
+            if(!infos.length) break;
+            nedit.sel=new Set();                              // los índices van a cambiar
+            nedit.drag={kind:'corner', infos:infos, prim:lc,
+              base:nedit.nodes.map(function(nd){ return {p:nd.p.slice(), hin:nd.hin.slice(), hout:nd.hout.slice(), sm:nd.sm}; }),
+              r:0, moved:false};
+            return;
+          }
+        }
         var hh=nodeHitHandle(sx,sy);
         if(hh){ nedit.drag={kind:'h',k:hh.k,w:hh.w,moved:false}; return; }
         var ha=nodeHitAnchor(sx,sy);
@@ -1623,6 +1670,17 @@
       var rn=cv.getBoundingClientRect(); var mn=sp(e.clientX-rn.left, e.clientY-rn.top);
       var dg=nedit.drag;
       if(!dg.moved){ nodeDirty(); dg.moved=true; }
+      if(dg.kind==='corner'){
+        var f0=dg.prim;
+        var mrel=[mn[0]-f0.P[0], mn[1]-f0.P[1]];
+        var m_along=Math.max(0, mrel[0]*f0.bis[0]+mrel[1]*f0.bis[1]);   // avance hacia adentro
+        var sinH=Math.sin(f0.theta/2);
+        var rr=m_along*sinH/Math.max(1e-6,(1-sinH));                    // el arco sigue al cursor
+        rr=Math.max(0, Math.min(rr, Math.min.apply(null, dg.infos.map(function(f){ return f.maxR; }))));
+        dg.r=rr;
+        nedit.nodes=roundLiveCorners(dg.base, dg.infos, rr);
+        draw(); return;
+      }
       if(dg.kind==='a'){
         var ddx=mn[0]-dg.last[0], ddy=mn[1]-dg.last[1]; dg.last=mn;
         nedit.sel.forEach(function(k){ var nd=nedit.nodes[k];
@@ -2155,20 +2213,6 @@
       refreshUI(); toast('Línea engrosada a '+w+' mm');
     });
   }
-  function doRound(){
-    if(!hasDoc()||cncLock()) return;
-    var rr=parseFloat(el('rndR').value);
-    if(isNaN(rr)||rr<=0){ toast('Pon el radio del redondeo (mm)'); return; }
-    var gu=geoUnits().filter(function(u){ return u.rings.length; });
-    if(!gu.length){ toast('Selecciona figuras cerradas'); return; }
-    geoCall('round', {r:rr, units:gu.map(function(u){ return u.rings; })}, function(r){
-      if(!r||!r.ok){ toast((r&&r.error)||'No se pudo redondear'); return; }
-      pushUndo();
-      var del=[]; gu.forEach(function(u){ u.idxs.forEach(function(i){ if(isClosedIdx(i)) del.push(i); }); });
-      geoRemove(del); geoInsert(r.paths);
-      refreshUI(); toast('Esquinas redondeadas a '+rr+' mm'+(r.eaten?(' · '+r.eaten+' figura(s) muy chicas quedaron igual'):''));
-    });
-  }
   // ===== Acomodar en la hoja (nesting) =====
   function doNest(){
     if(!hasDoc()||cncLock()) return;
@@ -2279,10 +2323,8 @@
   el('boolDiv').addEventListener('click',doDivide);
   el('btnOffset').addEventListener('click',doOffset);
   el('btnExpand').addEventListener('click',doExpand);
-  el('btnRound').addEventListener('click',doRound);
   el('offDist').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); doOffset(); this.blur(); } });
   el('expW').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); doExpand(); this.blur(); } });
-  el('rndR').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); doRound(); this.blur(); } });
 
   // ===== Edición de nodos (anclas + manijas Bézier) =====
   // El trazado vive aplanado en puntitos; al entrar se le RE-AJUSTAN curvas en el
@@ -2348,6 +2390,47 @@
     refreshUI();
   }
   function nodeDirty(){ if(nedit&&!nedit.dirty){ pushUndo(); nedit.dirty=true; } }
+  // Esquinas VIVAS (estilo Illustrator): ancla sin manijas entre dos tramos RECTOS.
+  // Devuelve la geometría necesaria para el widget y el redondeo.
+  function liveCorner(k){
+    var nds=nedit.nodes, N=nds.length;
+    var nd=nds[k];
+    if(!hzero(nd,'hin')||!hzero(nd,'hout')) return null;
+    var kp=(k-1+N)%N, kn=(k+1)%N;
+    if(!nedit.closed && (k===0||k===N-1)) return null;      // puntas de un abierto: no hay esquina
+    var a=nds[kp], b=nds[kn];
+    if(!hzero(a,'hout')||!hzero(b,'hin')) return null;      // los DOS lados deben ser rectos
+    var P=nd.p;
+    var vp=[a.p[0]-P[0], a.p[1]-P[1]], vn=[b.p[0]-P[0], b.p[1]-P[1]];
+    var Lp=Math.hypot(vp[0],vp[1]), Ln=Math.hypot(vn[0],vn[1]);
+    if(Lp<0.1||Ln<0.1) return null;
+    var dp=[vp[0]/Lp,vp[1]/Lp], dn=[vn[0]/Ln,vn[1]/Ln];
+    var cosT=Math.max(-1,Math.min(1,dp[0]*dn[0]+dp[1]*dn[1]));
+    var theta=Math.acos(cosT);
+    if(theta>Math.PI*0.97) return null;                      // casi recto: nada que redondear
+    var bis=[dp[0]+dn[0], dp[1]+dn[1]];
+    var bl=Math.hypot(bis[0],bis[1]); if(bl<1e-9) return null;
+    bis=[bis[0]/bl, bis[1]/bl];
+    var maxR=Math.tan(theta/2)*Math.min(Lp,Ln)*0.5;          // sin comerse más de medio lado
+    return {k:k, P:[P[0],P[1]], dp:dp, dn:dn, bis:bis, theta:theta, maxR:maxR};
+  }
+  // Reemplaza las esquinas 'infos' (sobre la BASE) por su arco de radio r.
+  function roundLiveCorners(base, infos, r){
+    var afect={}; infos.forEach(function(f){ afect[f.k]=f; });
+    var out=[];
+    base.forEach(function(nd,k){
+      var f=afect[k];
+      if(!f||r<=0.02){ out.push({p:nd.p.slice(), hin:nd.hin.slice(), hout:nd.hout.slice(), sm:nd.sm}); return; }
+      var rr=Math.min(r, f.maxR);
+      var d=rr/Math.tan(f.theta/2);
+      var h=(4/3)*Math.tan((Math.PI-f.theta)/4)*rr;           // arco circular ≈ cúbica
+      var T1=[f.P[0]+f.dp[0]*d, f.P[1]+f.dp[1]*d];
+      var T2=[f.P[0]+f.dn[0]*d, f.P[1]+f.dn[1]*d];
+      out.push({p:T1, hin:T1.slice(), hout:[T1[0]-f.dp[0]*h, T1[1]-f.dp[1]*h], sm:false});
+      out.push({p:T2, hin:[T2[0]-f.dn[0]*h, T2[1]-f.dn[1]*h], hout:T2.slice(), sm:false});
+    });
+    return out;
+  }
   function nodeHitAnchor(sx,sy){
     for(var k=0;k<nedit.nodes.length;k++){ var s=tp(nedit.nodes[k].p[0],nedit.nodes[k].p[1]);
       if(Math.abs(sx-s[0])<=6&&Math.abs(sy-s[1])<=6) return k; }
@@ -2476,6 +2559,14 @@
     im.onerror=function(){ toast('No se pudo leer esa imagen'); };
     im.src=dataUrl;
   }
+  el('toolNest').addEventListener('click',function(e){ e.stopPropagation();
+    var abierto=el('nestOpts').style.display!=='none';
+    el('nestOpts').style.display=abierto?'none':'flex';
+    el('toolNest').classList.toggle('on',!abierto); });
+  document.addEventListener('mousedown',function(e){
+    if(!e.target.closest) return;
+    if(!e.target.closest('#nestOpts') && !e.target.closest('#toolNest')){
+      el('nestOpts').style.display='none'; el('toolNest').classList.remove('on'); } });
   el('toolRef').addEventListener('click',function(){
     if(refImg){ refImg=null; el('toolRef').classList.remove('on'); draw(); toast('Imagen de referencia quitada'); return; }
     if(api()) api().ref_image().then(function(r){ if(r&&r.ok) refApply(r.data); else if(r&&r.error) toast(r.error); })
@@ -2630,7 +2721,6 @@
       activeIdx().forEach(function(i){ if(isClosedIdx(i)) hayCe=true; else hayAb=true; });
       if(hayCe) items.push({label:'Crear contorno ('+(parseFloat(el('offDist').value)||3)+' mm)', fn:doOffset});
       if(hayAb) items.push({label:'Engrosar línea ('+(parseFloat(el('expW').value)||2)+' mm)', fn:doExpand});
-      if(hayCe) items.push({label:'Redondear esquinas ('+(parseFloat(el('rndR').value)||3)+' mm)', fn:doRound});
       items.push({sep:1});
       items.push({label:'Copiar', keys:'⌘C', fn:doCopy});
       items.push({label:'Duplicar', keys:'⌘D', fn:doDuplicate});
@@ -2838,6 +2928,82 @@
     }).catch(function(e){ toast('Error: '+e); });
     this.value=''; });
   el('btnImport').addEventListener('click',importDesign);
+
+  // ===== Cotizador =====
+  function quoteRates(){ var q=(state.cnc&&state.cnc.quote)||{}; return {
+    mat_roll:q.mat_roll!=null?q.mat_roll:80, mat_m2:q.mat_m2!=null?q.mat_m2:350,
+    rate_plotter:q.rate_plotter!=null?q.rate_plotter:300, rate_cnc:q.rate_cnc!=null?q.rate_cnc:500,
+    setup:q.setup!=null?q.setup:50, margin:q.margin!=null?q.margin:30 }; }
+  function quoteJob(){   // números del trabajo (selección, o todo)
+    var A=activeIdx(); if(!A.length) return null;
+    var L=0;
+    A.forEach(function(i){ var e=effPts(i); for(var k=1;k<e.length;k++) L+=Math.hypot(e[k][0]-e[k-1][0], e[k][1]-e[k-1][1]); });
+    var b=bboxOf(A), esCNC=(state.machine==='cnc');
+    var mmps=esCNC?(cncTool()?cncTool().feed/60:1):cutParams().speed;
+    return { piezas:activeUnits().length, corte_m:L/1000, secs:L/Math.max(1,mmps),
+      esCNC:esCNC, roll_m:(b[2]-b[0])/1000, area_m2:((b[2]-b[0])*(b[3]-b[1]))/1e6 };
+  }
+  var lastQuoteText='';
+  function quoteCalc(){
+    var j=quoteJob(); if(!j) return;
+    var mat=parseFloat(el('qMat').value)||0, rate=parseFloat(el('qRate').value)||0;
+    var setup=parseFloat(el('qSetup').value)||0, margin=parseFloat(el('qMargin').value)||0;
+    var costoMat=j.esCNC? j.area_m2*mat : j.roll_m*mat;
+    var costoMaq=(j.secs/3600)*rate;
+    var sub=costoMat+costoMaq+setup;
+    var ganancia=sub*margin/100, total=sub+ganancia;
+    var mins=Math.max(1,Math.round(j.secs/60));
+    var matTxt=j.esCNC?(j.area_m2.toFixed(2)+' m² de lámina'):((j.roll_m*100).toFixed(0)+' cm de rollo');
+    el('qResumen').innerHTML=j.piezas+' pieza(s) · corte '+j.corte_m.toFixed(1)+' m · ~'+mins+' min de '+(j.esCNC?'CNC':'plotter')+' · '+matTxt;
+    function $(v){ return '$'+(Math.round(v*100)/100).toFixed(2); }
+    el('qDesglose').innerHTML=
+      'Material: <b>'+$(costoMat)+'</b><br>'+
+      'Máquina ('+mins+' min): <b>'+$(costoMaq)+'</b><br>'+
+      'Preparación: <b>'+$(setup)+'</b><br>'+
+      'Subtotal: <b>'+$(sub)+'</b> · Margen '+margin+'%: <b>'+$(ganancia)+'</b>';
+    el('qTotal').textContent='TOTAL '+$(total)+(j.piezas>1?('  ('+$(total/j.piezas)+' c/u)'):'');
+    lastQuoteText='COTIZACIÓN'+(state.name?(' — '+state.name):'')+'\n'+
+      j.piezas+' pieza(s) · corte '+j.corte_m.toFixed(1)+' m · ~'+mins+' min\n'+
+      'Material: '+$(costoMat)+'\nMáquina: '+$(costoMaq)+'\nPreparación: '+$(setup)+'\n'+
+      'TOTAL: '+$(total)+(j.piezas>1?(' ('+$(total/j.piezas)+' por pieza)'):'');
+  }
+  function openQuote(){
+    if(!hasDoc()){ toast('Abre o dibuja algo que cotizar'); return; }
+    var q=quoteRates(), esCNC=(state.machine==='cnc');
+    el('qMat').value=esCNC?q.mat_m2:q.mat_roll;
+    el('qMatU').textContent=esCNC?'$/m²':'$/m';
+    el('qRate').value=esCNC?q.rate_cnc:q.rate_plotter;
+    el('qSetup').value=q.setup; el('qMargin').value=q.margin;
+    quoteCalc();
+    el('quoteModal').style.display='flex';
+  }
+  function quoteSaveRates(){
+    var esCNC=(state.machine==='cnc'), patch={};
+    patch[esCNC?'mat_m2':'mat_roll']=parseFloat(el('qMat').value)||0;
+    patch[esCNC?'rate_cnc':'rate_plotter']=parseFloat(el('qRate').value)||0;
+    patch.setup=parseFloat(el('qSetup').value)||0;
+    patch.margin=parseFloat(el('qMargin').value)||0;
+    CNC.set({quote:patch}).then(function(r){ if(r&&r.ok) state.cnc=r; }).catch(function(){});
+  }
+  el('btnQuote').addEventListener('click',openQuote);
+  el('qClose').addEventListener('click',function(){ el('quoteModal').style.display='none'; });
+  el('quoteModal').addEventListener('click',function(e){ if(e.target===el('quoteModal')) el('quoteModal').style.display='none'; });
+  ['qMat','qRate','qSetup','qMargin'].forEach(function(id){
+    el(id).addEventListener('input',quoteCalc);
+    el(id).addEventListener('change',function(){ quoteCalc(); quoteSaveRates(); });
+  });
+  el('qCopy').addEventListener('click',function(){
+    var ok=false;
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(lastQuoteText); ok=true; }
+      else{
+        var ta=document.createElement('textarea'); ta.value=lastQuoteText;
+        document.body.appendChild(ta); ta.select();
+        ok=document.execCommand&&document.execCommand('copy'); ta.remove();
+      }
+    }catch(_e){}
+    toast(ok?'Cotización copiada — pégala en WhatsApp o donde quieras':'No se pudo copiar automáticamente');
+  });
 
   // ===== Autoguardado y recuperación =====
   // Cada minuto, si hubo cambios, se respalda el proyecto completo (autosave.dstudio

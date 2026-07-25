@@ -74,6 +74,12 @@ CNC_DEFAULTS = {
     'theme': 'light',                                  # tema de la interfaz (claro por default)
     'units': 'mm',                                     # unidades de MEDICIÓN de la UI: mm | in
     'sheets': 1,                                       # nº de hojas/láminas en la mesa (CNC)
+    'quote': {'mat_roll': 80.0,                        # $ por METRO LINEAL de rollo (plotter)
+              'mat_m2': 350.0,                         # $ por m² de lámina (CNC)
+              'rate_plotter': 300.0,                   # $ por hora de máquina (plotter)
+              'rate_cnc': 500.0,                       # $ por hora de máquina (CNC)
+              'setup': 50.0,                           # cargo fijo de preparación
+              'margin': 30.0},                         # margen % sobre el subtotal
     'work': [1220.0, 2440.0],                          # cama de la CNC de Jose (122×244 cm)
     'material': {'thickness': 15.0, 'z_zero': 'top',   # z_zero: 'top' (cara superior) | 'bed' (cama)
                  'clearance': 5.0, 'home_end': True,   # Z segura (mm) y "volver a X0 Y0 al terminar"
@@ -181,10 +187,11 @@ def cnc_get():
         p = _cnc_path()
         if p.exists():
             saved = json.loads(p.read_text())
-            for k in ('machine', 'theme', 'units', 'sheets', 'work', 'material', 'materials', 'tool_sel', 'tools'):
+            for k in ('machine', 'theme', 'units', 'sheets', 'quote', 'work', 'material', 'materials', 'tool_sel', 'tools'):
                 if k in saved:
                     data[k] = saved[k]
             data['material'] = {**CNC_DEFAULTS['material'], **(data.get('material') or {})}
+            data['quote'] = {**CNC_DEFAULTS['quote'], **(data.get('quote') or {})}
             if data['tools'] and 'cut' not in data['tools'][0]:      # esquema v1 → migrar
                 data['tools'] = _migrate_tools_v1(data['tools'], data['materials'])
                 if not any(t['id'] == data['tool_sel'] for t in data['tools']):
@@ -223,6 +230,16 @@ def cnc_set(patch):
             if not (1 <= n <= 8):
                 return {'ok': False, 'error': 'Hojas: entre 1 y 8.'}
             cur['sheets'] = n
+        if 'quote' in patch:
+            q = patch['quote'] or {}
+            base = {**CNC_DEFAULTS['quote'], **(cur.get('quote') or {})}
+            for k in ('mat_roll', 'mat_m2', 'rate_plotter', 'rate_cnc', 'setup', 'margin'):
+                if k in q:
+                    v = float(q[k])
+                    if not (0 <= v <= 1e7):
+                        return {'ok': False, 'error': 'Tarifa fuera de rango.'}
+                    base[k] = v
+            cur['quote'] = base
         if 'work' in patch:
             w, h = float(patch['work'][0]), float(patch['work'][1])
             if w < 10 or h < 10:
