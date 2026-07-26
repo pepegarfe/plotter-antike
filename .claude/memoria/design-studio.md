@@ -305,7 +305,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   (piezas, área)): apretada 10/16 util 64% en 3.8s; cama grande 30/30 en 5.6s. `rots` explícito
   sigue aceptado (compatibilidad/pruebas). ⚠️ El presupuesto hace el resultado dependiente de
   la VELOCIDAD de la máquina (una lenta puede saltarse etapas) — determinista en la misma
-  máquina, no entre máquinas. **+ ANIMACIÓN de intentos (pedida por Jose, ⚑ SIN COMMIT)**:
+  máquina, no entre máquinas. **+ ANIMACIÓN de intentos (pedida por Jose; ✅ quedó dentro del COMMIT 90161c3 con el en-vivo)**:
   el motor devuelve `runs` (bitácora: stage/order/placed/util por intento) + `best`; la UI los
   REPRODUCE como fantasmas (acento; ganador en verde --good) con marcador (intento i/N, giros,
   orden, piezas, util%) a 380ms/cuadro + 3 cuadros de pausa en el ganador; clic o Esc saltan y
@@ -424,7 +424,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   fin)`) y NO existen items 'm'/'h'. **Señal para la próxima**: si la librería cruda ve más
   elementos que la app, el que pierde es nuestro código.
 - **Vista 3D del corte** (fases R en [[cnc-richauto]]) y **auditoría del G-code** (ídem).
-- **Botón "Importar" — ⚠️ SIN COMMIT, pendiente vistazo de Jose (24-jul)**: suma otro archivo
+- **Botón "Importar" — ✅ COMMIT db5f141 (24-jul)**: suma otro archivo
   (SVG/DXF/AI/.dstudio) a la mesa SIN reemplazar. `addDoc`/`addProject` en studio_ui.html +
   `import_design`/`_load_vector` en design_studio.py (refactor: open_design usa el mismo helper).
   Reglas: lo existente intacto (uids viejos NO cambian → las trayectorias CNC calculadas
@@ -439,17 +439,19 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
 
-### Pendientes (act. 24-jul-2026 — commit db5f141 + push: Importar, husillo/marchas,
-### presets, auditoría y limpieza de UI ya SUBIDOS)
-1. **Rebaba en MDF 3mm** (primera prueba real): diagnóstico en curso — sospechosos: filo
-   cansado (prueba A/B con la 1/8" pendiente), cama comida, mordida baja (preset ya subido
-   a 4000) y fresa upcut. **Recomendación en pie: fresa DOWNCUT para lámina delgada** —
-   al comprarla, alta en "Fresas…" con sus presets.
-2. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL ([[estado]] Fase 3).
-   Necesita hardware; nadie puede cerrarlo desde la Mac.
-3. **Primer corte real de la CNC** — protocolo y checklist en [[cnc-richauto]] (auditoría ya pasada).
-4. Diferidas que Jose puede querer: organizar orden (z-order / orden de corte), texto, contorno/offset,
-   presets de material, optimizar orden de corte, snapping.
+### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
+1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
+   preset de 4000) → prueba A/B pendiente: pasada más agresiva / fresa nueva / **DOWNCUT**
+   (al comprarla, alta en "Fresas…" con sus presets). Protocolo: cambiar UNA cosa a la vez.
+2. **Verificar orientación del corte en el plotter** — el arreglo del eje Y cambió el HPGL
+   ([[estado]] Fase 3). Necesita hardware. (La orientación CNC ya quedó ✓ con el corte real.)
+3. **Calibrar marchas S2–S8** del A11E leyendo Hz del variador (tabla provisional en la app).
+4. Diferidas de diseño que quedan: **texto en trayecto**, **recortar con figura (máscara de
+   taller)**, **warp/envelope**, **voltear-como-copia**, **V-carve** (el proyecto grande).
+   (Ya HECHAS del viejo listado: z-order ✓, texto ✓, contorno/offset ✓, snapping ✓,
+   nesting ✓, y toda la épica Illustrator — ver notas 1-14 arriba.)
+5. **Ruta comercial** ([[idea-comercial]]): en paso 1 (producción propia); siguiente hito =
+   piloto con 2-3 talleres → antes: empaquetado Windows y decidir repo privado.
 
 ## Lanzador de escritorio (Mac) — ícono "Design Studio.app"
 Igual que Plotter Antike, hay un **ícono en el Escritorio** que lanza la app con doble clic. Es una
