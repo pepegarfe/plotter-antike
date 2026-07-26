@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-24T15:22:37.898Z
+  modified: 2026-07-26T15:55:51.209Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -439,6 +439,50 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
 
+## 25-jul-2026: EMPAQUETADO para Windows y Mac + auto-actualización — ✅ COMMIT d77d07c
+Jose eligió **distribuir SOLO Design Studio** (Plotter Antike se queda como motor/respaldo, ya no
+se compila) y **sin cuenta de desarrollador de Apple** (app sin firmar → primera apertura con clic
+derecho → Abrir). Lo construido, todo verificado:
+- **`updater.py`** (módulo nuevo, compartido escritorio/servidor): `check` → `start`/`status`
+  (descarga en hilo con % de avance) → `apply`. El `apply` escribe un **ayudante externo** (bash en
+  Mac, PowerShell en Windows) y cierra la app: **un programa no puede sobrescribirse a sí mismo**
+  (en Windows el .exe queda bloqueado; en Mac el .app está corriendo). Guardas: solo con
+  `sys.frozen` (como script manda a `git pull`), el destino debe terminar en `.app` **y** tener
+  `Contents/MacOS` antes de cualquier `rm -rf`.
+- **BUG REAL encontrado y corregido en las DOS apps: las versiones se comparaban como TEXTO** →
+  `'2026.7.10' > '2026.7.9'` es **falso** como texto, o sea que una versión nueva se veía más
+  vieja y nunca se ofrecía. Ahora `vkey()` compara número a número y **la CI rechaza etiquetas con
+  letras** (`v2026.07.25b`) porque al comparar se ignoran y dos releases empatarían.
+- **Lección dura (costó un cuelgue): esperar a que un proceso muera con `kill -0` NO sirve** — un
+  proceso **zombi** (terminado pero no recogido por su padre) sigue "existiendo" y el ayudante
+  esperaba para siempre. Se mira el ESTADO real (`ps -o stat=`, `Z` = se fue). La señal fue que la
+  prueba se colgó sin salida: el padre capturaba la salida del ayudante, que la heredó, y cada uno
+  esperaba al otro.
+- **⚠️ En Mac, `.app` SIEMPRE con `ditto`** (`-c -k --keepParent` para comprimir, `-x -k` para
+  extraer), nunca el `zipfile` de Python: **pierde los enlaces simbólicos y el permiso de
+  ejecución** y la app llega rota. La prueba de reemplazo lo verifica explícitamente.
+- **potrace viaja DENTRO de la app** (`preparar_potrace.py` → `vendor/`): se copia con su
+  `libpotrace.0.dylib`, se reapunta con `install_name_tool` a `@loader_path` y se **re-firma**
+  (cambiar el binario invalida la firma ad-hoc y macOS lo mata). Sin esto el calco B/N solo
+  funcionaba en esta Mac, que tiene Homebrew. `_potrace_bin()` busca primero dentro del paquete.
+- **`DesignStudio --diagnostico`**: lista qué piezas trae y cuáles faltan. Nació de una duda real —
+  la app puede **arrancar perfecta** y tener texto/nesting/CNC muertos porque una librería no quedó
+  empaquetada. La CI lo corre tras compilar en las dos plataformas.
+- **`DesignStudio.spec` estaba en `.gitignore`** (era el auto-generado): la CI habría fallado sin
+  el archivo. Ahora es receta a mano y va a git. Iconos por `crear_icono_studio.py` (marca magenta;
+  ⚠️ **ImageDraw no MEZCLA transparencias, las REEMPLAZA** — el "brillo" con alpha abrió un hueco
+  blanco en el primer intento).
+- **CI reescrita** (`.github/workflows/release.yml`): job `preparar` (valida etiqueta + crea el
+  release) → `windows` y `mac` (macos-14 = **Apple Silicon**; un Mac Intel necesitaría un job
+  aparte en macos-13). Instalador Windows propio: `instalar_studio.bat/.ps1` (copia la carpeta a
+  `%LOCALAPPDATA%\Antike\DesignStudio` con `robocopy /MIR`, misma carpeta que reemplaza el update).
+- **Verificación**: 24 checks del motor + 28 de la interfaz (arnés de DOM falso, ver abajo) + 8 del
+  reemplazo real con apps de mentira (incluidas las guardas) + **descarga real de 82 MB** desde
+  GitHub + app de Mac compilada (133 MB) que arranca y pasa el diagnóstico **también después de
+  empaquetarla y desempaquetarla como hará la CI** + `auditar_gcode.py` 133/133.
+- **PENDIENTE**: publicar el primer release de verdad (etiqueta + push) — no se hizo, requiere el
+  sí de Jose. Hasta que exista, el aviso de actualización no tiene nada que ofrecer.
+
 ### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
 1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
    preset de 4000) → prueba A/B pendiente: pasada más agresiva / fresa nueva / **DOWNCUT**
@@ -451,7 +495,10 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
    (Ya HECHAS del viejo listado: z-order ✓, texto ✓, contorno/offset ✓, snapping ✓,
    nesting ✓, y toda la épica Illustrator — ver notas 1-14 arriba.)
 5. **Ruta comercial** ([[idea-comercial]]): en paso 1 (producción propia); siguiente hito =
-   piloto con 2-3 talleres → antes: empaquetado Windows y decidir repo privado.
+   piloto con 2-3 talleres. **Empaquetado Win+Mac ya HECHO** (ver sección de arriba); falta
+   publicar el primer release y decidir repo privado. Para vender a talleres convendría la
+   cuenta de desarrollador de Apple (99 USD/año): hoy la app de Mac va sin firmar y asusta
+   en la primera apertura.
 
 ## Lanzador de escritorio (Mac) — ícono "Design Studio.app"
 Igual que Plotter Antike, hay un **ícono en el Escritorio** que lanza la app con doble clic. Es una
