@@ -25,6 +25,7 @@ import text_vector as texter
 import geo_ops as geo
 import curve_fit as fitter
 import nest_ops as nester
+import updater
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8765
@@ -178,6 +179,28 @@ def api_nest_start():
 @app.post('/api/nest_status')
 def api_nest_status():
     return _json(nester.nest_status(request.json or {}))
+
+
+@app.get('/api/update_check')
+def api_update_check():
+    return _json(updater.check())
+
+
+@app.post('/api/update_start')
+def api_update_start():
+    return _json(updater.start((request.json or {}).get('url')))
+
+
+@app.post('/api/update_status')
+def api_update_status():
+    return _json(updater.status((request.json or {}).get('job')))
+
+
+@app.post('/api/update_apply')
+def api_update_apply():
+    # En modo web el servidor NO se auto-reemplaza (updater.apply se niega si no es
+    # la app compilada); la respuesta explica que se actualiza con git pull.
+    return _json(updater.apply((request.json or {}).get('job')))
 
 
 @app.post('/api/autosave_save')

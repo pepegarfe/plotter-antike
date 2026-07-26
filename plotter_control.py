@@ -46,6 +46,12 @@ def _get_version():
 VERSION = _get_version()
 GITHUB_REPO = "pepegarfe/plotter-antike"
 
+
+def _vkey(s):
+    """Versión → tupla de números. Compararlas como TEXTO es un error: '2026.7.9'
+    saldría mayor que '2026.7.10' porque '9' > '1' como letra."""
+    return tuple(int(n) for n in re.findall(r'\d+', str(s or ''))[:4])
+
 # ── Optional dependencies ──────────────────────────────────────────────────────
 
 try:
@@ -3658,7 +3664,7 @@ class PlotterApp:
             with urllib.request.urlopen(req, timeout=8) as resp:
                 data = _json.loads(resp.read())
             latest = data['tag_name'].lstrip('v')
-            if latest > VERSION:
+            if _vkey(latest) and _vkey(VERSION) and _vkey(latest) > _vkey(VERSION):
                 self.root.after(0, lambda: self._show_update_dialog(latest, data))
             elif not silent:
                 self.root.after(0, lambda: messagebox.showinfo(
@@ -3675,7 +3681,9 @@ class PlotterApp:
                "¿Deseas descargar e instalar la actualización?")
         if not messagebox.askyesno("Actualización disponible", msg):
             return
-        assets = release_data.get('assets', [])
+        # Solo paquetes de ESTA app: los releases del repo también traen los de
+        # Design Studio, y bajarse uno ajeno terminaría en un instalador que no existe.
+        assets = [a for a in release_data.get('assets', []) if 'PlotterAntike' in a.get('name', '')]
         if sys.platform == 'win32':
             url = next((a['browser_download_url'] for a in assets if 'Windows' in a['name']), None)
             if url:

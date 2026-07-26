@@ -13,7 +13,8 @@
       "WebSearch",
       "WebFetch(domain:forum.vectric.com)",
       "Bash(/opt/homebrew/bin/python3 -m pip install --dry-run --break-system-packages --quiet shapely)",
-      "Bash(/opt/homebrew/bin/python3 -c \"import shapely\")"
+      "Bash(/opt/homebrew/bin/python3 -c \"import shapely\")",
+      "Bash(python3 *)"
     ]
   }
 }

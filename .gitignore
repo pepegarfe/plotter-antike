@@ -11,7 +11,13 @@ dist/
 plotter_config.json
 cnc_config.json
 
-# Spec auto-generado por PyInstaller (el comando de build está en .claude/memoria/design-studio.md)
-DesignStudio.spec
 fonts_cache.json
 autosave.dstudio
+
+# Generados por el empaquetado (los crea la CI en cada release, no van a git):
+#   crear_icono_studio.py -> studio.ico / studio.icns
+#   preparar_potrace.py   -> vendor/
+# ⚠️ DesignStudio.spec SÍ va a git: ya no es el auto-generado, es la receta de compilación.
+studio.ico
+studio.icns
+vendor/

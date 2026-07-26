@@ -20,6 +20,7 @@ import text_vector as texter
 import geo_ops as geo
 import curve_fit as fitter
 import nest_ops as nester
+import updater
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -231,6 +232,31 @@ class Api:
     def geo_nest_status(self, data):
         return nester.nest_status(data or {})
 
+    # --- Actualizaciones (solo tiene efecto en la app compilada) ---
+    def update_check(self):
+        return updater.check()
+
+    def update_start(self, data):
+        return updater.start((data or {}).get('url'))
+
+    def update_status(self, data):
+        return updater.status((data or {}).get('job'))
+
+    def update_apply(self, data):
+        """Instala y CIERRA la ventana: el ayudante externo reemplaza la app y la relanza."""
+        res = updater.apply((data or {}).get('job'))
+        if res.get('ok'):
+            # Un respiro para que la respuesta llegue al JS antes de que muera la ventana.
+            import threading
+            threading.Timer(0.6, self._quit).start()
+        return res
+
+    def _quit(self):
+        try:
+            self.window.destroy()
+        except Exception:
+            os._exit(0)
+
     # --- Autoguardado ---
     def autosave_save(self, data):
         from studio_backend import autosave_save as f
@@ -373,7 +399,50 @@ class Api:
     def test_cut(self):         return SERVICE.test_cut()
 
 
+def diagnostico():
+    """`DesignStudio --diagnostico` — qué trae dentro la app y qué le falta.
+
+    Vale sobre todo en la app COMPILADA: puede arrancar perfecta y tener el texto o el
+    acomodo muertos porque una librería no quedó empaquetada. Mejor verlo aquí que
+    descubrirlo con el material en la máquina."""
+    import cnc_gcode
+    print(f'Design Studio {updater.current_version()}')
+    print(f'  compilada: {"sí" if getattr(sys, "frozen", False) else "no (corriendo del código)"}')
+    print(f'  python {sys.version.split()[0]} · {sys.platform}')
+    filas = [
+        ('Plotter (puerto serial)', core.HAS_SERIAL, 'pyserial'),
+        ('Abrir DXF', core.HAS_DXF, 'ezdxf'),
+        ('Abrir AI', core.HAS_MUPDF, 'pymupdf'),
+        ('Texto con fuentes', texter.HAS_FONTS, 'fontTools'),
+        ('Booleanas y contorno', geo.HAS_SHAPELY, 'shapely'),
+        ('Acomodar en la hoja', nester.HAS_SHAPELY, 'shapely'),
+        ('CNC (trayectorias)', cnc_gcode.HAS_SHAPELY, 'shapely'),
+    ]
+    try:
+        potrace = tracer._potrace_bin()
+    except Exception as e:
+        potrace = f'FALTA ({e})'
+    try:
+        import vtracer  # noqa: F401
+        vt = True
+    except Exception:
+        vt = False
+    filas.append(('Calco a color', vt, 'vtracer'))
+    ancho = max(len(f[0]) for f in filas)
+    malos = 0
+    for nombre, ok, lib in filas:
+        malos += 0 if ok else 1
+        print(f'  {nombre.ljust(ancho)}  {"✓" if ok else "✗ FALTA " + lib}')
+    print(f'  {"Calco B/N (potrace)".ljust(ancho)}  {potrace}')
+    if 'FALTA' in str(potrace):
+        malos += 1
+    print('  → todo completo' if not malos else f'  → FALTAN {malos} piezas')
+    return 0 if not malos else 1
+
+
 def main():
+    if '--diagnostico' in sys.argv:
+        sys.exit(diagnostico())
     # Calentar el listado de fuentes en segundo plano: cuando el usuario abra el
     # modal de Texto ya está listo (con caché de disco es instantáneo; sin él,
     # el escaneo de ~5 s corre mientras la ventana arranca).

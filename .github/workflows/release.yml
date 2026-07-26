@@ -1,4 +1,8 @@
-name: Build and Release
+name: Publicar Design Studio
+
+# Se dispara al publicar una etiqueta (tag) tipo v2026.07.25, o a mano desde la
+# pestaña Actions de GitHub. Compila la app para Windows y para Mac y sube las dos
+# como archivos del release; la app instalada las encuentra sola (ver updater.py).
 
 on:
   push:
@@ -7,121 +11,156 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (ej. v2026.05.25)'
+        description: 'Etiqueta de version (ej. v2026.07.25)'
         required: true
-        default: 'v2026.05.25'
+        default: 'v2026.07.25'
 
 permissions:
   contents: write
 
 jobs:
-  build-windows:
+  # ── 1. Etiqueta y release vacío ──────────────────────────────────────────────
+  preparar:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+      version: ${{ steps.t.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir y validar la etiqueta
+        id: t
+        run: |
+          TAG=$([ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "${{ github.event.inputs.version }}" || echo "${{ github.ref_name }}")
+          # ⚠️ La etiqueta debe ser SOLO números: la app compara versiones número a
+          # número (v2026.7.10 es más nueva que v2026.7.9). Una letra al final
+          # ('v2026.07.25b') se ignora al comparar y dos releases empatarían.
+          if ! echo "$TAG" | grep -Eq '^v[0-9]+(\.[0-9]+)*$'; then
+            echo "::error::Etiqueta inválida: '$TAG'. Usa solo números, ej. v2026.07.25 o v2026.07.25.2"
+            exit 1
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Crear el release si no existe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.t.outputs.tag }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "El release $TAG ya existe; se reutiliza."
+            exit 0
+          fi
+          cat > notas.md <<'EOF'
+          ## Instalar
+
+          ### Windows
+          1. Descarga **DesignStudio-Windows.zip**
+          2. Extrae **todo** el zip a una carpeta (no lo abras "dentro" del zip)
+          3. Doble clic en **instalar_studio.bat** → queda un acceso directo en el Escritorio
+
+          ### Mac (Apple Silicon: M1/M2/M3/M4)
+          1. Descarga **DesignStudio-Mac.zip** y extráelo
+          2. Arrastra **DesignStudio.app** a tu carpeta *Aplicaciones*
+          3. La **primera vez**: clic derecho sobre la app → **Abrir** → *Abrir*.
+             macOS avisa porque la app no está firmada con una cuenta de desarrollador de
+             Apple; es normal. Solo hace falta la primera vez.
+             Si aparece "está dañada", ejecuta en Terminal:
+             `xattr -cr /Applications/DesignStudio.app`
+
+          ## Actualizaciones
+          La app avisa sola cuando hay una versión nueva (abajo a la derecha aparece el
+          número de versión; un clic ahí la descarga e instala).
+
+          ## Si algo no funciona
+          Abre una Terminal (Mac) o CMD (Windows) y corre la app con `--diagnostico`:
+          te dice qué piezas trae y cuál falta.
+          EOF
+          gh release create "$TAG" --repo "${{ github.repository }}" \
+            --title "Design Studio $TAG" --notes-file notas.md --latest
+
+  # ── 2. Windows ───────────────────────────────────────────────────────────────
+  windows:
+    needs: preparar
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install dependencies
-        run: pip install pyinstaller pillow pyserial svgpathtools ezdxf pymupdf
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pywebview pyserial ezdxf pymupdf shapely fonttools pillow bottle
+          pip install vtracer || echo "AVISO: sin vtracer, el calco a color no estara disponible"
 
-      - name: Write version.txt
+      - name: Escribir version.txt
+        shell: pwsh
+        run: '"${{ needs.preparar.outputs.version }}" | Out-File -FilePath version.txt -Encoding utf8 -NoNewline'
+
+      - name: Icono y potrace
+        run: |
+          python crear_icono_studio.py
+          python preparar_potrace.py
+
+      - name: Compilar
+        run: python -m PyInstaller DesignStudio.spec --noconfirm --clean
+
+      - name: Comprobar que la app trae todo
+        run: dist\DesignStudio\DesignStudio.exe --diagnostico
+
+      - name: Empaquetar
         shell: pwsh
         run: |
-          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ github.event.inputs.version }}" } else { "${{ github.ref_name }}" }
-          $tag.TrimStart('v') | Out-File -FilePath version.txt -Encoding utf8 -NoNewline
+          Copy-Item instalar_studio.bat dist\ -Force
+          Copy-Item instalar_studio.ps1 dist\ -Force
+          Compress-Archive -Force -Path dist\DesignStudio, dist\instalar_studio.bat, dist\instalar_studio.ps1 -DestinationPath DesignStudio-Windows.zip
 
-      - name: Build exe
-        run: |
-          python crear_icono.py
-          python -m PyInstaller PlotterAntike.spec --noconfirm --clean
-
-      - name: Package installer zip
-        shell: pwsh
-        run: |
-          Copy-Item instalar.bat dist\instalar.bat -Force
-          Copy-Item instalar.ps1 dist\instalar.ps1 -Force
-          Copy-Item desinstalar.bat dist\desinstalar.bat -Force
-          Copy-Item desinstalar.ps1 dist\desinstalar.ps1 -Force
-          Compress-Archive -Force `
-            -Path dist\PlotterAntike.exe, dist\instalar.bat, dist\instalar.ps1, dist\desinstalar.bat, dist\desinstalar.ps1 `
-            -DestinationPath PlotterAntike-Windows.zip
-
-      - name: Determine version tag
-        id: tag
-        shell: pwsh
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            echo "tag=${{ github.event.inputs.version }}" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
-          }
-
-      - name: Create or update release and upload Windows zip
-        shell: pwsh
+      - name: Subir al release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          $TAG="${{ steps.tag.outputs.tag }}"
-          $REPO="${{ github.repository }}"
-          $EXISTS = gh release view $TAG --repo $REPO 2>$null
-          if (-not $?) {
-            gh release create $TAG `
-              --repo $REPO `
-              --title "Plotter Antike $TAG" `
-              --notes "## Instalacion`n`n### Windows`n1. Descarga **PlotterAntike-Windows.zip**`n2. Extrae la carpeta`n3. Doble clic en **instalar.bat**`n4. Se crea un acceso directo en el Escritorio`n`n### Mac`n1. Descarga **PlotterAntike-Mac.zip**`n2. Extrae y abre **PlotterAntike**`n3. Si Mac bloquea la app: clic derecho -> **Abrir**" `
-              --latest
-          }
-          gh release upload $TAG PlotterAntike-Windows.zip --repo $REPO --clobber
+        run: gh release upload "${{ needs.preparar.outputs.tag }}" DesignStudio-Windows.zip --repo ${{ github.repository }} --clobber
 
-  build-mac:
-    runs-on: macos-13
+  # ── 3. Mac (Apple Silicon) ───────────────────────────────────────────────────
+  mac:
+    needs: preparar
+    runs-on: macos-14          # arm64. Un Mac Intel necesitaría un job aparte en macos-13.
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install dependencies
-        run: pip install pyinstaller pyserial svgpathtools ezdxf pymupdf
-
-      - name: Write version.txt
+      - name: Instalar dependencias
         run: |
-          TAG=$([ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "${{ github.event.inputs.version }}" || echo "${{ github.ref_name }}")
-          echo "${TAG#v}" > version.txt
+          python -m pip install --upgrade pip
+          pip install pyinstaller pywebview pyserial ezdxf pymupdf shapely fonttools pillow bottle
+          pip install vtracer || echo "AVISO: sin vtracer, el calco a color no estara disponible"
+          brew install potrace
 
-      - name: Build app
+      - name: Escribir version.txt
+        run: printf '%s' "${{ needs.preparar.outputs.version }}" > version.txt
+
+      - name: Icono y potrace
         run: |
-          pyinstaller --onefile --windowed --name PlotterAntike \
-            --hidden-import serial \
-            --hidden-import serial.tools \
-            --hidden-import serial.tools.list_ports \
-            --hidden-import svgpathtools \
-            --hidden-import ezdxf \
-            --hidden-import fitz \
-            plotter_control.py --noconfirm --clean
+          python crear_icono_studio.py
+          python preparar_potrace.py
 
-      - name: Package zip
-        run: |
-          cd dist
-          zip ../PlotterAntike-Mac.zip PlotterAntike
+      - name: Compilar
+        run: python -m PyInstaller DesignStudio.spec --noconfirm --clean
 
-      - name: Determine version tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+      - name: Comprobar que la app trae todo
+        run: dist/DesignStudio.app/Contents/MacOS/DesignStudio --diagnostico
 
-      - name: Upload Mac zip to release
+      - name: Empaquetar
+        # ⚠️ `ditto`, no `zip`: un .app lleva enlaces simbólicos y permisos de ejecución
+        # que un zip normal pierde, y la app llega rota al otro lado.
+        run: ditto -c -k --keepParent dist/DesignStudio.app DesignStudio-Mac.zip
+
+      - name: Subir al release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          gh release upload "$TAG" PlotterAntike-Mac.zip \
-            --repo ${{ github.repository }} --clobber
+        run: gh release upload "${{ needs.preparar.outputs.tag }}" DesignStudio-Mac.zip --repo ${{ github.repository }} --clobber

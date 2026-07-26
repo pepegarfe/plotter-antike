@@ -27,7 +27,17 @@ _STATE = {'path': None, 'name': None}
 def _potrace_bin():
     """Ruta absoluta de potrace. Lanzada desde Finder (ícono del Escritorio) o desde un
     entorno recortado, la app NO tiene /opt/homebrew/bin en el PATH y el nombre pelado
-    'potrace' truena con 'No such file or directory'."""
+    'potrace' truena con 'No such file or directory'.
+
+    En la app COMPILADA se busca primero el potrace que viaja DENTRO del paquete: el
+    usuario final no tiene Homebrew, así que sin esta copia el calco B/N no existiría."""
+    import sys
+    if getattr(sys, 'frozen', False):
+        base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        exe = 'potrace.exe' if sys.platform == 'win32' else 'potrace'
+        own = os.path.join(base, exe)
+        if os.path.exists(own):
+            return own
     p = shutil.which('potrace')
     if p:
         return p

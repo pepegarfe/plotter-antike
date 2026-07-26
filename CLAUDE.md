@@ -122,13 +122,36 @@ La app **arranca sin ninguna dependencia** y solo deshabilita la función que fa
 
 ## Distribución y auto-actualización (operativo, no obvio)
 
-- **CI en GitHub Actions** (`.github/workflows/release.yml`): al publicar un tag, compila solo el
-  `.exe` de Windows y la app de Mac y los sube como assets del release.
-- **Auto-update**: la app consulta `api.github.com/repos/pepegarfe/plotter-antike/releases/latest`,
-  compara el `tag_name` contra `VERSION` (leída de `version.txt`) y ofrece descargar/instalar.
-  - **El chequeo automático al arrancar SOLO corre en el exe compilado** (`sys.frozen`). Como script
-    no se auto-revisa; el chequeo manual (menú Ayuda) sí funciona siempre.
-  - `version.txt = "dev"` significa modo desarrollo local.
+**Desde el 25-jul-2026 solo se distribuye Design Studio** (decisión de Jose). La app tkinter sigue
+en el repo como motor y como respaldo, pero **ya no se compila ni se publica**.
+
+- **CI** (`.github/workflows/release.yml`): al publicar un tag compila Design Studio para **Windows
+  y Mac (Apple Silicon)** y sube `DesignStudio-Windows.zip` / `DesignStudio-Mac.zip` al release.
+- **⚠️ La etiqueta del release debe ser SOLO números** (`v2026.07.25`, `v2026.07.25.2`). La CI lo
+  valida y aborta si no. Motivo: las versiones se comparan **número a número** (`vkey()` en
+  `updater.py`) — una letra al final se ignora y dos releases empatarían. **Nunca comparar
+  versiones como texto**: `'2026.7.10' > '2026.7.9'` es FALSO en texto (era un bug real, corregido
+  en ambas apps).
+- **Auto-update** (`updater.py`, compartido escritorio/servidor): consulta
+  `releases/latest`, elige el .zip por sistema (y por procesador si hubiera varios), descarga con
+  avance y **lanza un ayudante externo** (bash en Mac, PowerShell en Windows) que espera a que la
+  app muera, la reemplaza y la relanza. Un programa **no puede sobrescribirse a sí mismo**.
+  - **Solo actúa con `sys.frozen`**; como script se niega y manda a `git pull`.
+  - `version.txt = "dev"` = modo desarrollo: nunca ofrece actualizar.
+  - ⚠️ El ayudante espera por el **estado** del proceso (`ps -o stat=`), no con `kill -0`: un
+    proceso **zombi** sigue "existiendo" y la espera no terminaría nunca (pasó en pruebas).
+- **⚠️ En Mac, comprimir/descomprimir un `.app` SIEMPRE con `ditto`** (`-c -k --keepParent` /
+  `-x -k`), nunca con el `zipfile` de Python ni `zip` a secas: se pierden los **enlaces simbólicos**
+  y el **permiso de ejecución**, y la app llega rota al otro lado.
+- **Recetas de compilación** (`DesignStudio.spec` — **sí va a git**, ya no es el auto-generado):
+  `crear_icono_studio.py` (iconos) y `preparar_potrace.py` (mete potrace y su dylib en `vendor/`,
+  reapuntados a `@loader_path` y re-firmados). Sin ese `vendor/`, **el calco B/N no existe** en la
+  máquina del usuario final: potrace es un programa aparte que aquí solo está por Homebrew.
+- **`DesignStudio --diagnostico`** imprime qué piezas trae la app y cuáles faltan. La CI lo corre
+  tras compilar: una app puede arrancar perfecta y tener el texto o el acomodo muertos porque una
+  librería no quedó empaquetada.
+- **Mac sin firmar** (Jose no tiene cuenta de Apple): la primera vez hay que abrirla con
+  **clic derecho → Abrir**, o `xattr -cr` si dice "está dañada". Va explicado en las notas del release.
 
 ---
 
