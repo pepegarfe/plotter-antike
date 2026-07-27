@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T17:10:27.023Z
+  modified: 2026-07-27T17:33:41.017Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -451,8 +451,11 @@ Pedido de Jose ("como lo tiene Illustrator"). Módulo nuevo **`export_ops.py`** 
   sale hueco. Abiertos nunca se rellenan.
 - Opciones: solo la selección (re-numera las unidades a la lista recortada) · encuadre
   "el diseño" con margen o "la hoja completa" · relleno (arranca como la vista del lienzo) ·
-  resolución · fondo transparente. El diálogo **esconde lo que no aplica**: DXF sin aspecto,
-  JPG sin transparencia (no la soporta), PDF sin resolución.
+  resolución · **fondo Transparente o Blanco** (segmentado; Jose lo pidió explícito — nació como
+  casilla escondida solo para PNG). El **blanco se pinta DENTRO del archivo** (rectángulo al fondo
+  del PDF y del SVG), no solo en la imagen, para que viaje aunque abran el vector; el PNG blanco
+  sale sin canal alfa. El diálogo **esconde lo que no aplica**: DXF sin aspecto, JPG sin elección
+  de fondo (el formato no admite transparencia), PDF sin resolución.
 - **Volteo de Y en UN solo sitio por formato**: PDF/SVG/raster son Y-abajo, DXF Y-arriba y no
   se toca (misma disciplina que salvó los imports en jul-2026).
 - Guardas: DPI absurdo → baja solo (techo de píxeles) en vez de quedarse sin memoria; una
