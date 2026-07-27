@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T17:46:07.987Z
+  modified: 2026-07-27T22:47:44.833Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -438,6 +438,23 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   `add`/`addProject`). Así se probó el flujo real de importar (9 checks) sin abrir la app.
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
+
+## 27-jul-2026: CNC — seleccionar trayectorias por el lienzo y AZUL para la elegida — ✅ COMMIT 8dfc5ba
+Pedido de Jose: con varias trayectorias encimadas en la misma pieza no había forma de saber cuál
+estabas editando.
+- Cada grupo de la vista previa guarda **`tpi`** = a qué fila de la lista pertenece. ⚠️ Se calcula
+  con `tpaths.indexOf(list[k])`, **no con `k`**: si una trayectoria falla no se apila en `groups` y
+  los índices se correrían en silencio.
+- La **seleccionada se pinta AZUL** (`--group`) y más gruesa; el resto sigue en magenta. Flechas de
+  sentido y taladros heredan el color porque se pintan con el mismo `strokeStyle`.
+- **Pulsar una trayectoria en el lienzo** la selecciona en la lista, la carga en el formulario y
+  lleva su fila a la vista. El impacto va **ANTES** que la selección de figuras (se dibujan encima)
+  y solo actúa con `cncStep()` y vista previa encendida.
+- El repintado se dispara **desde `paintTps()`**: por ahí pasa TODO cambio de `tpSel` (clic en fila,
+  borrar, reordenar, calcular) → un único sitio del que acordarse.
+- ⚠️ **Limitación del arnés descubierta aquí**: el DOM falso **no completa el arranque en modo CNC**
+  (`applyMachine` no llega a aplicarse; comprobado contra la versión de ayer, así que es viejo, no
+  una regresión). En las pruebas hay que poner `state.machine='cnc'` y `setSideMode('cnc')` a mano.
 
 ## 27-jul-2026: EXPORTAR COMO… (PNG/JPG/PDF/SVG/DXF) — ✅ COMMIT 0d8bed9
 Pedido de Jose ("como lo tiene Illustrator"). Módulo nuevo **`export_ops.py`** + botón
