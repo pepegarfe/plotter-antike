@@ -78,6 +78,7 @@
   .wapill{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px;box-shadow:0 4px 14px -6px #0006;z-index:3;}
   .wapill button{width:26px;height:26px;border:0;background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;display:grid;place-content:center;}
   .wapill button:hover{background:var(--hover);color:var(--ink);}
+  .wapill button.on{background:var(--accent);color:#fff;}
   .wapill button svg{width:15px;height:15px;}
   .zoompill span{font-family:var(--mono);font-size:12px;color:var(--ink);padding:0 8px;min-width:48px;text-align:center;cursor:pointer;}
   .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:2;pointer-events:none;}
@@ -365,7 +366,7 @@
       <label><input type="checkbox" id="shpStar"> Estrella</label>
       <span>Interior</span><input id="shpInner" value="50" disabled><span>%</span>
     </div>
-    <div class="pillbar"><div class="wapill"><button id="btnSettings" title="Tamaño del área de trabajo…"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="11" rx="1.5"/><path d="M4.5 17.5v3.5M19.5 17.5v3.5M4.5 19.25h15"/><path d="M8 17.6 4.9 19.25 8 20.9M16 17.6l3.1 1.65L16 20.9"/></svg></button></div><div class="wapill"><button id="toolFit" title="Ajustar vista a la hoja de trabajo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button></div><div class="zoompill"><button id="zOut">−</button><span id="zoomTxt">Ajustar</span><button id="zIn">+</button></div></div>
+    <div class="pillbar"><div class="wapill"><button id="btnSettings" title="Tamaño del área de trabajo…"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="11" rx="1.5"/><path d="M4.5 17.5v3.5M19.5 17.5v3.5M4.5 19.25h15"/><path d="M8 17.6 4.9 19.25 8 20.9M16 17.6l3.1 1.65L16 20.9"/></svg></button></div><div class="wapill"><button id="toolFill" title="Ver las figuras RELLENAS (Cmd+Shift+Y) — para reconocer la silueta y ver qué queda como hueco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg></button></div><div class="wapill"><button id="toolFit" title="Ajustar vista a la hoja de trabajo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button></div><div class="zoompill"><button id="zOut">−</button><span id="zoomTxt">Ajustar</span><button id="zIn">+</button></div></div>
   </main>
 
   <aside class="inspect">
@@ -1044,6 +1045,49 @@
   var snapGuides=null;                          // líneas del imán mientras arrastras
   var refImg=null;                              // imagen de referencia {img,x,y,w,h} (solo sesión)
   var outlineMode=false;                        // Cmd+Y estilo Illustrator: esqueleto sin adornos
+  var fillView=false;                           // Cmd+Shift+Y: figuras RELLENAS (ver siluetas y huecos)
+
+  // ===== Ver relleno =====
+  // Pinta cada UNIDAD (un grupo, o un trazo suelto) como silueta llena con la regla
+  // PAR-IMPAR: un anillo dentro de otro abre HUECO (la "O" conserva el suyo). Es la MISMA
+  // convención del motor de corte (geo_ops / cnc_gcode / nest_ops), así que lo que se ve
+  // relleno es exactamente lo que quedará de material — no es un adorno, es una vista fiel.
+  function allUnits(){
+    var byG={}, units=[], i;
+    for(i=0;i<doc.paths.length;i++){
+      var g=doc.grp[i];
+      if(g){ (byG[g]=byG[g]||[]).push(i); } else units.push([i]);
+    }
+    Object.keys(byG).forEach(function(g){ units.push(byG[g]); });
+    // Orden de dibujo: el índice más bajo va debajo (mismo criterio que el z-order).
+    units.sort(function(a,b){ return Math.min.apply(null,a)-Math.min.apply(null,b); });
+    return units;
+  }
+  function drawFills(selSet,m,skip){
+    var base=cvar('--stroke'), selC=cvar('--sel'), grpC=cvar('--group'), faint=cvar('--faint');
+    var us=allUnits();
+    for(var k=0;k<us.length;k++){
+      var u=us[k], lleno=false;
+      ctx.beginPath();
+      for(var t=0;t<u.length;t++){
+        var i=u[t];
+        if(i===skip) continue;
+        // Una sola transformación por trazo (effPts no tiene caché): pedirla dos veces
+        // —una para saber si cierra y otra para dibujar— encarecería cada cuadro de paneo.
+        var e=effPts(i);
+        if(!isClosedPts(e)) continue;               // los trazos ABIERTOS no se rellenan
+        var p0=tp(e[0][0],e[0][1]); ctx.moveTo(p0[0],p0[1]);
+        for(var j=1;j<e.length;j++){ var q=tp(e[j][0],e[j][1]); ctx.lineTo(q[0],q[1]); }
+        ctx.closePath(); lleno=true;
+      }
+      if(!lleno) continue;
+      var isSel=u.some(function(x){ return selSet.has(x); });
+      ctx.fillStyle = isSel ? (m==='grp'?grpC:selC) : (isLocked(u[0])?faint:base);
+      ctx.globalAlpha = isSel?0.32:0.26;          // translúcido: se sigue viendo la rejilla y los traslapes
+      ctx.fill('evenodd');
+      ctx.globalAlpha = 1;
+    }
+  }
   var rotating=null;                            // giro libre con el mouse {A,pivot,start,applied,deg,moved}
   var ROTH=22;                                  // alto del tallo de la manija de rotación (px)
   var nestAnim=null;                            // reproducción de los intentos del nesting (fantasmas)
@@ -1089,6 +1133,7 @@
     var cutC=cvar('--stroke'), selC=cvar('--sel'), grpC=cvar('--group');
     ctx.lineJoin='round'; ctx.lineCap='round';
     var neI=(typeof nedit!=='undefined'&&nedit)?neditIdx():-1;   // el trazado en edición de nodos se pinta aparte
+    if(fillView && !outlineMode) drawFills(selSet,m,neI);        // relleno DEBAJO de los contornos
     for(var i=0;i<doc.paths.length;i++){
       if(i===neI) continue;
       var e=effPts(i), isSel=selSet.has(i);
@@ -1821,7 +1866,11 @@
     if(e.code==='Space'){ spaceDown=true; if(!pan&&!moving&&!marquee) cv.style.cursor='grab'; }
     else if(meta && e.key.toLowerCase()==='z' && !e.shiftKey){ e.preventDefault(); undo(); }
     else if(meta && e.key.toLowerCase()==='z' && e.shiftKey){ e.preventDefault(); redo(); }
-    else if(meta && e.key.toLowerCase()==='y'){ e.preventDefault(); outlineMode=!outlineMode; draw();
+    else if(meta && e.key.toLowerCase()==='y' && e.shiftKey){ e.preventDefault(); setFillView(!fillView);
+      toast(fillView?'Vista rellena — lo pintado es lo que queda de material':'Vista de contorno'); }
+    else if(meta && e.key.toLowerCase()==='y'){ e.preventDefault(); outlineMode=!outlineMode;
+      if(outlineMode) setFillView(false,false);      // vistas opuestas; sin guardar: la preferencia se conserva
+      draw();
       toast(outlineMode?'Modo contorno — solo el esqueleto de los trazos (Cmd+Y regresa)':'Vista normal'); }
     else if(meta && e.key.toLowerCase()==='c'){ e.preventDefault(); doCopy(); }
     else if(meta && e.key.toLowerCase()==='v'){ e.preventDefault(); doPaste(); }
@@ -2130,8 +2179,11 @@
   });
 
   // ===== Combinar (booleanas) y Contorno (offset) — shapely en el backend =====
-  function isClosedIdx(i){ var e=effPts(i); return e.length>2 &&
+  // UNA sola definición de "cerrado" (≤0.05 mm entre el primer y el último punto): la
+  // comparten el criterio de los motores y la vista rellena.
+  function isClosedPts(e){ return e.length>2 &&
     Math.hypot(e[0][0]-e[e.length-1][0], e[0][1]-e[e.length-1][1])<=0.05; }
+  function isClosedIdx(i){ return isClosedPts(effPts(i)); }
   // Unidades activas con sus anillos CERRADOS en coordenadas efectivas,
   // ordenadas por orden de dibujo (la primera = la de abajo, importa en Restar).
   function geoUnits(){
@@ -2793,6 +2845,18 @@
   document.addEventListener('mousedown',function(e){ if(!e.target.closest || !e.target.closest('#ctxMenu')) ctxHide(); });
   cv.addEventListener('wheel',ctxHide);
   el('toolFit').addEventListener('click',function(){ userZoomed=false; view.ready=false; fitView(); });
+  function setFillView(on,guardar){
+    fillView=!!on;
+    el('toolFill').classList.toggle('on',fillView);
+    if(fillView && outlineMode) outlineMode=false;   // son vistas opuestas: no pueden convivir
+    draw();
+    if(guardar!==false) CNC.set({fillview:fillView});
+  }
+  el('toolFill').addEventListener('click',function(){
+    setFillView(!fillView);
+    toast(fillView ? 'Vista rellena — lo pintado es lo que queda de material (los huecos se ven vacíos)'
+                   : 'Vista de contorno');
+  });
 
   // ===== Zoom UI =====
   el('zIn').addEventListener('click',function(){var r=cv.getBoundingClientRect();zoomAt(1.25,r.width/2,r.height/2);});
@@ -3071,7 +3135,7 @@
     if(api()){ api().get_workarea().then(got).catch(function(){fitView();}); }
     else { fetch('/api/workarea').then(function(r){return r.json();}).then(got).catch(function(){fitView();}); }
     // Config del CNC + máquina activa de la sesión pasada (idempotente: se puede re-llamar)
-    CNC.get().then(function(r){ if(r&&r.ok!==false){ state.cnc=r; if(r.theme&&r.theme!==curTheme()) setTheme(r.theme); if(r.units) setUnits(r.units,false); applyMachine(r.machine||'plotter', false);
+    CNC.get().then(function(r){ if(r&&r.ok!==false){ state.cnc=r; if(r.theme&&r.theme!==curTheme()) setTheme(r.theme); if(r.units) setUnits(r.units,false); setFillView(!!r.fillview,false); applyMachine(r.machine||'plotter', false);
       setSideMode('design'); } }).catch(function(){});   // al ABRIR siempre se arranca en el paso Diseño (aunque la máquina guardada sea la CNC)
   }
   if(window.ResizeObserver){ new ResizeObserver(function(){ if(userZoomed&&view.ready) draw(); else fitView(); }).observe(document.querySelector('.canvas')); }
@@ -4466,7 +4530,8 @@
   }, 4000);
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
-  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits, upd:{check:upCheck, open:openUpd, download:upDownload, chip:upChip, get info(){return upInfo;}} };
+  window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits, upd:{check:upCheck, open:openUpd, download:upDownload, chip:upChip, get info(){return upInfo;}},
+    allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw };
 })();
 </script>
 </body>
