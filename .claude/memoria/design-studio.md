@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T22:47:44.833Z
+  modified: 2026-07-27T22:59:07.497Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -445,8 +445,14 @@ estabas editando.
 - Cada grupo de la vista previa guarda **`tpi`** = a qué fila de la lista pertenece. ⚠️ Se calcula
   con `tpaths.indexOf(list[k])`, **no con `k`**: si una trayectoria falla no se apila en `groups` y
   los índices se correrían en silencio.
-- La **seleccionada se pinta AZUL** (`--group`) y más gruesa; el resto sigue en magenta. Flechas de
+- La **seleccionada se pinta VERDE** (`--good`) y más gruesa; el resto sigue en magenta. Flechas de
   sentido y taladros heredan el color porque se pintan con el mismo `strokeStyle`.
+  ⚠️ **Nació azul y se cambió a verde el mismo día**: Jose pidió el mapa de colores y al escribirlo
+  salió la contradicción — en el lienzo **el azul ya significa "VARIAS figuras seleccionadas"**,
+  justo lo contrario de "esta una trayectoria". **Regla del lienzo, respetarla al añadir colores:
+  magenta (`--accent`/`--sel`) = UNA figura o acción en curso · azul (`--group`) = VARIAS ·
+  verde (`--good`) = la trayectoria CNC activa · gris (`--faint`) = bloqueado.** El color no es
+  adorno: en el diseño distingue selección individual (medidas ABSOLUTAS) de múltiple (RELATIVAS).
 - **Pulsar una trayectoria en el lienzo** la selecciona en la lista, la carga en el formulario y
   lleva su fila a la vista. El impacto va **ANTES** que la selección de figuras (se dibujan encima)
   y solo actúa con `cncStep()` y vista previa encendida.

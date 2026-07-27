@@ -1271,10 +1271,13 @@
     if(state.machine==='cnc' && cncPrev){
       for(var gi=0; gi<cncPrev.groups.length; gi++){
         var G=cncPrev.groups[gi];
-        // La trayectoria SELECCIONADA en la lista se pinta AZUL y más gruesa: con varias
+        // La trayectoria SELECCIONADA en la lista se pinta VERDE y más gruesa: con varias
         // encimadas en la misma pieza, es la única forma de saber cuál estás editando.
+        // ⚠️ Verde y NO azul a propósito: en el lienzo el azul ya significa "varias figuras
+        // seleccionadas", justo lo contrario de "esta una". Cada color, una sola cosa:
+        // magenta = una figura / acción en curso · azul = varias · verde = trayectoria activa.
         var esSel=(G.tpi!=null && G.tpi===tpSel);
-        ctx.strokeStyle=esSel?cvar('--group'):cvar('--accent'); ctx.lineWidth=esSel?2.6:1.6;
+        ctx.strokeStyle=esSel?cvar('--good'):cvar('--accent'); ctx.lineWidth=esSel?2.6:1.6;
         for(var t=0;t<G.tps.length;t++){ var tpts=G.tps[t]; if(tpts.length<2) continue;
           var sp=new Array(tpts.length);
           for(var u=0;u<tpts.length;u++) sp[u]=tp(tpts[u][0],tpts[u][1]);
