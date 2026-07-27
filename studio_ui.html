@@ -78,7 +78,6 @@
   .wapill{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px;box-shadow:0 4px 14px -6px #0006;z-index:3;}
   .wapill button{width:26px;height:26px;border:0;background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;display:grid;place-content:center;}
   .wapill button:hover{background:var(--hover);color:var(--ink);}
-  .wapill button.on{background:var(--accent);color:#fff;}
   .wapill button svg{width:15px;height:15px;}
   .zoompill span{font-family:var(--mono);font-size:12px;color:var(--ink);padding:0 8px;min-width:48px;text-align:center;cursor:pointer;}
   .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:2;pointer-events:none;}
@@ -345,6 +344,7 @@
     <div class="tool" id="toolNest" title="Acomodar en la hoja (nesting): acomoda las piezas solo para desperdiciar menos material"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2" opacity=".45"/><rect x="6" y="6" width="5" height="8" rx="1"/><rect x="13.5" y="6" width="4.5" height="5" rx="1"/><rect x="6" y="16" width="7" height="2.5" rx="1"/><rect x="13.5" y="13.5" width="4.5" height="5" rx="1"/></svg></div>
     <div class="tool" id="toolRef" title="Imagen de referencia — foto de fondo, tenue y bloqueada, para dibujar encima (clic de nuevo la quita)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" stroke-dasharray="3 2.2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 17-5-5-9 7"/></svg></div>
     <div class="sep"></div>
+    <div class="tool" id="toolFill" title="Ver las figuras RELLENAS (Cmd+Shift+Y) — silueta maciza del mismo color que el contorno, para reconocer la figura y ver qué queda como hueco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg></div>
     <div class="grow"></div>
     <div class="tool" id="tgl" title="Cambiar tema claro/oscuro"></div>
   </nav>
@@ -366,7 +366,7 @@
       <label><input type="checkbox" id="shpStar"> Estrella</label>
       <span>Interior</span><input id="shpInner" value="50" disabled><span>%</span>
     </div>
-    <div class="pillbar"><div class="wapill"><button id="btnSettings" title="Tamaño del área de trabajo…"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="11" rx="1.5"/><path d="M4.5 17.5v3.5M19.5 17.5v3.5M4.5 19.25h15"/><path d="M8 17.6 4.9 19.25 8 20.9M16 17.6l3.1 1.65L16 20.9"/></svg></button></div><div class="wapill"><button id="toolFill" title="Ver las figuras RELLENAS (Cmd+Shift+Y) — para reconocer la silueta y ver qué queda como hueco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg></button></div><div class="wapill"><button id="toolFit" title="Ajustar vista a la hoja de trabajo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button></div><div class="zoompill"><button id="zOut">−</button><span id="zoomTxt">Ajustar</span><button id="zIn">+</button></div></div>
+    <div class="pillbar"><div class="wapill"><button id="btnSettings" title="Tamaño del área de trabajo…"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="11" rx="1.5"/><path d="M4.5 17.5v3.5M19.5 17.5v3.5M4.5 19.25h15"/><path d="M8 17.6 4.9 19.25 8 20.9M16 17.6l3.1 1.65L16 20.9"/></svg></button></div><div class="wapill"><button id="toolFit" title="Ajustar vista a la hoja de trabajo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button></div><div class="zoompill"><button id="zOut">−</button><span id="zoomTxt">Ajustar</span><button id="zIn">+</button></div></div>
   </main>
 
   <aside class="inspect">

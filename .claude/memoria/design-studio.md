@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T16:45:52.941Z
+  modified: 2026-07-27T16:48:19.983Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -441,7 +441,9 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
 
 ## 27-jul-2026: VISTA RELLENA — ✅ COMMIT b37520c
 Jose: "necesitamos ver los trazados rellenos para identificar la figura de manera correcta".
-Botón en la píldora del lienzo (junto a Ajustar vista) + **Cmd+Shift+Y**.
+Botón en el **riel izquierdo**, en su propia sección tras "Imagen de referencia" (Jose lo pidió ahí;
+nació en la píldora del lienzo) + **Cmd+Shift+Y**. No cambia la herramienta activa y `setTool()` no
+lo apaga (togglea IDs concretos, no todo `.tool`) — igual que toolRef y toolNest.
 - Cada **unidad** (un grupo, o un trazo suelto) se pinta con **regla PAR-IMPAR** (`fill('evenodd')`):
   un anillo dentro de otro abre hueco. Es la **misma convención del motor de corte**
   (geo_ops/cnc_gcode/nest_ops) → **lo relleno es lo que quedará de material**. Vista fiel, no
