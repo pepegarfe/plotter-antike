@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-26T15:55:51.209Z
+  modified: 2026-07-27T16:41:50.561Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -438,6 +438,30 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   `add`/`addProject`). Así se probó el flujo real de importar (9 checks) sin abrir la app.
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
+
+## 27-jul-2026: VISTA RELLENA — ✅ COMMIT b37520c
+Jose: "necesitamos ver los trazados rellenos para identificar la figura de manera correcta".
+Botón en la píldora del lienzo (junto a Ajustar vista) + **Cmd+Shift+Y**.
+- Cada **unidad** (un grupo, o un trazo suelto) se pinta con **regla PAR-IMPAR** (`fill('evenodd')`):
+  un anillo dentro de otro abre hueco. Es la **misma convención del motor de corte**
+  (geo_ops/cnc_gcode/nest_ops) → **lo relleno es lo que quedará de material**. Vista fiel, no
+  adorno: si dos figuras del mismo grupo se traslapan, el traslape sale hueco *porque el cortador
+  las corta las dos*.
+- Translúcido (26%; 32% si va seleccionada) para no tapar rejilla, traslapes ni color de selección.
+  Los trazos **abiertos no se rellenan**. Relleno y modo contorno (Cmd+Y) se apagan entre sí, pero
+  el apagado por contorno **no pisa la preferencia guardada**.
+- Persistencia: llave **`fillview`** en `cnc_config`. ⚠️ Hubo que añadirla en TRES sitios
+  (`CNC_DEFAULTS`, la lista de llaves que lee `cnc_get`, y `cnc_set`) — el mismo patrón que hizo
+  perder `spinup` en su día: **llave nueva que no se agrega a la lista blanca se pierde en silencio**.
+- Refactor de paso: **una sola definición de "cerrado"** (`isClosedPts`, ≤0.05 mm) compartida por
+  el criterio de los motores y el relleno; y **una sola llamada a `effPts` por trazo** (no tiene
+  caché: pedirla dos veces —una para saber si cierra, otra para dibujar— encarecía cada cuadro).
+- **Medido** en vez de supuesto: 0.25 ms extra por cuadro con 32 000 puntos (un cuadro dura 16.7 ms).
+- Verificado: 18 checks (unidades, hueco de la O, abiertos sin rellenar, vistas opuestas,
+  persistencia) + backend real + regresión de actualizaciones (28+24).
+- **Lección del arnés (3ª vez que muerde)**: el manejador de teclado vive en **`window`**, no en
+  `document` — disparar la tecla en el sitio equivocado da un falso fallo. Y los elementos falsos
+  necesitan que `firstChild`/`lastChild` nunca sean `null` (el HTML real sí tiene esos nodos).
 
 ## 25-jul-2026: EMPAQUETADO para Windows y Mac + auto-actualización — ✅ COMMIT d77d07c
 Jose eligió **distribuir SOLO Design Studio** (Plotter Antike se queda como motor/respaldo, ya no
