@@ -1635,9 +1635,13 @@
     }
     // En el paso CNC, con las trayectorias a la vista: pulsar una la selecciona en la
     // lista de Corte. Va ANTES que la selección de figuras porque se dibuja encima.
-    if(cncStep() && cncPrev){
-      var htp=hitToolpath(sx,sy);
-      if(htp>=0){ selectTpFromCanvas(htp); return; }
+    // Pulsar CUALQUIER OTRA COSA la suelta, igual que al volver a pulsar su fila.
+    if(cncStep()){
+      if(cncPrev){
+        var htp=hitToolpath(sx,sy);
+        if(htp>=0){ selectTpFromCanvas(htp); return; }
+      }
+      if(tpSel>=0) deselectTp();      // y se sigue: el clic aún puede tomar una figura
     }
     if(tool==='nodes'){
       if(cncLock()) return;
@@ -3574,6 +3578,10 @@
     if(row && row.scrollIntoView) row.scrollIntoView({block:'nearest'});
     toast('Trayectoria «'+tpaths[i].name+'» seleccionada');
   }
+  // Soltar la trayectoria seleccionada. Deseleccionar NO es solo quitar el azul: el
+  // formulario vuelve a "trayectoria nueva" (el botón pasa de Recalcular a Calcular),
+  // que es exactamente lo que ya hacía volver a pulsar su fila.
+  function deselectTp(){ if(tpSel<0) return; tpSel=-1; el('tpName').value=''; paintTps(); }
   function paintTps(){ var L=el('tpList'); if(!L) return; L.innerHTML='';
     el('tpEmpty').style.display=tpaths.length?'none':'block';
     el('tpCount').textContent=tpaths.length?String(tpaths.length):'';
@@ -3604,9 +3612,9 @@
       mkb(TP_TRASH,'Eliminar trayectoria', function(){ tpaths.splice(i,1); if(tpSel===i)tpSel=-1; else if(tpSel>i)tpSel--; paintTps(); refreshPrev(); });
       var clickT=null;
       row.addEventListener('click',function(){ clearTimeout(clickT); clickT=setTimeout(function(){
-        if(tpSel===i){ tpSel=-1; el('tpName').value=''; }   // deseleccionar = formulario "nueva" con nombre limpio
-        else { tpSel=i; loadEditor(t); }
-        paintTps(); },230); });
+        if(tpSel===i) deselectTp();                        // una sola definición de "soltar"
+        else { tpSel=i; loadEditor(t); paintTps(); }
+      },230); });
       // arrastrar para reordenar (el orden de la lista ES el orden de corte)
       row.addEventListener('dragstart',function(e){ dragIdx=i; e.dataTransfer.effectAllowed='move'; });
       row.addEventListener('dragover',function(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; row.classList.add('dragover'); });
