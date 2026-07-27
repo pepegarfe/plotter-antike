@@ -77,6 +77,15 @@ def _frame(paths, opts):
     return b[0] - m, b[1] - m, w + 2 * m, h + 2 * m
 
 
+def bg_is_white(opts):
+    """¿Fondo blanco o transparente? Acepta `bg:'white'|'transparent'` y, por
+    compatibilidad, el `transparent:bool` con el que nació el exportador."""
+    b = opts.get('bg')
+    if b:
+        return str(b).lower() in ('white', 'blanco', 'w')
+    return not bool(opts.get('transparent', True))
+
+
 def _units_of(paths, opts):
     """[(anillos_cerrados, trazos_abiertos)] por unidad de dibujo."""
     idxs = opts.get('units')
@@ -107,6 +116,13 @@ def _pdf_doc(paths, opts):
         """mm con Y arriba → puntos con Y abajo (el volteo vive AQUÍ y solo aquí)."""
         return fitz.Point((pt[0] - x0) * _MM_PT, (hmm - (pt[1] - y0)) * _MM_PT)
 
+    if bg_is_white(opts):
+        # Fondo pintado DENTRO del PDF: así el blanco viaja también al PDF y al SVG,
+        # no solo a la imagen. Va primero, debajo de todo.
+        fondo = page.new_shape()
+        fondo.draw_rect(page.rect)
+        fondo.finish(color=None, fill=(1, 1, 1))
+        fondo.commit()
     negro = (0, 0, 0)
     ancho = _LINE_MM * _MM_PT
     rellenar = bool(opts.get('fill'))
@@ -139,8 +155,9 @@ def _raster(paths, opts, fmt):
     px = (wmm / 25.4 * dpi) * (hmm / 25.4 * dpi)
     if px > _MAX_PX:                              # baja el DPI en vez de tronar
         dpi = max(36, int(dpi * math.sqrt(_MAX_PX / px)))
-    # JPG no tiene transparencia: siempre fondo blanco.
-    alpha = bool(opts.get('transparent', True)) and fmt == 'png'
+    # JPG no tiene transparencia: siempre opaco. El PNG solo lleva alfa si se pidió
+    # transparente (con fondo blanco el rectángulo ya está pintado en el PDF).
+    alpha = fmt == 'png' and not bg_is_white(opts)
     pix = doc[0].get_pixmap(dpi=dpi, alpha=alpha)
     return pix.tobytes('png' if fmt == 'png' else 'jpg')
 
@@ -162,6 +179,8 @@ def _svg(paths, opts):
 
     rellenar = bool(opts.get('fill'))
     cuerpo = []
+    if bg_is_white(opts):
+        cuerpo.append('<rect x="0" y="0" width="%s" height="%s" fill="#fff"/>' % (n(wmm), n(hmm)))
     for cerrados, abiertos in _units_of(paths, opts):
         if cerrados:
             cuerpo.append('<path d="%s" fill="%s" fill-rule="evenodd" stroke="#000" '
