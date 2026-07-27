@@ -822,10 +822,11 @@
         <button data-f="pdf" title="Vectorial: se imprime a cualquier tamaño sin pixelarse">PDF</button>
         <button data-f="svg" title="Vector para otro programa de diseño (Illustrator, Inkscape…)">SVG</button>
         <button data-f="dxf" title="Vector para CAD/CAM (AutoCAD, Aspire, otra CNC)">DXF</button>
+        <button data-f="hpgl" id="exFmtHpgl" title="Archivo de CORTE del plotter — el mismo que se manda a la máquina">HPGL</button>
       </div>
       <label class="chk" style="margin-top:10px"><input type="checkbox" id="exSel"> Solo lo seleccionado</label>
     </div>
-    <div class="grp">
+    <div class="grp" id="exAreaGrp">
       <div class="grp-t">Qué encuadra</div>
       <div class="seg" id="exArea">
         <button class="on" data-a="content" title="Ajustado al diseño, con un margen">El diseño</button>
@@ -1021,12 +1022,18 @@
   function cutParams(){ return { speed: parseFloat(el('cutSpeed').value)||320, pressure: parseFloat(el('cutPressure').value)||140, overcut: parseFloat(el('cutOvercut').value)||0, corner: parseFloat(el('cutCorner').value)||0 }; }
   function effAll(){ var r=[]; for(var i=0;i<doc.paths.length;i++){ r.push(effPts(i)); } return r; }
   function pathLen(){ var L=0; for(var i=0;i<doc.paths.length;i++){ var e=effPts(i); for(var k=1;k<e.length;k++){ L+=Math.hypot(e[k][0]-e[k-1][0], e[k][1]-e[k-1][1]); } } return L; }
-  function hpglPayload(){ var cp=cutParams(); return {paths:effAll(), name:state.name, speed:cp.speed, pressure:cp.pressure, overcut:cp.overcut, corner:cp.corner}; }
-  function saveHpgl(){
+  // idxs: qué trazados entran (por defecto TODOS). Lo usa el diálogo de Exportar para
+  // ofrecer "solo lo seleccionado" sin duplicar el generador de HPGL, que es el que
+  // acaba en la máquina y debe existir UNA sola vez.
+  function hpglPayload(idxs){ var cp=cutParams();
+    return {paths:(idxs?idxs.map(function(i){return effPts(i);}):effAll()), name:state.name,
+            speed:cp.speed, pressure:cp.pressure, overcut:cp.overcut, corner:cp.corner}; }
+  function saveHpgl(payload, done){
     if(!hasDoc()) return;
-    var payload=hpglPayload();
-    if(api()){ api().save_hpgl(payload).then(function(r){ if(r&&r.ok) toast('Guardado: '+r.path); else if(r&&r.error) toast(r.error); }).catch(function(e){toast('Error: '+e);}); }
-    else { fetch('/api/hpgl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json();}).then(function(r){ if(!r||!r.ok){toast(r&&r.error?r.error:'Error HPGL');return;} var blob=new Blob([r.hpgl],{type:'text/plain'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(state.name||'diseno').replace(/\.[^.]+$/,'')+'.hpgl'; a.click(); toast('HPGL generado: '+r.lines+' líneas'); }).catch(function(e){toast('Error: '+e);}); }
+    payload=payload||hpglPayload();
+    var listo=done||function(){};
+    if(api()){ api().save_hpgl(payload).then(function(r){ if(r&&r.ok){ toast('Guardado: '+r.path); listo(true); } else { if(r&&r.error) toast(r.error); listo(false); } }).catch(function(e){toast('Error: '+e); listo(false);}); }
+    else { fetch('/api/hpgl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json();}).then(function(r){ if(!r||!r.ok){toast(r&&r.error?r.error:'Error HPGL'); listo(false); return;} var blob=new Blob([r.hpgl],{type:'text/plain'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(state.name||'diseno').replace(/\.[^.]+$/,'')+'.hpgl'; a.click(); toast('HPGL generado: '+r.lines+' líneas'); listo(true); }).catch(function(e){toast('Error: '+e); listo(false);}); }
   }
 
   // ===== Mejoras: duplicar · rotar 90 · alinear · rejilla · zoom a selección =====
@@ -4515,21 +4522,38 @@
     jpg:'Imagen con fondo blanco y más ligera. No admite transparencia.',
     pdf:'Vectorial: se imprime a cualquier tamaño sin pixelarse, y mide lo que dice medir.',
     svg:'Vector para otro programa de diseño (Illustrator, Inkscape). Conserva los milímetros.',
-    dxf:'Vector para CAD/CAM (AutoCAD, Aspire, otra CNC). Solo geometría: no lleva relleno.'
+    dxf:'Vector para CAD/CAM (AutoCAD, Aspire, otra CNC). Solo geometría: no lleva relleno.',
+    hpgl:'El archivo de CORTE del plotter, idéntico al del botón de la barra: usa la velocidad, '+
+         'la presión y el sobrecorte del panel de Corte. No tiene aspecto ni encuadre — son órdenes '+
+         'de movimiento para la cuchilla.'
   };
   function exPaint(){
     var raster=(exFmt==='png'||exFmt==='jpg');
+    // El HPGL no es un dibujo sino órdenes para la cuchilla: sin encuadre ni aspecto.
+    var soloGeom=(exFmt==='dxf'||exFmt==='hpgl');
     el('exDpiRow').style.display=raster?'flex':'none';
-    // El JPG no admite transparencia (siempre blanco) y el DXF no tiene fondo:
+    // El JPG no admite transparencia (siempre blanco) y el DXF/HPGL no tienen fondo:
     // solo se elige en PNG, PDF y SVG.
     el('exBgRow').style.display=(exFmt==='png'||exFmt==='pdf'||exFmt==='svg')?'':'none';
-    el('exFillRow').style.display=(exFmt==='dxf')?'none':'';        // el DXF no tiene relleno
-    el('exLookGrp').style.display=(exFmt==='dxf')?'none':'';
-    el('exMarginRow').style.display=(el('exArea').querySelector('.on').getAttribute('data-a')==='content')?'flex':'none';
+    el('exFillRow').style.display=soloGeom?'none':'';
+    el('exLookGrp').style.display=soloGeom?'none':'';
+    el('exAreaGrp').style.display=(exFmt==='hpgl')?'none':'';       // el HPGL sale en coordenadas de la máquina
+    el('exMarginRow').style.display=(!soloGeom||exFmt==='dxf') &&
+      el('exArea').querySelector('.on').getAttribute('data-a')==='content' ? 'flex':'none';
     el('exHint').textContent=EX_NOTA[exFmt]||'';
+  }
+  function exSetFmt(f){
+    exFmt=f;
+    el('exFmt').querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x.getAttribute('data-f')===exFmt); });
+    exPaint();
   }
   function exOpen(){
     if(!hasDoc()){ toast('Abre un diseño primero'); return; }
+    // El HPGL solo existe con el plotter: la CNC guarda su G-code desde el panel de
+    // Corte, donde vive la lógica de varias trayectorias y una fresa por archivo.
+    var hayHpgl=(state.machine==='plotter');
+    el('exFmtHpgl').style.display=hayHpgl?'':'none';
+    if(!hayHpgl && exFmt==='hpgl') exSetFmt('png');
     var haySel=(mode()!=='all');
     el('exSel').disabled=!haySel; if(!haySel) el('exSel').checked=false;
     el('exFill').checked=fillView;              // arranca como lo estás viendo en pantalla
@@ -4558,6 +4582,15 @@
     if(!p.paths.length){ toast('No hay nada que exportar'); return; }
     var b=el('exGo'); b.disabled=true; b.textContent='Exportando…';
     var fin=function(){ b.disabled=false; b.textContent='Exportar'; };
+    if(exFmt==='hpgl'){
+      // Se DELEGA en el generador de siempre (el mismo que alimenta a la máquina):
+      // aquí solo se elige qué trazados entran.
+      var solo=el('exSel').checked && !el('exSel').disabled;
+      saveHpgl(hpglPayload(solo?activeIdx():allIdx()), function(bien){
+        fin(); if(bien) el('exModal').style.display='none';
+      });
+      return;
+    }
     if(api()){
       api().export_as(p).then(function(r){ fin();
         if(r&&r.ok){ el('exModal').style.display='none'; toast('Guardado: '+r.path); }
@@ -4576,9 +4609,7 @@
   }
   el('btnExport').addEventListener('click',exOpen);
   el('exFmt').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
-    exFmt=b.getAttribute('data-f');
-    el('exFmt').querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x.getAttribute('data-f')===exFmt); });
-    exPaint(); });
+    exSetFmt(b.getAttribute('data-f')); });
   el('exArea').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     el('exArea').querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x===b); });
     exPaint(); });
@@ -4663,7 +4694,7 @@
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
   window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits, upd:{check:upCheck, open:openUpd, download:upDownload, chip:upChip, get info(){return upInfo;}},
     allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw,
-    ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}} };
+    ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, setFmt:exSetFmt, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}} };
 })();
 </script>
 </body>
