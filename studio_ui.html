@@ -326,7 +326,6 @@
     <button class="tbtn" id="btnImport" title="Importar otro diseño (SVG/DXF/AI o .dstudio) SUMÁNDOLO a la mesa — no quita lo que ya está"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6m-3-3h6"/></svg>Importar</button>
     <button class="tbtn" id="btnSaveProject" disabled title="Guardar tu proyecto (.dstudio) para reabrirlo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Guardar</button>
     <button class="tbtn" id="btnExport" disabled title="Exportar como… — imagen (PNG/JPG), PDF o vector (SVG/DXF) para mandar al cliente o a otro programa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Exportar…</span></button>
-    <button class="tbtn" id="btnSave" disabled title="Exportar el archivo de corte HPGL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg><span id="btnSaveLbl">Exportar HPGL</span></button>
     <button class="conn" id="connPill" title="Abrir panel del plotter"><span class="dot"></span><span id="connText">Desconectado</span></button>
     <button class="cta" id="btnSendTop" disabled><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 3 14 9-14 9z"/></svg>Enviar al plotter</button>
   </header>
@@ -1464,7 +1463,7 @@
     }
     var _on=el('alignTo').querySelector('.on');
     el('alignToLbl').textContent=(_on&&_on.getAttribute('data-to')==='workarea')?'a la hoja de trabajo':'a la selección';
-    el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has; el('btnQuote').disabled=!has; el('btnExport').disabled=!has;
+    el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has; el('btnQuote').disabled=!has; el('btnExport').disabled=!has;
     el('fileName').textContent=state.name||'sin diseño';
     var m=mode();
     if(!has){ ['fx','fy','fw','fh'].forEach(function(id){el(id).value='0.0';}); el('fr').value='0'; el('fs').value='100'; el('metaSize').textContent='—'; el('stSel').textContent=''; return; }
@@ -2919,7 +2918,6 @@
   el('zOut').addEventListener('click',function(){var r=cv.getBoundingClientRect();zoomAt(0.8,r.width/2,r.height/2);});
   el('zoomTxt').addEventListener('click',function(){ userZoomed=false; view.ready=false; fitView(); });
   el('btnUndo').addEventListener('click',undo); el('btnRedo').addEventListener('click',redo);
-  el('btnSave').addEventListener('click',function(){ if(state.machine==='cnc') saveTap(); else saveHpgl(); });
   // (Enviar al plotter se cablea en el bloque Fase 3, abajo)
 
   // ===== Abrir diseño (dual: pywebview o servidor) =====
@@ -3316,7 +3314,6 @@
     var cncMode=(m==='cnc');
     el('modeBar').style.display=cncMode?'block':'none';   // el toggle Diseño|CNC solo existe con la CNC activa
     setSideMode(cncMode?'cnc':'design');
-    el('btnSave').style.display=cncMode?'none':'';   // en CNC el G-code se guarda desde el panel de Corte
     el('btnSendTop').style.display=cncMode?'none':'';   // la CNC trabaja offline (archivo por USB), no hay envío
     el('connPill').style.display=cncMode?'none':'';
     state.work = cncMode ? ((state.cnc&&state.cnc.work)||[1220,2440]) : state.plotterWork;
@@ -4694,7 +4691,8 @@
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
   window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits, upd:{check:upCheck, open:openUpd, download:upDownload, chip:upChip, get info(){return upInfo;}},
     allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw,
-    ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, setFmt:exSetFmt, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}} };
+    ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, setFmt:exSetFmt, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}},
+    hpglPayload:hpglPayload };
 })();
 </script>
 </body>
