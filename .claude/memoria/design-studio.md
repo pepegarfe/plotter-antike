@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T17:41:44.346Z
+  modified: 2026-07-27T17:46:07.987Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -471,8 +471,12 @@ Pedido de Jose ("como lo tiene Illustrator"). Módulo nuevo **`export_ops.py`** 
   en `saveHpgl`/`hpglPayload` de siempre (ahora con parámetros opcionales: índices y aviso de
   terminado) y solo decide qué trazados entran → "solo lo seleccionado" también vale para el
   corte. El check que amarra esto compara que el envío del diálogo sea **idéntico** al del botón
-  de la barra: si divergen, el corte saldría distinto según por dónde se pida. El botón
-  "Exportar HPGL" de la barra superior **se queda** (camino rápido del trabajo diario).
+  de la barra. **El botón "Exportar HPGL" de la barra superior SE ELIMINÓ** el mismo día: lo dejé
+  puesto (argumento: es la acción diaria, un clic contra tres) y Jose preguntó por qué — su regla
+  del 24-jul manda, *lo que ya vive en otro sitio sale de las barras*. Barra superior final:
+  deshacer · rehacer · Abrir · Importar · Guardar · **Exportar…** · conexión · Enviar al plotter.
+  El check de equivalencia se reapuntó y quedó MEJOR: ya no compara contra un botón, sino contra
+  **lo que recibe "Enviar al plotter"** → lo que exportas es exactamente lo que corta la máquina.
 - **Limitación consciente v1**: todo sale en NEGRO. Los parsers sí leen `fill`/`stroke` del
   archivo, pero `_load_vector` los descarta al entrar a la UI — para exportar con los colores
   originales habría que conservarlos en el documento y en el `.dstudio`.
