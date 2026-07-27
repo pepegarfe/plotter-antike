@@ -1271,7 +1271,10 @@
     if(state.machine==='cnc' && cncPrev){
       for(var gi=0; gi<cncPrev.groups.length; gi++){
         var G=cncPrev.groups[gi];
-        ctx.strokeStyle=cvar('--accent'); ctx.lineWidth=1.6;
+        // La trayectoria SELECCIONADA en la lista se pinta AZUL y más gruesa: con varias
+        // encimadas en la misma pieza, es la única forma de saber cuál estás editando.
+        var esSel=(G.tpi!=null && G.tpi===tpSel);
+        ctx.strokeStyle=esSel?cvar('--group'):cvar('--accent'); ctx.lineWidth=esSel?2.6:1.6;
         for(var t=0;t<G.tps.length;t++){ var tpts=G.tps[t]; if(tpts.length<2) continue;
           var sp=new Array(tpts.length);
           for(var u=0;u<tpts.length;u++) sp[u]=tp(tpts[u][0],tpts[u][1]);
@@ -1591,6 +1594,29 @@
   var pan=null, moving=null, marquee=null, spaceDown=false, draft=null;   // draft = forma en curso (herramientas de dibujo)
   function hitPath(sx,sy){ // índice del trazado bajo el cursor (o -1). Recorre de arriba (último) a abajo.
     var thr=6; for(var i=doc.paths.length-1;i>=0;i--){ if(isLocked(i)) continue; var e=effPts(i); for(var k=0;k<e.length-1;k++){ var a=tp(e[k][0],e[k][1]), b=tp(e[k+1][0],e[k+1][1]); if(distSeg(sx,sy,a[0],a[1],b[0],b[1])<=thr) return i; } if(e.length===1){var a2=tp(e[0][0],e[0][1]); if(Math.hypot(sx-a2[0],sy-a2[1])<=thr) return i;} } return -1; }
+  // ¿Hay una TRAYECTORIA CNC bajo el cursor? Devuelve su fila en la lista (o -1).
+  // Se recorre de arriba hacia abajo (la última dibujada es la que se ve encima).
+  function hitToolpath(sx,sy){
+    if(!(state.machine==='cnc' && cncPrev)) return -1;
+    var thr=6;
+    for(var gi=cncPrev.groups.length-1; gi>=0; gi--){
+      var G=cncPrev.groups[gi];
+      if(G.tpi==null) continue;
+      for(var t=0;t<G.tps.length;t++){
+        var pts=G.tps[t];
+        for(var k=0;k<pts.length-1;k++){
+          var a=tp(pts[k][0],pts[k][1]), b=tp(pts[k+1][0],pts[k+1][1]);
+          if(distSeg(sx,sy,a[0],a[1],b[0],b[1])<=thr) return G.tpi;
+        }
+      }
+      var dr=Math.max(2,(G.dia/2)*view.scale);     // los taladros son círculos: se pulsan dentro
+      for(var q=0;q<G.drills.length;q++){
+        var d=tp(G.drills[q][0],G.drills[q][1]);
+        if(Math.hypot(sx-d[0],sy-d[1])<=dr+thr) return G.tpi;
+      }
+    }
+    return -1;
+  }
   function distSeg(px,py,x1,y1,x2,y2){ var dx=x2-x1,dy=y2-y1; var L=dx*dx+dy*dy; if(L===0) return Math.hypot(px-x1,py-y1); var t=((px-x1)*dx+(py-y1)*dy)/L; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x1+t*dx),py-(y1+t*dy)); }
   // ¿el trazado i está en la selección EXPLÍCITA? (en modo "Todos" no hay selección explícita → false,
   // para que un clic sobre una figura la seleccione individualmente en vez de mover todo)
@@ -1606,6 +1632,12 @@
       if(sx<=RUL && sy<=RUL){ if(guides.v.length||guides.h.length){ guides={v:[],h:[]}; draw(); toast('Guías borradas'); } return; }
       guideDrag={o: sx<=RUL?'v':'h', pos:null, idx:-1, sx:sx, sy:sy};
       return;
+    }
+    // En el paso CNC, con las trayectorias a la vista: pulsar una la selecciona en la
+    // lista de Corte. Va ANTES que la selección de figuras porque se dibuja encima.
+    if(cncStep() && cncPrev){
+      var htp=hitToolpath(sx,sy);
+      if(htp>=0){ selectTpFromCanvas(htp); return; }
     }
     if(tool==='nodes'){
       if(cncLock()) return;
@@ -3532,6 +3564,16 @@
   var dragIdx=null;
   function refreshPrev(){ killPrev();
     if(prevOn && activeTps().length) computePreview(); else draw(); }
+  // Pulsar una trayectoria en el LIENZO = seleccionarla en la lista y cargarla en el
+  // formulario, igual que pulsar su fila. Se lleva la fila a la vista por si la lista
+  // es larga y la seleccionada quedó fuera de pantalla.
+  function selectTpFromCanvas(i){
+    if(i<0 || i>=tpaths.length) return;
+    tpSel=i; loadEditor(tpaths[i]); paintTps();
+    var L=el('tpList'), row=L&&L.children[i];
+    if(row && row.scrollIntoView) row.scrollIntoView({block:'nearest'});
+    toast('Trayectoria «'+tpaths[i].name+'» seleccionada');
+  }
   function paintTps(){ var L=el('tpList'); if(!L) return; L.innerHTML='';
     el('tpEmpty').style.display=tpaths.length?'none':'block';
     el('tpCount').textContent=tpaths.length?String(tpaths.length):'';
@@ -3578,6 +3620,10 @@
         dragIdx=null; paintTps(); refreshPrev(); toast('Orden de corte actualizado'); });
       row.addEventListener('dragend',function(){ dragIdx=null; var d=L.querySelector('.dragover'); if(d) d.classList.remove('dragover'); });
       L.appendChild(row); });
+    // Repintar SIEMPRE al final: aquí pasa todo cambio de tpSel (clic en fila, borrar,
+    // reordenar, calcular…), así que es el único sitio donde hace falta acordarse de
+    // que el AZUL del lienzo tiene que seguir a la lista.
+    draw();
   }
   // controles del formulario: SOLO refrescan la vista del formulario (nada se aplica sin Calcular)
   el('opSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
@@ -3680,7 +3726,10 @@
     })).then(function(rs){
       var groups=[], secs=0, skipped=0, bad=null, gearsSeen={};
       rs.forEach(function(r,k){
-        if(r&&r.ok){ groups.push({tps:r.toolpaths||[], drills:r.drills||[], dia:r.dia||6, depth:(pls[k].start||0)+(pls[k].depth||0)}); secs+=r.secs||0; skipped+=r.skipped||0; if(r.gear) gearsSeen['S'+r.gear]=1; }
+        // `tpi` = a qué fila de la lista pertenece este dibujo. Sin él no se podría
+        // pintar de azul la seleccionada ni saber cuál se pulsó en el lienzo.
+        // ⚠️ No vale usar k: si una trayectoria falla, no se apila y los índices se corren.
+        if(r&&r.ok){ groups.push({tps:r.toolpaths||[], drills:r.drills||[], dia:r.dia||6, depth:(pls[k].start||0)+(pls[k].depth||0), tpi:tpaths.indexOf(list[k])}); secs+=r.secs||0; skipped+=r.skipped||0; if(r.gear) gearsSeen['S'+r.gear]=1; }
         else bad=(pls[k].label?pls[k].label+': ':'')+((r&&r.error)||'error');
       });
       if(!groups.length){ el('tpPrevLbl').textContent='Ver trayectorias'; toast(bad||'No se pudieron calcular las trayectorias'); return; }
@@ -4692,7 +4741,11 @@
   window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits, upd:{check:upCheck, open:openUpd, download:upDownload, chip:upChip, get info(){return upInfo;}},
     allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw,
     ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, setFmt:exSetFmt, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}},
-    hpglPayload:hpglPayload };
+    hpglPayload:hpglPayload,
+    cnc:{ get tpaths(){return tpaths;}, get tpSel(){return tpSel;}, set tpSel(v){tpSel=v;},
+          get prev(){return cncPrev;}, set prev(v){cncPrev=v;}, hitToolpath:hitToolpath,
+          selectFromCanvas:selectTpFromCanvas, paintTps:paintTps,
+          get step(){return cncStep();}, setSideMode:setSideMode } };
 })();
 </script>
 </body>
