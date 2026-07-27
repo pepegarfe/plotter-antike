@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T16:41:50.561Z
+  modified: 2026-07-27T16:45:52.941Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -447,7 +447,12 @@ Botón en la píldora del lienzo (junto a Ajustar vista) + **Cmd+Shift+Y**.
   (geo_ops/cnc_gcode/nest_ops) → **lo relleno es lo que quedará de material**. Vista fiel, no
   adorno: si dos figuras del mismo grupo se traslapan, el traslape sale hueco *porque el cortador
   las corta las dos*.
-- Translúcido (26%; 32% si va seleccionada) para no tapar rejilla, traslapes ni color de selección.
+- **Sólido y del MISMO color que su propio contorno** (`--stroke`, o `--sel`/`--group` si está
+  seleccionada, `--faint` si está bloqueada) → figura y línea se funden en una silueta maciza.
+  Nació translúcido al 26% y **Jose pidió opaco** ("que se vea como una sola figura"). Ojo: "negro"
+  es relativo al tema — en tema oscuro el contorno es gris claro y el relleno también (si fuera
+  negro literal sería invisible sobre el lienzo casi negro). Consecuencia asumida: dos unidades
+  encimadas ya **se tapan** por orden de dibujo; para ver lo de abajo, Cmd+Y (contorno).
   Los trazos **abiertos no se rellenan**. Relleno y modo contorno (Cmd+Y) se apagan entre sí, pero
   el apagado por contorno **no pisa la preferencia guardada**.
 - Persistencia: llave **`fillview`** en `cnc_config`. ⚠️ Hubo que añadirla en TRES sitios

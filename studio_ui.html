@@ -1082,10 +1082,11 @@
       }
       if(!lleno) continue;
       var isSel=u.some(function(x){ return selSet.has(x); });
+      // MISMO color que su contorno y SIN transparencia: figura y línea se funden en una
+      // sola silueta maciza (pedido de Jose). Los huecos dejan ver el lienzo, que es
+      // justo lo que los delata. Las unidades encimadas se tapan por orden de dibujo.
       ctx.fillStyle = isSel ? (m==='grp'?grpC:selC) : (isLocked(u[0])?faint:base);
-      ctx.globalAlpha = isSel?0.32:0.26;          // translúcido: se sigue viendo la rejilla y los traslapes
       ctx.fill('evenodd');
-      ctx.globalAlpha = 1;
     }
   }
   var rotating=null;                            // giro libre con el mouse {A,pivot,start,applied,deg,moved}
