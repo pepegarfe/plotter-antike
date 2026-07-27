@@ -58,7 +58,7 @@ def _mac():
                        check=True)
         subprocess.run(['install_name_tool', '-id', f'@loader_path/{name}', str(VENDOR / name)],
                        check=True)
-        print(f'  · librería incluida: {name}')
+        print(f'    libreria incluida: {name}')
 
     # Re-firmar: cambiar el binario invalida su firma ad-hoc y macOS lo mata al abrirlo.
     subprocess.run(['codesign', '--force', '-s', '-', str(dst)], check=True,
@@ -73,7 +73,7 @@ def _win():
     VENDOR.mkdir(exist_ok=True)
     dst = VENDOR / 'potrace.exe'
     zpath = VENDOR / 'potrace-win.zip'
-    print(f'  · bajando {WIN_URL}')
+    print(f'    bajando {WIN_URL}')
     urllib.request.urlretrieve(WIN_URL, zpath)
     with zipfile.ZipFile(zpath) as z:
         member = next(n for n in z.namelist() if n.lower().endswith('/potrace.exe')
@@ -90,7 +90,7 @@ def main():
     r = subprocess.run([str(dst), '--version'], capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(f'El potrace preparado no corre: {r.stderr.strip()}')
-    print(f'✓ {dst}  →  {r.stdout.splitlines()[0].strip()}')
+    print(f'OK  {dst}  ->  {r.stdout.splitlines()[0].strip()}')
 
 
 if __name__ == '__main__':

@@ -54,10 +54,10 @@ def main():
     ico = os.path.join(here, 'studio.ico')
     imgs[256].save(ico, format='ICO',
                    sizes=[(n, n) for n in (16, 24, 32, 48, 64, 128, 256)])
-    print(f'✓ {ico}')
+    print(f'OK  {ico}')
 
     if sys.platform != 'darwin':
-        print('· .icns se genera solo en Mac (necesita iconutil) — se omite.')
+        print('    .icns se genera solo en Mac (necesita iconutil): se omite.')
         return
     iconset = os.path.join(here, 'studio.iconset')
     shutil.rmtree(iconset, ignore_errors=True)
@@ -69,7 +69,7 @@ def main():
     icns = os.path.join(here, 'studio.icns')
     subprocess.run(['iconutil', '-c', 'icns', iconset, '-o', icns], check=True)
     shutil.rmtree(iconset, ignore_errors=True)
-    print(f'✓ {icns}')
+    print(f'OK  {icns}')
 
 
 if __name__ == '__main__':

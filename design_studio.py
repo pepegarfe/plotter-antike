@@ -406,9 +406,16 @@ def diagnostico():
     acomodo muertos porque una librería no quedó empaquetada. Mejor verlo aquí que
     descubrirlo con el material en la máquina."""
     import cnc_gcode
+    # ⚠️ La consola de Windows (cp1252) NO puede escribir ✓ ✗ · → y el programa TRUENA
+    # al imprimirlos. Se comprueba antes y, si no caben, se usa texto pelado.
+    try:
+        '✓·→'.encode(sys.stdout.encoding or 'utf-8')
+        SI, NO, PT, FL = '✓', '✗ FALTA ', '·', '→'
+    except Exception:
+        SI, NO, PT, FL = 'OK', 'FALTA ', '-', '=>'
     print(f'Design Studio {updater.current_version()}')
-    print(f'  compilada: {"sí" if getattr(sys, "frozen", False) else "no (corriendo del código)"}')
-    print(f'  python {sys.version.split()[0]} · {sys.platform}')
+    print(f'  compilada: {"si" if getattr(sys, "frozen", False) else "no (corriendo del codigo)"}')
+    print(f'  python {sys.version.split()[0]} {PT} {sys.platform}')
     filas = [
         ('Plotter (puerto serial)', core.HAS_SERIAL, 'pyserial'),
         ('Abrir DXF', core.HAS_DXF, 'ezdxf'),
@@ -432,11 +439,11 @@ def diagnostico():
     malos = 0
     for nombre, ok, lib in filas:
         malos += 0 if ok else 1
-        print(f'  {nombre.ljust(ancho)}  {"✓" if ok else "✗ FALTA " + lib}')
+        print(f'  {nombre.ljust(ancho)}  {SI if ok else NO + lib}')
     print(f'  {"Calco B/N (potrace)".ljust(ancho)}  {potrace}')
     if 'FALTA' in str(potrace):
         malos += 1
-    print('  → todo completo' if not malos else f'  → FALTAN {malos} piezas')
+    print(f'  {FL} todo completo' if not malos else f'  {FL} FALTAN {malos} piezas')
     return 0 if not malos else 1
 
 

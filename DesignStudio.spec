@@ -40,8 +40,9 @@ if vendor.is_dir():
             binaries.append((str(f), '.'))
     print(f'[spec] potrace incluido desde {vendor}')
 else:
-    print('[spec] AVISO: sin vendor/ — la app no traerá potrace y el calco B/N '
-          'solo funcionará donde esté instalado (corre preparar_potrace.py).')
+    # Sin acentos a proposito: la consola de Windows (cp1252) truena al imprimirlos.
+    print('[spec] AVISO: sin vendor/ - la app no llevara potrace y el calco B/N '
+          'solo funcionara donde ya este instalado (corre preparar_potrace.py).')
 
 try:
     VERSION = (HERE / 'version.txt').read_text().strip() or '0.0.0'
