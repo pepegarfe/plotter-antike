@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T16:48:19.983Z
+  modified: 2026-07-27T17:10:27.023Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -438,6 +438,33 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   `add`/`addProject`). Así se probó el flujo real de importar (9 checks) sin abrir la app.
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
+
+## 27-jul-2026: EXPORTAR COMO… (PNG/JPG/PDF/SVG/DXF) — ✅ COMMIT 0d8bed9
+Pedido de Jose ("como lo tiene Illustrator"). Módulo nuevo **`export_ops.py`** + botón
+"Exportar…" en la barra superior (visible con las DOS máquinas; el archivo de máquina
+—HPGL/G-code— sigue por su camino aparte).
+- **CERO dependencias nuevas**, que importaba porque el empaquetado acababa de cerrarse:
+  PDF y rasterizado con **pymupdf** (ya estaba para leer `.ai`), DXF con **ezdxf** (ya estaba
+  para leerlos). **PNG y JPG se obtienen rasterizando el MISMO PDF** → imagen y vector no
+  pueden contradecirse, y hay un solo camino de dibujo que mantener.
+- Regla **par-impar por unidad** (misma convención del lienzo y del corte): el hueco de la O
+  sale hueco. Abiertos nunca se rellenan.
+- Opciones: solo la selección (re-numera las unidades a la lista recortada) · encuadre
+  "el diseño" con margen o "la hoja completa" · relleno (arranca como la vista del lienzo) ·
+  resolución · fondo transparente. El diálogo **esconde lo que no aplica**: DXF sin aspecto,
+  JPG sin transparencia (no la soporta), PDF sin resolución.
+- **Volteo de Y en UN solo sitio por formato**: PDF/SVG/raster son Y-abajo, DXF Y-arriba y no
+  se toca (misma disciplina que salvó los imports en jul-2026).
+- Guardas: DPI absurdo → baja solo (techo de píxeles) en vez de quedarse sin memoria; una
+  recta (alto cero) no degenera la página; **el LWPOLYLINE cerrado NO repite el último punto**
+  (repetirlo deja un segmento de largo cero que algunos CAM leen como pinchazo).
+- **Verificado midiendo**: 33 checks del motor —100 mm miden 100 mm en los cinco formatos— y
+  la prueba fuerte es la **IDA Y VUELTA**: exportar SVG y DXF y **reabrirlos con nuestros
+  propios lectores**, que siguen midiendo 100×100. Más 31 de UI y e2e por el servidor real
+  (los cinco con su MIME y reconocidos por `file`); el PNG se miró sobre fondo de color.
+- **Limitación consciente v1**: todo sale en NEGRO. Los parsers sí leen `fill`/`stroke` del
+  archivo, pero `_load_vector` los descarta al entrar a la UI — para exportar con los colores
+  originales habría que conservarlos en el documento y en el `.dstudio`.
 
 ## 27-jul-2026: VISTA RELLENA — ✅ COMMIT b37520c
 Jose: "necesitamos ver los trazados rellenos para identificar la figura de manera correcta".
