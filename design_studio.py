@@ -21,6 +21,7 @@ import geo_ops as geo
 import curve_fit as fitter
 import nest_ops as nester
 import updater
+import export_ops as exporter
 
 # En la app compilada (PyInstaller) los recursos van a sys._MEIPASS; como script, junto al .py.
 if getattr(sys, 'frozen', False):
@@ -231,6 +232,28 @@ class Api:
 
     def geo_nest_status(self, data):
         return nester.nest_status(data or {})
+
+    # --- Exportar como… (PNG/JPG/PDF/SVG/DXF) ---
+    def export_as(self, data):
+        """Genera el archivo y lo guarda con el diálogo nativo del sistema."""
+        d = data or {}
+        r = exporter.export_bytes(d.get('format'), d)
+        if not r.get('ok'):
+            return r
+        ext = r['ext']
+        name = (d.get('name') or 'diseno').rsplit('.', 1)[0] + '.' + ext
+        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        if not res:
+            return {'ok': False, 'cancelled': True}
+        path = res if isinstance(res, str) else res[0]
+        if not path.lower().endswith('.' + ext):
+            path += '.' + ext
+        try:
+            with open(path, 'wb') as f:
+                f.write(r['bytes'])
+        except Exception as e:
+            return {'ok': False, 'error': f'No se pudo guardar: {e}'}
+        return {'ok': True, 'path': path, 'size': len(r['bytes'])}
 
     # --- Actualizaciones (solo tiene efecto en la app compilada) ---
     def update_check(self):

@@ -26,6 +26,7 @@ import geo_ops as geo
 import curve_fit as fitter
 import nest_ops as nester
 import updater
+import export_ops as exporter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8765
@@ -179,6 +180,21 @@ def api_nest_start():
 @app.post('/api/nest_status')
 def api_nest_status():
     return _json(nester.nest_status(request.json or {}))
+
+
+@app.post('/api/export')
+def api_export():
+    """Devuelve el archivo YA GENERADO como descarga (no JSON: son binarios y pesan)."""
+    d = request.json or {}
+    r = exporter.export_bytes(d.get('format'), d)
+    if not r.get('ok'):
+        return _json(r)
+    tipos = {'png': 'image/png', 'jpg': 'image/jpeg', 'pdf': 'application/pdf',
+             'svg': 'image/svg+xml', 'dxf': 'application/dxf'}
+    name = (d.get('name') or 'diseno').rsplit('.', 1)[0] + '.' + r['ext']
+    return HTTPResponse(body=r['bytes'], status=200, headers={
+        'Content-Type': tipos.get(r['ext'], 'application/octet-stream'),
+        'Content-Disposition': f'attachment; filename="{name}"'})
 
 
 @app.get('/api/update_check')

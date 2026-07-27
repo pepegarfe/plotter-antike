@@ -317,6 +317,7 @@
     <button class="tbtn" id="btnOpen" title="Abrir un diseño (SVG/DXF/AI) o un proyecto (.dstudio)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Abrir</button>
     <button class="tbtn" id="btnImport" title="Importar otro diseño (SVG/DXF/AI o .dstudio) SUMÁNDOLO a la mesa — no quita lo que ya está"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6m-3-3h6"/></svg>Importar</button>
     <button class="tbtn" id="btnSaveProject" disabled title="Guardar tu proyecto (.dstudio) para reabrirlo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Guardar</button>
+    <button class="tbtn" id="btnExport" disabled title="Exportar como… — imagen (PNG/JPG), PDF o vector (SVG/DXF) para mandar al cliente o a otro programa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Exportar…</span></button>
     <button class="tbtn" id="btnQuote" disabled title="Cotizar este trabajo: material + tiempo de máquina + margen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"/></svg><span>Cotizar</span></button>
     <button class="tbtn" id="btnSave" disabled title="Exportar el archivo de corte HPGL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg><span id="btnSaveLbl">Exportar HPGL</span></button>
     <button class="conn" id="connPill" title="Abrir panel del plotter"><span class="dot"></span><span id="connText">Desconectado</span></button>
@@ -800,6 +801,40 @@
         <button class="pbtn" id="cfNo" style="flex:1">Cancelar</button>
         <button class="pbtn acc" id="cfYes" style="flex:1">Sí, continuar</button>
       </div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="exModal" style="display:none">
+  <div class="sheet" style="width:400px">
+    <div class="sheet-h"><h3>Exportar como…</h3><button id="exClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="grp">
+      <div class="grp-t">Formato</div>
+      <div class="seg" id="exFmt">
+        <button class="on" data-f="png" title="Imagen con fondo transparente — para mandar por WhatsApp o meter en una presentación">PNG</button>
+        <button data-f="jpg" title="Imagen con fondo blanco, más ligera — para correo">JPG</button>
+        <button data-f="pdf" title="Vectorial: se imprime a cualquier tamaño sin pixelarse">PDF</button>
+        <button data-f="svg" title="Vector para otro programa de diseño (Illustrator, Inkscape…)">SVG</button>
+        <button data-f="dxf" title="Vector para CAD/CAM (AutoCAD, Aspire, otra CNC)">DXF</button>
+      </div>
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="exSel"> Solo lo seleccionado</label>
+    </div>
+    <div class="grp">
+      <div class="grp-t">Qué encuadra</div>
+      <div class="seg" id="exArea">
+        <button class="on" data-a="content" title="Ajustado al diseño, con un margen">El diseño</button>
+        <button data-a="sheet" title="Toda el área de trabajo, con el diseño donde está colocado">La hoja completa</button>
+      </div>
+      <div class="mrow" id="exMarginRow" style="margin-top:8px"><span style="flex:1;font-size:12px;color:var(--muted)">Margen</span><input type="number" id="exMargin" value="5" min="0" max="500" step="1" style="width:70px"><span style="font-size:12px;color:var(--muted)">mm</span></div>
+    </div>
+    <div class="grp" id="exLookGrp">
+      <div class="grp-t">Aspecto</div>
+      <label class="chk" id="exFillRow"><input type="checkbox" id="exFill"> Figuras rellenas (silueta maciza)</label>
+      <div class="mrow" id="exDpiRow" style="margin-top:8px"><span style="flex:1;font-size:12px;color:var(--muted)">Resolución</span><input type="number" id="exDpi" value="300" min="36" max="1200" step="10" style="width:70px"><span style="font-size:12px;color:var(--muted)">ppp</span></div>
+      <label class="chk" id="exBgRow" style="margin-top:8px"><input type="checkbox" id="exBg" checked> Fondo transparente</label>
+    </div>
+    <div class="grp">
+      <div id="exHint" style="font-size:12px;color:var(--muted);line-height:1.5"></div>
+      <button class="pbtn acc" id="exGo" style="width:100%;margin-top:10px">Exportar</button>
     </div>
   </div>
 </div>
@@ -1409,7 +1444,7 @@
     }
     var _on=el('alignTo').querySelector('.on');
     el('alignToLbl').textContent=(_on&&_on.getAttribute('data-to')==='workarea')?'a la hoja de trabajo':'a la selección';
-    el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has; el('btnQuote').disabled=!has;
+    el('btnSave').disabled=!has; el('btnSaveProject').disabled=!has; el('btnSendTop').disabled=!has; el('btnQuote').disabled=!has; el('btnExport').disabled=!has;
     el('fileName').textContent=state.name||'sin diseño';
     var m=mode();
     if(!has){ ['fx','fy','fw','fh'].forEach(function(id){el(id).value='0.0';}); el('fr').value='0'; el('fs').value='100'; el('metaSize').textContent='—'; el('stSel').textContent=''; return; }
@@ -4458,6 +4493,84 @@
   }
   el('traceApply').addEventListener('click',doTrace);
 
+  // ===== Exportar como… (PNG / JPG / PDF / SVG / DXF) =====
+  // El archivo de MÁQUINA (HPGL / G-code) sigue por su camino; esto es para mandar una
+  // muestra al cliente, imprimir, o pasarle el vector a otro programa.
+  var exFmt='png';
+  var EX_NOTA={
+    png:'Imagen con fondo transparente. Buena para WhatsApp, catálogos o presentaciones.',
+    jpg:'Imagen con fondo blanco y más ligera. No admite transparencia.',
+    pdf:'Vectorial: se imprime a cualquier tamaño sin pixelarse, y mide lo que dice medir.',
+    svg:'Vector para otro programa de diseño (Illustrator, Inkscape). Conserva los milímetros.',
+    dxf:'Vector para CAD/CAM (AutoCAD, Aspire, otra CNC). Solo geometría: no lleva relleno.'
+  };
+  function exPaint(){
+    var raster=(exFmt==='png'||exFmt==='jpg');
+    el('exDpiRow').style.display=raster?'flex':'none';
+    el('exBgRow').style.display=(exFmt==='png')?'':'none';
+    el('exFillRow').style.display=(exFmt==='dxf')?'none':'';        // el DXF no tiene relleno
+    el('exLookGrp').style.display=(exFmt==='dxf')?'none':'';
+    el('exMarginRow').style.display=(el('exArea').querySelector('.on').getAttribute('data-a')==='content')?'flex':'none';
+    el('exHint').textContent=EX_NOTA[exFmt]||'';
+  }
+  function exOpen(){
+    if(!hasDoc()){ toast('Abre un diseño primero'); return; }
+    var haySel=(mode()!=='all');
+    el('exSel').disabled=!haySel; if(!haySel) el('exSel').checked=false;
+    el('exFill').checked=fillView;              // arranca como lo estás viendo en pantalla
+    exPaint(); el('exModal').style.display='flex';
+  }
+  function exPayload(){
+    // Solo la selección: se recortan los trazados Y se re-numeran las unidades, porque
+    // el backend agrupa por POSICIÓN en la lista que le mandamos.
+    var solo=el('exSel').checked && !el('exSel').disabled;
+    var idxs=solo?activeIdx():allIdx();
+    var pos={}; idxs.forEach(function(i,k){ pos[i]=k; });
+    var units=allUnits().map(function(u){
+      return u.filter(function(i){ return pos[i]!==undefined; }).map(function(i){ return pos[i]; });
+    }).filter(function(u){ return u.length; });
+    return { format:exFmt, name:state.name||'diseno',
+             paths:idxs.map(function(i){ return effPts(i); }), units:units,
+             area:el('exArea').querySelector('.on').getAttribute('data-a'),
+             work:[state.work[0], state.work[1]],
+             margin:parseFloat(el('exMargin').value)||0,
+             fill:el('exFill').checked && exFmt!=='dxf',
+             dpi:parseInt(el('exDpi').value,10)||300,
+             transparent:el('exBg').checked };
+  }
+  function exGo(){
+    var p=exPayload();
+    if(!p.paths.length){ toast('No hay nada que exportar'); return; }
+    var b=el('exGo'); b.disabled=true; b.textContent='Exportando…';
+    var fin=function(){ b.disabled=false; b.textContent='Exportar'; };
+    if(api()){
+      api().export_as(p).then(function(r){ fin();
+        if(r&&r.ok){ el('exModal').style.display='none'; toast('Guardado: '+r.path); }
+        else if(r&&r.error) toast(r.error);
+      }).catch(function(e){ fin(); toast('Error: '+e); });
+    } else {
+      // En el navegador el servidor devuelve el archivo; aquí se dispara la descarga.
+      fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+        .then(function(r){ return r.headers.get('Content-Type').indexOf('json')>=0 ? r.json().then(function(j){throw new Error(j.error||'No se pudo exportar');}) : r.blob(); })
+        .then(function(blob){ fin();
+          var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+          a.download=(state.name||'diseno').replace(/\.[^.]+$/,'')+'.'+exFmt; a.click();
+          el('exModal').style.display='none'; toast('Exportado a '+exFmt.toUpperCase());
+        }).catch(function(e){ fin(); toast(''+e); });
+    }
+  }
+  el('btnExport').addEventListener('click',exOpen);
+  el('exFmt').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+    exFmt=b.getAttribute('data-f');
+    el('exFmt').querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x.getAttribute('data-f')===exFmt); });
+    exPaint(); });
+  el('exArea').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+    el('exArea').querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x===b); });
+    exPaint(); });
+  el('exGo').addEventListener('click',exGo);
+  el('exClose').addEventListener('click',function(){ el('exModal').style.display='none'; });
+  el('exModal').addEventListener('click',function(e){ if(e.target===el('exModal')) el('exModal').style.display='none'; });
+
   // ===== Actualizaciones (GitHub Releases) =====
   // Tres pasos: consultar → descargar (con avance) → instalar. El último cierra la app:
   // un programa no puede sobrescribirse a sí mismo mientras corre (ver updater.py).
@@ -4532,7 +4645,8 @@
 
   // Gancho de depuración (inofensivo): permite inyectar/leer estado durante pruebas.
   window.__DS={ load:loadDoc, add:addDoc, addProject:addProject, get doc(){return doc;}, get sel(){return sel;}, effPts:effPts, bboxOf:bboxOf, mode:mode, activeIdx:activeIdx, refreshUI:refreshUI, tp:tp, get view(){return view;}, projectData:projectData, loadProject:loadProject, get nedit(){return nedit;}, get pen(){return pen;}, get guides(){return guides;}, get refImg(){return refImg;}, get snapGuides(){return snapGuides;}, get nestAnim(){return nestAnim;}, autosaveTick:autosaveTick, get dirty(){return dirtySince;}, get state(){return state;}, setUnits:setUnits, upd:{check:upCheck, open:openUpd, download:upDownload, chip:upChip, get info(){return upInfo;}},
-    allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw };
+    allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw,
+    ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}} };
 })();
 </script>
 </body>
