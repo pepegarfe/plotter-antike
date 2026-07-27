@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T17:33:41.017Z
+  modified: 2026-07-27T17:41:44.346Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -465,6 +465,14 @@ Pedido de Jose ("como lo tiene Illustrator"). Módulo nuevo **`export_ops.py`** 
   la prueba fuerte es la **IDA Y VUELTA**: exportar SVG y DXF y **reabrirlos con nuestros
   propios lectores**, que siguen midiendo 100×100. Más 31 de UI y e2e por el servidor real
   (los cinco con su MIME y reconocidos por `file`); el PNG se miró sobre fondo de color.
+- **HPGL como un formato más** (27-jul, COMMIT 9290183): en modo plotter el diálogo ofrece
+  PNG·JPG·PDF·SVG·DXF·**HPGL**; con la CNC no aparece (su G-code sale del panel de Corte, que
+  tiene multi-trayectoria y una fresa por archivo). ⚠️ **No se reimplementa**: el diálogo DELEGA
+  en `saveHpgl`/`hpglPayload` de siempre (ahora con parámetros opcionales: índices y aviso de
+  terminado) y solo decide qué trazados entran → "solo lo seleccionado" también vale para el
+  corte. El check que amarra esto compara que el envío del diálogo sea **idéntico** al del botón
+  de la barra: si divergen, el corte saldría distinto según por dónde se pida. El botón
+  "Exportar HPGL" de la barra superior **se queda** (camino rápido del trabajo diario).
 - **Limitación consciente v1**: todo sale en NEGRO. Los parsers sí leen `fill`/`stroke` del
   archivo, pero `_load_vector` los descarta al entrar a la UI — para exportar con los colores
   originales habría que conservarlos en el documento y en el `.dstudio`.
