@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-27T22:59:07.497Z
+  modified: 2026-07-28T16:59:04.540Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -439,7 +439,7 @@ Illustrator pedirá otra representación). V-carve sigue fuera.
   El extractor por marcadores (`node --check` + eval de funciones puras) sigue sirviendo para
   el módulo 3D.
 
-## 27-jul-2026: CNC — seleccionar trayectorias por el lienzo y AZUL para la elegida — ✅ COMMIT 8dfc5ba
+## 27-jul-2026: CNC — seleccionar trayectorias por el lienzo y VERDE para la elegida — ✅ COMMITS 8dfc5ba + 477a802 + 26a8a52
 Pedido de Jose: con varias trayectorias encimadas en la misma pieza no había forma de saber cuál
 estabas editando.
 - Cada grupo de la vista previa guarda **`tpi`** = a qué fila de la lista pertenece. ⚠️ Se calcula
@@ -456,11 +456,29 @@ estabas editando.
 - **Pulsar una trayectoria en el lienzo** la selecciona en la lista, la carga en el formulario y
   lleva su fila a la vista. El impacto va **ANTES** que la selección de figuras (se dibujan encima)
   y solo actúa con `cncStep()` y vista previa encendida.
+- **Pulsar CUALQUIER OTRA COSA la suelta** (COMMIT 477a802 — faltaba: solo estaba construida la
+  mitad "seleccionar" y Jose preguntó por qué no se deseleccionaba). Vale en el vacío y sobre una
+  figura; el clic **sigue su camino**, así que aún puede tomar la figura. En el paso Diseño no se
+  toca (allí la lista ni se ve). ⚠️ **Soltar NO es solo quitar el verde**: el formulario vuelve a
+  "trayectoria nueva" (el botón pasa de Recalcular a Calcular) — misma semántica que re-pulsar su
+  fila, extraída a `deselectTp()` para que exista UNA vez. Efecto colateral asumido: lo tecleado
+  en el formulario y aún no Calculado se pierde.
 - El repintado se dispara **desde `paintTps()`**: por ahí pasa TODO cambio de `tpSel` (clic en fila,
   borrar, reordenar, calcular) → un único sitio del que acordarse.
 - ⚠️ **Limitación del arnés descubierta aquí**: el DOM falso **no completa el arranque en modo CNC**
   (`applyMachine` no llega a aplicarse; comprobado contra la versión de ayer, así que es viejo, no
   una regresión). En las pruebas hay que poner `state.machine='cnc'` y `setSideMode('cnc')` a mano.
+
+## 27-jul-2026: reacomodo de barras — ✅ COMMITS 7ccc539 + 28ce65b
+- **Cotizar** se fue de la barra superior a la **BARRA INFERIOR, solo como icono**, junto al tiempo
+  estimado (que es el dato del que sale el precio de máquina). Conserva su `id`, así que todo lo que
+  lo enganchaba siguió igual; clase nueva `.statbtn` para iconos de la barra de estado.
+- **"Exportar HPGL" ELIMINADO de la barra superior**: lo dejé puesto argumentando que era la acción
+  diaria, Jose preguntó por qué, y mandó su regla del 24-jul (*lo que ya vive en otro sitio sale de
+  las barras*). **Barra superior final: deshacer · rehacer · Abrir · Importar · Guardar ·
+  Exportar… · conexión · Enviar al plotter.**
+- Arnés nuevo `test_barras.js`: comprueba **dónde vive cada botón en el marcado**, no solo que
+  funcione. Es lo que detecta que algo "se movió solo".
 
 ## 27-jul-2026: EXPORTAR COMO… (PNG/JPG/PDF/SVG/DXF) — ✅ COMMIT 0d8bed9
 Pedido de Jose ("como lo tiene Illustrator"). Módulo nuevo **`export_ops.py`** + botón
@@ -576,8 +594,14 @@ derecho → Abrir). Lo construido, todo verificado:
   reemplazo real con apps de mentira (incluidas las guardas) + **descarga real de 82 MB** desde
   GitHub + app de Mac compilada (133 MB) que arranca y pasa el diagnóstico **también después de
   empaquetarla y desempaquetarla como hará la CI** + `auditar_gcode.py` 133/133.
-- **PENDIENTE**: publicar el primer release de verdad (etiqueta + push) — no se hizo, requiere el
-  sí de Jose. Hasta que exista, el aviso de actualización no tiene nada que ofrecer.
+- **PUBLICADO el 27-jul**: `v2026.07.27` (primer release) y `v2026.07.27.2` (con todo lo del 27).
+  Windows 64 MB · Mac 57 MB, ambas verdes en la CI y con el diagnóstico completo dentro.
+  ⚠️ **El primer intento FALLÓ en Windows**: la consola (cp1252) **no puede imprimir `✓ ✗ · →`** y
+  el `print` mató el paso — el icono y potrace ya se habían creado bien. Arreglado en los tres
+  scripts y en `--diagnostico` (comprueba la codificación y cae a texto pelado), porque **le
+  pasaría igual a un usuario en CMD**. Regla: **la salida de terminal, en ASCII**.
+  Ensayo real del ciclo de actualización preparado en `/tmp/ensayo-update` (copia con la versión
+  bajada a mano) — falta que Jose pulse el botón.
 
 ### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
 1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
@@ -592,7 +616,7 @@ derecho → Abrir). Lo construido, todo verificado:
    nesting ✓, y toda la épica Illustrator — ver notas 1-14 arriba.)
 5. **Ruta comercial** ([[idea-comercial]]): en paso 1 (producción propia); siguiente hito =
    piloto con 2-3 talleres. **Empaquetado Win+Mac ya HECHO** (ver sección de arriba); falta
-   publicar el primer release y decidir repo privado. Para vender a talleres convendría la
+   decidir repo privado (el empaquetado y el primer release ya están hechos). Para vender a talleres convendría la
    cuenta de desarrollador de Apple (99 USD/año): hoy la app de Mac va sin firmar y asusta
    en la primera apertura.
 
