@@ -494,17 +494,35 @@ def diagnostico():
 def main():
     if '--diagnostico' in sys.argv:
         sys.exit(diagnostico())
-    # Calentar el listado de fuentes en segundo plano: cuando el usuario abra el
-    # modal de Texto ya está listo (con caché de disco es instantáneo; sin él,
-    # el escaneo de ~5 s corre mientras la ventana arranca).
-    import threading
-    threading.Thread(target=texter.list_fonts, daemon=True).start()
     api = Api()
     win = webview.create_window(
         'Design Studio', os.path.join(HERE, 'studio_ui.html'),
         js_api=api, width=1300, height=820, min_size=(1040, 660),
         background_color='#0E1013')
     api.window = win
+
+    # Calentar el listado de fuentes: cuando el usuario abra el modal de Texto ya está
+    # listo (con caché de disco es instantáneo; sin él, el escaneo tarda segundos —
+    # MUCHOS en Windows, donde el antivirus inspecciona cada uno de los ~400 archivos
+    # que abre una app sin firmar).
+    #
+    # ⚠️ NUNCA lanzar esto ANTES de `create_window`. Así estaba y colgaba la app en
+    # Windows ~2 de cada 3 arranques: el escaneo es Python puro y acapara el intérprete
+    # (un solo hilo a la vez), justo mientras la ventana nace y necesita entrar a Python
+    # para armarse. Carrera perdida = ventana "No responde" para siempre. En Mac no se
+    # notaba porque el escaneo dura 3 s en vez de un minuto.
+    #
+    # `events.loaded` corre cuando la página YA cargó, y pywebview lo despacha en su
+    # propio hilo. Puede dispararse más de una vez: no importa, `list_fonts` cachea.
+    def _calentar_fuentes():
+        import time
+        time.sleep(1.5)     # margen para que la ventana termine de asentarse
+        try:
+            texter.list_fonts()
+        except Exception:
+            pass            # el modal de Texto lo reintentará cuando haga falta
+    win.events.loaded += _calentar_fuentes
+
     webview.start()
 
 

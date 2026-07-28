@@ -118,7 +118,9 @@ def list_fonts(refresh=False):
         except Exception:
             pass
     # 2) escaneo real
+    import time
     out = {}
+    vistos = 0
     for d in _font_dirs():
         if not os.path.isdir(d):
             continue
@@ -126,6 +128,13 @@ def list_fonts(refresh=False):
             for fn in sorted(files):
                 if fn.startswith('.'):
                     continue
+                # ⚠️ Soltar el intérprete cada 16 archivos. Python solo deja correr UN
+                # hilo a la vez, y este escaneo es Python puro: sin esta pausa acapara
+                # el intérprete y deja sin aire a la ventana (en Windows se ve como
+                # "No responde"). Cuesta ~nada y hace que el escaneo sea buen vecino.
+                vistos += 1
+                if not vistos % 16:
+                    time.sleep(0)
                 ext = os.path.splitext(fn)[1].lower()
                 path = os.path.join(base, fn)
                 try:
