@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-28T16:59:04.540Z
+  modified: 2026-07-28T18:19:31.862Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -602,6 +602,42 @@ derecho → Abrir). Lo construido, todo verificado:
   pasaría igual a un usuario en CMD**. Regla: **la salida de terminal, en ASCII**.
   Ensayo real del ciclo de actualización preparado en `/tmp/ensayo-update` (copia con la versión
   bajada a mano) — falta que Jose pulse el botón.
+
+## 28-jul-2026: la app NO ARRANCABA en Windows — la "marca de internet" — ✅ `v2026.07.28`
+
+**Síntoma** (en la PC de un usuario, no la de Jose): cuadro *"Unhandled exception in script"* con
+`Failed to resolve Python.Runtime.Loader.Initialize from ...\_internal\pythonnet\runtime\Python.Runtime.dll`.
+
+**Causa**: al extraer un `.zip` bajado del navegador, Windows le pega a cada archivo el flujo
+alterno **`Zone.Identifier`** ("vino de internet"). A un **ensamblado de .NET** eso lo mata: el CLR
+se niega a cargarlo. Y pywebview en Windows **no puede vivir sin pythonnet** (`import clr`) — es el
+puente Python↔.NET que dibuja la ventana. El instalador nunca quitaba esa marca.
+
+- **Arreglo**: `instalar_studio.ps1` hace `Unblock-File` recursivo tras el `robocopy`.
+  ⚠️ **Ese archivo se mantiene 100% ASCII a propósito**: PowerShell 5.1 lee UTF-8 sin BOM como ANSI
+  y destroza los acentos. (Lo rompí al comentar con `⚠️` y hubo que revertirlo.)
+- **No hay pescadilla**: el propio `.ps1` también sale marcado, pero `instalar_studio.bat` lo lanza
+  con `-ExecutionPolicy Bypass`, que ignora la zona. Por eso el instalador sí corre.
+- **La auto-actualización NUNCA estuvo afectada**: `updater.py` descarga con `urllib` y descomprime
+  con `zipfile`, y **ninguno de los dos pone la marca** — solo la ponen los navegadores y el
+  Explorador. Fallaba únicamente la instalación manual del zip.
+
+### El hueco de fondo: `--diagnostico` no probaba LA VENTANA
+Revisaba 8 piezas y **ninguna era el motor gráfico**, porque `webview.start()` lo carga de forma
+**perezosa** — o sea *después* del chequeo. Resultado: la CI compilaba, imprimía "todo completo" y
+publicaba una app que **moría al abrirse**. Ahora `--diagnostico` reproduce el `import clr` y, si
+falla, imprime la causa y el comando de PowerShell que lo arregla.
+**Lección general: un chequeo que corre antes de la carga perezosa no prueba nada de lo que viene
+después.** Si la librería se carga tarde, el diagnóstico tiene que forzar esa carga.
+
+**Cómo se confirmó**: en la Windows de la CI el mismo paquete da `Ventana (motor grafico) OK` — el
+empaquetado estaba bien, lo único distinto en la máquina rota era el origen (zip del navegador).
+**Señal de lectura**: el error decía *"Failed to **resolve**"* **con la ruta completa del archivo**,
+no *"file not found"* → **el archivo estaba ahí**; era bloqueo/permisos, no empaquetado.
+
+⏳ **Falta que el usuario confirme** que ya abre (con `Unblock-File` a mano o reinstalando con
+`v2026.07.28`). Comando de diagnóstico a mano:
+`Get-Item <ruta>\Python.Runtime.dll -Stream Zone.Identifier` (si existe → era esto).
 
 ### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
 1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
