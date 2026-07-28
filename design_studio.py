@@ -458,6 +458,19 @@ def diagnostico():
     except Exception:
         vt = False
     filas.append(('Calco a color', vt, 'vtracer'))
+    # ⚠️ LA VENTANA MISMA. Sin esto el diagnostico decia "todo completo" en una app que
+    # MORIA al abrirse: `webview.start()` carga el motor grafico de forma perezosa, o sea
+    # DESPUES de este chequeo. En Windows ese motor necesita pythonnet (`import clr`), el
+    # puente Python <-> .NET; si .NET se niega a cargarlo, el usuario ve un muro de
+    # traceback en vez de un mensaje util. Aqui se reproduce el mismo import, antes.
+    ventana, ventana_error = True, ''
+    try:
+        import webview  # noqa: F401
+        if sys.platform == 'win32':
+            import clr  # noqa: F401
+    except Exception as e:
+        ventana, ventana_error = False, f'{e.__class__.__name__}: {e}'
+    filas.append(('Ventana (motor grafico)', ventana, 'pywebview/pythonnet'))
     ancho = max(len(f[0]) for f in filas)
     malos = 0
     for nombre, ok, lib in filas:
@@ -466,6 +479,14 @@ def diagnostico():
     print(f'  {"Calco B/N (potrace)".ljust(ancho)}  {potrace}')
     if 'FALTA' in str(potrace):
         malos += 1
+    if not ventana:
+        print(f'     causa: {ventana_error}')
+        if sys.platform == 'win32':
+            # Sin acentos: la consola de Windows (cp1252) truena al imprimirlos.
+            print('     Windows suele BLOQUEAR los DLL que salieron de un .zip bajado de')
+            print('     internet. Abre PowerShell y corre (una sola linea):')
+            print('       Get-ChildItem "$env:LOCALAPPDATA\\Antike\\DesignStudio" -Recurse '
+                  '-File | Unblock-File')
     print(f'  {FL} todo completo' if not malos else f'  {FL} FALTAN {malos} piezas')
     return 0 if not malos else 1
 

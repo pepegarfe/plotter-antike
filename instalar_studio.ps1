@@ -45,6 +45,17 @@ if ($LASTEXITCODE -ge 8) {
 }
 Write-Host '   OK' -ForegroundColor Green
 
+# Quitar la "marca de internet" (flujo alterno Zone.Identifier) que Windows le pega a
+# TODO lo que sale de un .zip bajado del navegador.
+# OJO: sin esto la app NO ARRANCA. pywebview necesita pythonnet, y .NET se NIEGA a cargar
+# un ensamblado marcado como de zona Internet. El sintoma es un cuadro de error con
+# "Failed to resolve Python.Runtime.Loader.Initialize": el DLL esta ahi, pero bloqueado.
+# (Este archivo se mantiene 100% ASCII a proposito: PowerShell 5.1 lee UTF-8 sin BOM
+#  como ANSI y destroza los acentos.)
+Write-Host ' Desbloqueando archivos (marca de internet)...'
+Get-ChildItem -Path $dest -Recurse -File -Force -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+Write-Host '   OK' -ForegroundColor Green
+
 function New-Shortcut {
     param($LnkPath, $Target, $WorkDir, $Desc)
     $ws = New-Object -ComObject WScript.Shell
