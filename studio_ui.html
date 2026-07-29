@@ -3352,7 +3352,10 @@
     el('machSeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===m); });
     var cncMode=(m==='cnc');
     el('modeBar').style.display=cncMode?'block':'none';   // el toggle Diseño|CNC solo existe con la CNC activa
-    setSideMode(cncMode?'cnc':'design');
+    // ⚠️ SIEMPRE 'design', también al elegir la CNC: cambiar de máquina NO debe saltarte al
+    // paso de trayectorias. Primero se acomoda el diseño; al paso CNC se pasa a mano con el
+    // toggle de arriba. (Antes hacía `cncMode?'cnc':'design'` y te sacaba del diseño de golpe.)
+    setSideMode('design');
     el('btnSendTop').style.display=cncMode?'none':'';   // la CNC trabaja offline (archivo por USB), no hay envío
     el('connPill').style.display=cncMode?'none':'';
     state.work = cncMode ? ((state.cnc&&state.cnc.work)||[1220,2440]) : state.plotterWork;
