@@ -13,6 +13,7 @@ cnc_config.json
 
 fonts_cache.json
 autosave.dstudio
+arranque.log
 
 # Generados por el empaquetado (los crea la CI en cada release, no van a git):
 #   crear_icono_studio.py -> studio.ico / studio.icns

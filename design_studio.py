@@ -30,6 +30,55 @@ else:
     HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+# ---------------------------------------------------------------- registro de arranque
+# La app se distribuye SIN consola (`console=False` en el .spec), así que si se cuelga al
+# arrancar no hay dónde ver nada: el usuario solo ve "No responde". Este registro es la
+# única ventana a lo que pasó. Vive junto a la config (AppData en Windows).
+
+_LOG_F = None
+
+
+def _log(msg):
+    """Escribe una línea con hora en arranque.log. Nunca falla ni interrumpe la app."""
+    global _LOG_F
+    try:
+        import time as _t
+        if _LOG_F is None:
+            p = core._config_path().with_name('arranque.log')
+            # Que no crezca sin fin: pasado 1 MB se empieza de cero.
+            if p.exists() and p.stat().st_size > 1_000_000:
+                p.unlink()
+            _LOG_F = open(p, 'a', encoding='utf-8')
+        _LOG_F.write(f'{_t.strftime("%H:%M:%S")}  {msg}\n')
+        _LOG_F.flush()   # ⚠️ SIEMPRE: si la app muere a la fuerza, lo no volcado se pierde
+    except Exception:
+        pass
+
+
+def _armar_vigilante():
+    """Si el arranque se atora, vuelca la pila de TODOS los hilos al registro.
+
+    `faulthandler` es del propio Python y hace justo esto. Convierte un "se queda en No
+    responde" en "el hilo principal está detenido en tal archivo, tal línea"."""
+    try:
+        import faulthandler
+        if _LOG_F is None:
+            return
+        faulthandler.enable(file=_LOG_F)                                  # y ante un cierre brusco
+        faulthandler.dump_traceback_later(25, repeat=True, file=_LOG_F)   # cada 25 s si sigue vivo
+        _log('vigilante armado (vuelca las pilas si el arranque pasa de 25 s)')
+    except Exception as e:
+        _log(f'vigilante NO armado: {e}')
+
+
+def _desarmar_vigilante():
+    try:
+        import faulthandler
+        faulthandler.cancel_dump_traceback_later()
+    except Exception:
+        pass
+
+
 def _load_workarea():
     """Área de trabajo guardada (misma config que la app vieja), o el default del plotter."""
     try:
@@ -494,12 +543,17 @@ def diagnostico():
 def main():
     if '--diagnostico' in sys.argv:
         sys.exit(diagnostico())
+    _log('=== ARRANQUE ===')
+    _log(f'version {updater.current_version()} | python {sys.version.split()[0]} | '
+         f'{sys.platform} | compilada={bool(getattr(sys, "frozen", False))}')
+    _armar_vigilante()
     api = Api()
     win = webview.create_window(
         'Design Studio', os.path.join(HERE, 'studio_ui.html'),
         js_api=api, width=1300, height=820, min_size=(1040, 660),
         background_color='#0E1013')
     api.window = win
+    _log('ventana creada (aun no dibujada)')
 
     # Calentar el listado de fuentes: cuando el usuario abra el modal de Texto ya está
     # listo (con caché de disco es instantáneo; sin él, el escaneo tarda segundos —
@@ -516,14 +570,19 @@ def main():
     # propio hilo. Puede dispararse más de una vez: no importa, `list_fonts` cachea.
     def _calentar_fuentes():
         import time
-        time.sleep(1.5)     # margen para que la ventana termine de asentarse
+        _log('pagina cargada  <-- si el registro llega aqui, la ventana SI vivio')
+        _desarmar_vigilante()   # arrancó bien: ya no hace falta vigilar
+        time.sleep(1.5)         # margen para que la ventana termine de asentarse
         try:
-            texter.list_fonts()
-        except Exception:
-            pass            # el modal de Texto lo reintentará cuando haga falta
+            r = texter.list_fonts()
+            _log(f'fuentes listas: {len(r.get("fonts") or [])}')
+        except Exception as e:
+            _log(f'fuentes fallaron: {e}')   # el modal de Texto lo reintentará
     win.events.loaded += _calentar_fuentes
 
+    _log('entrando a webview.start() -- de aqui no se sale hasta cerrar')
     webview.start()
+    _log('=== CERRADA NORMALMENTE ===')
 
 
 if __name__ == '__main__':
