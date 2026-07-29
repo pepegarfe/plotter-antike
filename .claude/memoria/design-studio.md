@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-28T18:19:31.862Z
+  modified: 2026-07-29T03:04:56.943Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -635,9 +635,45 @@ empaquetado estaba bien, lo único distinto en la máquina rota era el origen (z
 **Señal de lectura**: el error decía *"Failed to **resolve**"* **con la ruta completa del archivo**,
 no *"file not found"* → **el archivo estaba ahí**; era bloqueo/permisos, no empaquetado.
 
-⏳ **Falta que el usuario confirme** que ya abre (con `Unblock-File` a mano o reinstalando con
-`v2026.07.28`). Comando de diagnóstico a mano:
+✅ **CONFIRMADO por el usuario**: con `Unblock-File` abrió sin problema. Diagnóstico a mano:
 `Get-Item <ruta>\Python.Runtime.dll -Stream Zone.Identifier` (si existe → era esto).
+
+## 28-jul-2026: y entonces se colgaba ~2 de cada 3 arranques — ✅ `v2026.07.28.2`
+
+Ya abierta, la app entraba en **"No responde"** de forma **intermitente**. El síntoma que reportó
+Jose fue "no puedo maximizar la ventana" — pero eso era **consecuencia**: Windows no redimensiona
+una ventana que no bombea mensajes.
+
+**Causa: una carrera.** `main()` lanzaba el calentado de fuentes **antes** de `create_window()`.
+Python solo corre **un hilo a la vez** (GIL) y ese escaneo es Python puro y acaparador, justo
+cuando la ventana necesita entrar a Python para armarse. Quién gana depende del reloj → **2 de 3**.
+En Mac nunca se vio: 3.12 s de escaneo contra ~1 min en Windows (Defender inspecciona cada uno de
+los ~400 archivos de fuente que abre una app **sin firmar**).
+
+**Y se alimentaba solo**: el hilo era `daemon=True`, así que al cerrar la app a medias **no escribía
+el caché** → el siguiente arranque re-escaneaba desde cero → la carrera se repetía siempre.
+
+- `design_studio.py`: el calentado se engancha a **`win.events.loaded`** (+1.5 s de margen).
+  pywebview lo despacha **en su propio hilo** (`Event(self)` sin lock, `event.py:44-47`; un
+  manejador **sin parámetros** se llama tal cual). ⚠️ **Nunca volver a lanzar trabajo pesado de
+  Python antes de `create_window()`.**
+- `text_vector.py`: el escaneo hace `time.sleep(0)` cada 16 archivos para soltar el intérprete.
+  Costo medido: **3.12 s vs 3.27 s = ninguno**.
+
+### Cómo se descartó lo demás (el camino, que vale más que la respuesta)
+1. **WebView2 faltante** → descartado: *"sí se ve la interfaz"*. Dato clave: WebView2 pinta en un
+   **proceso aparte**, por eso se ve la interfaz completa y congelada mientras el anfitrión está
+   muerto. Ver la UI **no** prueba que la app viva.
+2. **Abrazo mortal Python↔ventana** → descartado leyendo el código: **cero** `evaluate_js`. Además
+   pywebview corre cada llamada `js_api` **en un hilo aparte** a propósito (`util.py:247-250`), así
+   que una función lenta de Python **no** congela la ventana.
+3. **Costo de primera vez** → descartado por *"2 de cada 3"*. **Un fallo intermitente casi nunca es
+   'algo roto': son dos cosas compitiendo.** Esa frase fue la que resolvió el caso.
+
+⚠️ **NO reproducible en Mac** (necesita el Windows lento). Verificado aquí: contrato del evento
+contra el despachador real de pywebview sin GUI + prueba de punta a punta abriendo la app 16 s con
+el caché borrado → ventana viva y caché reescrito completo (60439 B) **después** de cargar, no
+antes. ⏳ **Falta confirmar en la PC de Windows** que ya abre varias veces seguidas sin trabarse.
 
 ### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
 1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
