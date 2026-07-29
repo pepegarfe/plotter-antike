@@ -128,7 +128,15 @@ class Api:
     """Métodos que la interfaz web puede llamar (window.pywebview.api.*)."""
 
     def __init__(self):
-        self.window = None
+        # ⚠️ EL GUION BAJO NO ES ESTILO: ES LO QUE EVITA UN ABRAZO MORTAL. NO se lo quites.
+        # pywebview RECORRE este objeto para exponerle sus métodos al JavaScript, y se mete
+        # dentro de cualquier atributo público que sea un objeto (`util.py` get_functions).
+        # Si la ventana cuelga de un atributo público, el recorrido toca `window.width`, cuyo
+        # getter le PREGUNTA EL TAMAÑO A LA VENTANA NATIVA... que en ese instante todavía se
+        # está creando en otro hilo. Los dos se esperan y la app se queda en "No responde"
+        # PARA SIEMPRE. Es una carrera: en Mac casi nunca se pierde; en Windows, 2 de cada 3.
+        # Los nombres que empiezan con `_` los SALTA (`if name.startswith('_'): continue`).
+        self._window = None
 
     def get_workarea(self):
         ww, wh = _load_workarea()
@@ -147,7 +155,7 @@ class Api:
     def tools_export(self):
         """Guarda la biblioteca (materiales + fresas) como JSON con diálogo nativo."""
         cfg = _cnc_get()
-        res = self.window.create_file_dialog(webview.SAVE_DIALOG,
+        res = self._window.create_file_dialog(webview.SAVE_DIALOG,
                                              save_filename='fresas-antike.json')
         if not res:
             return {'ok': False, 'cancelled': True}
@@ -162,7 +170,7 @@ class Api:
 
     def tools_import(self):
         """Abre un JSON de biblioteca y REEMPLAZA materiales + fresas (validando)."""
-        res = self.window.create_file_dialog(
+        res = self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
             file_types=('Biblioteca de fresas (*.json)', 'Todos los archivos (*.*)'))
         if not res:
@@ -188,7 +196,7 @@ class Api:
             raw = base64.b64decode((d.get('data') or '').split(',', 1)[1])
         except Exception:
             return {'ok': False, 'error': 'Captura vacía o corrupta.'}
-        res = self.window.create_file_dialog(webview.SAVE_DIALOG,
+        res = self._window.create_file_dialog(webview.SAVE_DIALOG,
                                              save_filename=d.get('name') or 'vista3d.png')
         if not res:
             return {'ok': False, 'cancelled': True}
@@ -213,7 +221,7 @@ class Api:
         if not r.get('ok'):
             return r
         name = ((data or {}).get('name') or 'diseno').rsplit('.', 1)[0] + '.tap'
-        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        res = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
         if not res:
             return {'ok': False, 'cancelled': True}
         path = res if isinstance(res, str) else res[0]
@@ -229,7 +237,7 @@ class Api:
 
     # --- Calco de imagen ---
     def trace_pick(self):
-        res = self.window.create_file_dialog(
+        res = self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
             file_types=('Imágenes (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)', 'Todos los archivos (*.*)'))
         if not res:
@@ -291,7 +299,7 @@ class Api:
             return r
         ext = r['ext']
         name = (d.get('name') or 'diseno').rsplit('.', 1)[0] + '.' + ext
-        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        res = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
         if not res:
             return {'ok': False, 'cancelled': True}
         path = res if isinstance(res, str) else res[0]
@@ -325,7 +333,7 @@ class Api:
 
     def _quit(self):
         try:
-            self.window.destroy()
+            self._window.destroy()
         except Exception:
             os._exit(0)
 
@@ -344,7 +352,7 @@ class Api:
 
     def ref_image(self):
         """Imagen de referencia: diálogo nativo → data-URL para pintarla de fondo."""
-        res = self.window.create_file_dialog(
+        res = self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
             file_types=('Imágenes (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)', 'Todos los archivos (*.*)'))
         if not res:
@@ -362,7 +370,7 @@ class Api:
     def open_design(self):
         """Abre un diálogo nativo. Acepta un diseño (SVG/DXF/AI), un proyecto (.dstudio)
         o una imagen (PNG/JPG…) que se manda directo al calco."""
-        res = self.window.create_file_dialog(
+        res = self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
             file_types=('Diseños imágenes y proyectos '
                         '(*.svg;*.dxf;*.ai;*.dstudio;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff)',
@@ -388,7 +396,7 @@ class Api:
     def import_design(self):
         """Como open_design pero para SUMAR a la mesa (no reemplaza): solo vectores
         y proyectos. Las imágenes van por Abrir — el calco siempre reemplaza."""
-        res = self.window.create_file_dialog(
+        res = self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False,
             file_types=('Diseños y proyectos (*.svg;*.dxf;*.ai;*.dstudio)',
                         'Todos los archivos (*.*)'))
@@ -429,7 +437,7 @@ class Api:
         except Exception as e:
             return {'ok': False, 'error': str(e)}
         name = (data.get('name') or 'diseno').rsplit('.', 1)[0] + '.hpgl'
-        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        res = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
         if not res:
             return {'ok': False, 'cancelled': True}
         path = res if isinstance(res, str) else res[0]
@@ -444,7 +452,7 @@ class Api:
         """Guarda el proyecto completo (trazados + transforms + área + corte) a un .dstudio."""
         name = (data.get('name') or 'proyecto')
         name = name.rsplit('.', 1)[0] + '.dstudio'
-        res = self.window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        res = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
         if not res:
             return {'ok': False, 'cancelled': True}
         path = res if isinstance(res, str) else res[0]
@@ -552,7 +560,7 @@ def main():
         'Design Studio', os.path.join(HERE, 'studio_ui.html'),
         js_api=api, width=1300, height=820, min_size=(1040, 660),
         background_color='#0E1013')
-    api.window = win
+    api._window = win     # ⚠️ con guion bajo a propósito — ver el comentario en Api.__init__
     _log('ventana creada (aun no dibujada)')
 
     # Calentar el listado de fuentes: cuando el usuario abra el modal de Texto ya está
