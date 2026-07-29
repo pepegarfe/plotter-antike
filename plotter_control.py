@@ -22,15 +22,50 @@ def _resource(filename):
     return Path(__file__).parent / filename
 
 
+# Carpeta de config: <base del sistema>/<FABRICANTE>/<APP>. Convención Fabricante\Aplicación,
+# la misma de `Google\Chrome`: así todos los programas de la casa viven juntos sin chocar con
+# los de otros. Se renombró el 29-jul-2026 (antes `Antike/PlotterController`, heredado de la app
+# vieja de tkinter y ya engañoso). Los nombres VIEJOS siguen aquí porque hay que migrar.
+_FABRICANTE, _APP = 'BuiltByJose', 'DesignStudio'
+_FABRICANTE_VIEJO, _APP_VIEJA = 'Antike', 'PlotterController'
+
+
+def _config_base():
+    """Carpeta del sistema donde va la config de cada usuario (sin fabricante ni app)."""
+    if sys.platform == 'darwin':
+        return Path.home() / 'Library' / 'Application Support'
+    if sys.platform == 'win32':
+        # APPDATA (Roaming), no LOCALAPPDATA: los AJUSTES siguen al usuario entre máquinas.
+        return Path(os.environ.get('APPDATA', str(Path.home())))
+    return Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config')))
+
+
+def _migrar_config(base, nueva):
+    """Copia la config de la carpeta vieja a la nueva, una sola vez.
+
+    ⚠️ COPIA, NO MUEVE, a propósito: ahí viven las fresas, materiales y presets del CNC.
+    Si algo saliera mal, la carpeta vieja sigue intacta y se puede volver atrás a mano.
+    Deja una carpeta huérfana pequeña: es el precio de poder deshacer."""
+    try:
+        minus = sys.platform not in ('darwin', 'win32')   # en Linux la costumbre es minúsculas
+        vieja = base / (_FABRICANTE_VIEJO.lower() if minus else _FABRICANTE_VIEJO) \
+                     / ('plotter-controller' if minus else _APP_VIEJA)
+        if not vieja.is_dir() or nueva.exists():
+            return
+        import shutil
+        shutil.copytree(vieja, nueva)
+    except Exception:
+        pass   # sin config previa, o sin permisos: se arranca con la de fábrica
+
+
 def _config_path():
     """Ruta persistente para la config: AppData/Library cuando es exe, dir del script si no."""
     if getattr(sys, 'frozen', False):
-        if sys.platform == 'darwin':
-            d = Path.home() / 'Library' / 'Application Support' / 'Antike' / 'PlotterController'
-        elif sys.platform == 'win32':
-            d = Path(os.environ.get('APPDATA', str(Path.home()))) / 'Antike' / 'PlotterController'
-        else:  # Linux y otros
-            d = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'antike' / 'plotter-controller'
+        base = _config_base()
+        minus = sys.platform not in ('darwin', 'win32')
+        d = base / (_FABRICANTE.lower() if minus else _FABRICANTE) / (_APP.lower() if minus else _APP)
+        if not d.exists():
+            _migrar_config(base, d)
         d.mkdir(parents=True, exist_ok=True)
         return d / 'plotter_config.json'
     return Path(__file__).parent / 'plotter_config.json'

@@ -97,7 +97,7 @@ app = BUNDLE(
     coll,
     name='DesignStudio.app',
     icon=str(HERE / 'studio.icns'),
-    bundle_identifier='com.antike.designstudio',
+    bundle_identifier='com.builtbyjose.designstudio',
     version=PLIST_VER,
     info_plist={
         'CFBundleName': 'Design Studio',
@@ -106,6 +106,6 @@ app = BUNDLE(
         'CFBundleVersion': PLIST_VER,
         'NSHighResolutionCapable': True,        # sin esto se ve borroso en pantallas Retina
         'LSMinimumSystemVersion': '10.15',
-        'NSHumanReadableCopyright': 'Antike',
+        'NSHumanReadableCopyright': 'BuiltByJose',
     },
 )

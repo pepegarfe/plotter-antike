@@ -9,8 +9,13 @@ $appName = 'Design Studio'
 $folder  = 'DesignStudio'
 $exeName = 'DesignStudio.exe'
 $src     = Join-Path $PSScriptRoot $folder
-$dest    = Join-Path $env:LOCALAPPDATA "Antike\$folder"
+# Convencion Fabricante\Aplicacion (como Google\Chrome). Renombrado 29-jul-2026: antes el
+# fabricante era 'Antike'. La instalacion vieja se borra mas abajo, tras copiar la nueva.
+$vendor      = 'BuiltByJose'
+$vendorViejo = 'Antike'
+$dest    = Join-Path $env:LOCALAPPDATA "$vendor\$folder"
 $destExe = Join-Path $dest $exeName
+$destViejo = Join-Path $env:LOCALAPPDATA "$vendorViejo\$folder"
 
 Write-Host ''
 Write-Host ' ===================================================' -ForegroundColor Magenta
@@ -56,6 +61,27 @@ Write-Host ' Desbloqueando archivos (marca de internet)...'
 Get-ChildItem -Path $dest -Recurse -File -Force -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 Write-Host '   OK' -ForegroundColor Green
 
+# Quitar la instalacion vieja (fabricante 'Antike'), ya que la nueva quedo copiada bien.
+# GUARDAS a proposito: solo borra si la ruta es EXACTAMENTE la vieja esperada, si no es la
+# misma que acabamos de instalar, y si de verdad contiene el .exe de esta app. Nunca se le
+# pasa al comando una ruta que no haya pasado esas tres pruebas.
+if ((Test-Path $destViejo) -and ($destViejo -ne $dest) -and
+    (Test-Path (Join-Path $destViejo $exeName))) {
+    Write-Host " Quitando la instalacion anterior: $destViejo"
+    Remove-Item -Path $destViejo -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path $destViejo) {
+        Write-Host "   No se pudo borrar del todo. Puedes borrarla a mano." -ForegroundColor Yellow
+    } else {
+        Write-Host '   OK' -ForegroundColor Green
+        # Si la carpeta del fabricante viejo quedo vacia, se va tambien.
+        $vendorDirViejo = Join-Path $env:LOCALAPPDATA $vendorViejo
+        if ((Test-Path $vendorDirViejo) -and
+            (-not (Get-ChildItem $vendorDirViejo -Force -ErrorAction SilentlyContinue))) {
+            Remove-Item $vendorDirViejo -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function New-Shortcut {
     param($LnkPath, $Target, $WorkDir, $Desc)
     $ws = New-Object -ComObject WScript.Shell
@@ -71,9 +97,17 @@ $desktop    = [Environment]::GetFolderPath('Desktop')
 New-Shortcut (Join-Path $desktop "$appName.lnk") $destExe $dest $desc
 Write-Host " Acceso directo en el Escritorio" -ForegroundColor Green
 
-$startDir = Join-Path ([Environment]::GetFolderPath('Programs')) 'Antike'
+$startDir = Join-Path ([Environment]::GetFolderPath('Programs')) $vendor
 if (-not (Test-Path $startDir)) { New-Item -ItemType Directory -Path $startDir -Force | Out-Null }
 New-Shortcut (Join-Path $startDir "$appName.lnk") $destExe $dest $desc
+# El acceso directo viejo del menu de inicio apuntaba a una carpeta que ya no existe.
+$startViejo = Join-Path ([Environment]::GetFolderPath('Programs')) $vendorViejo
+if (Test-Path (Join-Path $startViejo "$appName.lnk")) {
+    Remove-Item (Join-Path $startViejo "$appName.lnk") -Force -ErrorAction SilentlyContinue
+    if (-not (Get-ChildItem $startViejo -Force -ErrorAction SilentlyContinue)) {
+        Remove-Item $startViejo -Force -ErrorAction SilentlyContinue
+    }
+}
 Write-Host " Acceso directo en el Menu Inicio" -ForegroundColor Green
 
 Write-Host ''

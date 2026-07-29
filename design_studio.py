@@ -539,11 +539,14 @@ def diagnostico():
     if not ventana:
         print(f'     causa: {ventana_error}')
         if sys.platform == 'win32':
+            # ⚠️ La ruta se DEDUCE de donde esta el .exe, no se escribe a mano: quien
+            # instalo antes del cambio de fabricante (Antike -> BuiltByJose) sigue en la
+            # carpeta vieja hasta que reinstale, y una ruta fija le daria el consejo mal.
+            raiz = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else HERE
             # Sin acentos: la consola de Windows (cp1252) truena al imprimirlos.
             print('     Windows suele BLOQUEAR los DLL que salieron de un .zip bajado de')
             print('     internet. Abre PowerShell y corre (una sola linea):')
-            print('       Get-ChildItem "$env:LOCALAPPDATA\\Antike\\DesignStudio" -Recurse '
-                  '-File | Unblock-File')
+            print(f'       Get-ChildItem "{raiz}" -Recurse -File | Unblock-File')
     print(f'  {FL} todo completo' if not malos else f'  {FL} FALTAN {malos} piezas')
     return 0 if not malos else 1
 

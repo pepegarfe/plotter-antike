@@ -86,7 +86,7 @@ def _cache_file():
         from studio_backend import _cnc_path
         return os.path.join(os.path.dirname(_cnc_path()), 'fonts_cache.json')
     except Exception:
-        return os.path.join(os.path.expanduser('~'), '.antike_fonts_cache.json')
+        return os.path.join(os.path.expanduser('~'), '.builtbyjose_fonts_cache.json')
 
 
 def _dirs_sig():
