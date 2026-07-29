@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 21ab0256-37c6-4ef2-a2de-deb0c30ca8da
-  modified: 2026-07-29T20:00:00.000Z
+  modified: 2026-07-29T19:51:34.430Z
 ---
 
 # ✅ RESUELTO: el grosor del material volvía a 15 mm (Windows)
@@ -80,3 +80,27 @@ versión real solo se escribe en el pipeline de CI al publicar un release, nunca
 **Medir en la máquina que falla, no deducir desde la que funciona** — la causa era 100% específica
 de Windows (codepage cp1252 vs. default UTF-8 en Mac) y nunca iba a aparecer en las pruebas del Mac
 sin importar cuántas veces se repitieran.
+
+## Cierre de la clase entera — COMMIT `8c0e3bc`, release `v2026.07.29.6`
+
+El arreglo tapó `studio_backend.py`, pero la **misma bomba seguía en otros cinco sitios**, con la
+misma asimetría: se escribía en UTF-8 y se leía con el codepage del sistema.
+
+| Sitio | Qué pasaba en Windows |
+|---|---|
+| `design_studio.py:87` · `studio_server.py:40` | Leían `plotter_config.json` sin `encoding` → área de trabajo silenciosamente a 3000×600 |
+| `plotter_control.py:88` · `updater.py:50` | `version.txt` → ahora **`utf-8-sig`**, que además **se come el BOM** |
+| `plotter_control.py:3840` y `:3859` | La config que **comparten las dos apps**, lectura y escritura |
+
+- ⚠️ El de `updater.py` era el más grave: `.strip()` **NO quita el BOM**, así que la versión salía
+  como `﻿2026.07.29.5` y **`vkey()` no podía compararla** — la auto-actualización decidiendo mal.
+- **`utf-8-sig` en vez de una advertencia**: la nota decía "no escribas `version.txt` con
+  `Out-File`", o sea confiaba en que nadie se equivoque. Con `utf-8-sig` **el código aguanta el BOM
+  aunque aparezca**. Advertir no es arreglar.
+- **NO se tocaron el `.tap` ni el HPGL**: escriben solo números (`G00 X%s Y%s`), sin texto del
+  usuario, así que no pueden fallar. `tools_export` ya llevaba su `encoding`.
+- ⚠️ **La regla está en `CLAUDE.md`**, no solo aquí: la memoria se lee bajo demanda, y esto es un
+  "nunca hagas X" que basta un `write_text(json.dumps(...))` para reintroducir.
+
+Verificado 6/6: cp1252 falla de verdad con `'Fresa 3.175 mm (1/8″)'`; `version.txt` **con BOM** se
+lee limpio en ambas apps y `vkey()` da `(2026,7,29,5)`. Las 24 pruebas del actualizador, intactas.
