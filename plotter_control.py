@@ -41,19 +41,28 @@ def _config_base():
 
 
 def _migrar_config(base, nueva):
-    """Copia la config de la carpeta vieja a la nueva, una sola vez.
+    """Copia de la carpeta vieja los archivos que TODAVÍA no estén en la nueva.
 
     ⚠️ COPIA, NO MUEVE, a propósito: ahí viven las fresas, materiales y presets del CNC.
     Si algo saliera mal, la carpeta vieja sigue intacta y se puede volver atrás a mano.
-    Deja una carpeta huérfana pequeña: es el precio de poder deshacer."""
+
+    ⚠️ Archivo por archivo, y NUNCA pisa uno que ya exista en la nueva. Antes esto era un
+    `copytree` condicionado a que la carpeta nueva NO existiera, y era una trampa de un solo
+    tiro: si la carpeta llegaba a crearse vacía (una copia a medias, un antivirus que bloquea
+    un archivo), la migración no se reintentaba JAMÁS y el usuario se quedaba con los valores
+    de fábrica creyendo que perdió su configuración. Así se reintenta hasta que sale."""
     try:
         minus = sys.platform not in ('darwin', 'win32')   # en Linux la costumbre es minúsculas
         vieja = base / (_FABRICANTE_VIEJO.lower() if minus else _FABRICANTE_VIEJO) \
                      / ('plotter-controller' if minus else _APP_VIEJA)
-        if not vieja.is_dir() or nueva.exists():
+        if not vieja.is_dir():
             return
         import shutil
-        shutil.copytree(vieja, nueva)
+        nueva.mkdir(parents=True, exist_ok=True)
+        for f in vieja.iterdir():
+            destino = nueva / f.name
+            if f.is_file() and not destino.exists():
+                shutil.copy2(f, destino)
     except Exception:
         pass   # sin config previa, o sin permisos: se arranca con la de fábrica
 
@@ -64,7 +73,10 @@ def _config_path():
         base = _config_base()
         minus = sys.platform not in ('darwin', 'win32')
         d = base / (_FABRICANTE.lower() if minus else _FABRICANTE) / (_APP.lower() if minus else _APP)
-        if not d.exists():
+        # ⚠️ La condición es "la carpeta nueva NO tiene config todavía", NO "la carpeta no
+        # existe": esta misma función crea la carpeta dos líneas abajo, así que condicionar a
+        # su existencia dejaba la migración muerta para siempre si alguna vez quedaba vacía.
+        if not any((d / n).exists() for n in ('cnc_config.json', 'plotter_config.json')):
             _migrar_config(base, d)
         d.mkdir(parents=True, exist_ok=True)
         return d / 'plotter_config.json'
