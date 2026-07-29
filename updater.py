@@ -47,7 +47,9 @@ def _resource(name):
 
 def current_version():
     try:
-        v = _resource('version.txt').read_text(encoding='utf-8').strip()
+        # ⚠️ 'utf-8-sig': `.strip()` NO quita el BOM (`﻿`), así que con 'utf-8' a secas
+        # la versión saldría como '﻿2026.07.29' y `vkey()` no podría compararla.
+        v = _resource('version.txt').read_text(encoding='utf-8-sig').strip()
         return v or 'dev'
     except Exception:
         return 'dev'

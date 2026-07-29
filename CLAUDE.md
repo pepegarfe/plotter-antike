@@ -1,14 +1,11 @@
 # CLAUDE.md — Plotter Antike
 
-Leer **antes** de tocar el código. Aquí van solo los **invariantes y las trampas** que no se
-deducen leyendo el código. La arquitectura (clases, métodos, UI) se descubre leyendo
-`plotter_control.py` — **no** se documenta aquí para que no se pudra.
+Leer **antes** de tocar el código: solo **invariantes y trampas** que no se deducen leyéndolo. La
+arquitectura se descubre en `plotter_control.py` — no se documenta aquí para que no se pudra.
 
 **Historia, decisiones y estado del trabajo → [[MEMORY]]** (`.claude/memoria/`, empezar por `estado.md`).
 
-> Este doc fue **reescrito y verificado contra el código el 21-jul-2026** (el anterior describía una
-> versión vieja: hablaba de una UI que ya no existe y de código muerto). Si vuelves a ver una
-> afirmación que el código contradice, **corrígela aquí** — no la copies.
+> Verificado contra el código el 21-jul-2026. Si ves algo que el código contradice, **corrígelo aquí**.
 
 ---
 
@@ -62,6 +59,10 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   (`_undo_stack` y `_redo_stack`).
 - **Rutas de recursos y config: usar `_resource()` y `_config_path()`**, nunca hardcodear. Es lo que
   hace que funcione igual como script y como exe de PyInstaller (config en AppData en Windows).
+- ⚠️ **TODO JSON con `encoding='utf-8'` EXPLÍCITO**: sin él Python usa el codepage del SO (**cp1252
+  en Windows**) y un `″` —lo llevan los nombres de fresa de fábrica— hace que `write_text` **trunque
+  el archivo a 0 BYTES** y la config se pierda EN SILENCIO. **En Mac nunca falla**, así que no
+  aparece probando aquí. `version.txt` con **`utf-8-sig`**: se come el BOM de PowerShell 5.1.
 - **Refrescos de posición/escala/rotación: usar `_refresh_preview()`**, que NO resetea el zoom. **No
   llamar `set_paths()` ni `_auto_fit()`** para eso — perderías el zoom del usuario.
 - **`set_paths()` y `_generate_hpgl()` siempre con `_effective_styled()`**, nunca con
@@ -97,8 +98,7 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
 - **No quitar `arranque.log` ni el vigilante `faulthandler`** de `main()`. La app se distribuye
   **sin consola**: sin ese registro, un cuelgue al arrancar **no deja ningún rastro** y solo queda
   adivinar. En un arranque sano escribe seis líneas y se desarma solo.
-- **Regla general:** un fallo **intermitente** = **dos cosas compitiendo** (lo roto falla siempre o
-  nunca); si solo pasa en una máquina que no puedes tocar, **instrumenta en vez de deducir**.
+- **Regla:** fallo **intermitente** = dos cosas compitiendo; fallo en **una sola máquina** = mide ahí, no deduzcas.
 
 ---
 

@@ -85,7 +85,12 @@ def _config_path():
 
 def _get_version():
     try:
-        return _resource('version.txt').read_text().strip()
+        # ⚠️ 'utf-8-sig', no 'utf-8': además de fijar el encoding, SE COME el BOM si lo hay.
+        # `Out-File -Encoding utf8` de PowerShell 5.1 SIEMPRE mete BOM, y esos tres bytes
+        # invisibles al inicio reventaban `--diagnostico` en Windows. Que el código aguante
+        # el BOM es más fiable que confiar en que nadie escriba el archivo con la herramienta
+        # equivocada.
+        return _resource('version.txt').read_text(encoding='utf-8-sig').strip()
     except Exception:
         return "0.0.0"
 
@@ -3837,7 +3842,7 @@ chmod +x "{current}"
         self._has_config = self._CONFIG_PATH.exists()
         try:
             if self._CONFIG_PATH.exists():
-                data = json.loads(self._CONFIG_PATH.read_text())
+                data = json.loads(self._CONFIG_PATH.read_text(encoding='utf-8'))
                 self.var_work_w.set(float(data.get('work_w', 300.0)))
                 self.var_work_h.set(float(data.get('work_h', 200.0)))
                 self.var_overcut.set(float(data.get('overcut', 1.0)))
@@ -3858,7 +3863,7 @@ chmod +x "{current}"
                 'corner_angle':  self.var_corner_angle.get(),
                 'port':          self.var_port.get(),
                 'baud':          self.var_baud.get(),
-            }))
+            }), encoding='utf-8')
         except Exception:
             pass
 

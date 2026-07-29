@@ -84,7 +84,7 @@ def _load_workarea():
     try:
         p = core._config_path()
         if p.exists():
-            d = json.loads(p.read_text())
+            d = json.loads(p.read_text(encoding='utf-8'))   # ⚠️ ver la regla del encoding abajo
             return float(d.get('work_w', 3000.0)), float(d.get('work_h', 600.0))
     except Exception:
         pass
