@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-29T03:04:56.943Z
+  modified: 2026-07-29T17:28:22.217Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -673,7 +673,46 @@ el caché** → el siguiente arranque re-escaneaba desde cero → la carrera se 
 ⚠️ **NO reproducible en Mac** (necesita el Windows lento). Verificado aquí: contrato del evento
 contra el despachador real de pywebview sin GUI + prueba de punta a punta abriendo la app 16 s con
 el caché borrado → ventana viva y caché reescrito completo (60439 B) **después** de cargar, no
-antes. ⏳ **Falta confirmar en la PC de Windows** que ya abre varias veces seguidas sin trabarse.
+antes. ❌ **Este arreglo era un defecto real pero NO era la causa del cuelgue** — siguió pasando.
+
+## 29-jul-2026: LA CAUSA RAÍZ del cuelgue en Windows — `api.window` → `api._window` — ✅ `v2026.07.29.2`
+
+**Un abrazo mortal (deadlock), y era código nuestro.** `api.window = win` le colgaba la ventana al
+objeto que se le pasa a `js_api`. pywebview **RECORRE** ese objeto para saber qué métodos exponerle
+al JavaScript (`util.py` → `inject_pywebview` → `get_functions`) y, al ver un atributo que es un
+objeto no-invocable con `__module__`, **se mete dentro**. Adentro de la `Window` toca la propiedad
+**`width`**, cuyo getter (`window.py:215-219`) hace `events.shown.wait(15)` y luego
+`gui.get_size(uid)`: **le pregunta el tamaño a la ventana nativa**… que en ese instante todavía se
+está creando en **otro hilo**. Los dos se esperan. Para siempre.
+
+**Arreglo**: renombrar a **`_window`** — pywebview **salta** los atributos que empiezan con guion
+bajo (`util.py:193-194`). ⚠️ **Ese guion bajo NO es estilo, es el arreglo**; está comentado con
+letras grandes en `Api.__init__` para que nadie lo "limpie". **Regla: nunca colgar del objeto
+`js_api` un atributo público que sea un objeto** — pywebview lo recorrerá.
+
+**Por qué ~2 de cada 3 y solo en Windows**: es una carrera. Si la ventana alcanza a mostrarse antes
+de que el recorrido llegue a `width`, no pasa nada. En Mac esa carrera se gana siempre.
+
+### Lo que DE VERDAD resolvió el caso: instrumentar (`v2026.07.29`)
+Cinco hipótesis caídas razonando desde el Mac (marca de internet ✅ sí era, pero de OTRO fallo ·
+escaneo de fuentes · WebView2 ausente · abrazo mortal por `evaluate_js` · procesos huérfanos).
+La sexta salió a la primera **en cuanto la app contó qué le pasaba**:
+- **`arranque.log`** junto a la config (`%APPDATA%\Antike\PlotterController\`), con marca por paso;
+  se vuelca a disco en CADA línea (si la matan a la fuerza no se pierde nada). **Se acumula entre
+  arranques** — los arranques sanos sirven de grupo de control contra el trabado.
+- **Vigilante `faulthandler`**: pasados 25 s sin cargar, vuelca **la pila de todos los hilos**, y
+  repite. Se desarma solo al cargar la página, así que un arranque sano no escribe nada.
+- **Cómo se leyó**: los seis volcados eran **IDÉNTICOS** → no estaba lento, estaba **DETENIDO**. Y
+  mostraban los tres hilos del abrazo (principal en `create_window`, el de la UI en `create`, y el
+  puente de JS parado dentro de un `getattr`). ⚠️ **La app se distribuye sin consola: sin este
+  registro un cuelgue al arrancar no deja NINGÚN rastro.** No quitarlo.
+
+**Lección**: en cuanto un fallo solo ocurra en una máquina que no puedes tocar, **deja de deducir e
+instrumenta**. Cada teoría costó un release y una reinstalación; el registro lo resolvió en un
+intento. Y: **un fallo intermitente = dos cosas compitiendo**, casi nunca algo roto.
+
+⏳ **Falta que la PC de Windows confirme** varios arranques seguidos terminando en
+`=== CERRADA NORMALMENTE ===`. No probados uno por uno los 12 diálogos de archivo renombrados.
 
 ### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
 1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
