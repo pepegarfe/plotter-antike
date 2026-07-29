@@ -1,83 +1,82 @@
 ---
 name: bug-grosor-15mm
-description: SIN RESOLVER — en Windows el grosor del material vuelve a 15 mm (el default) y no se deja cambiar; qué está descartado y qué medir
+description: RESUELTO 29-jul-2026 — el grosor volvía a 15 mm en Windows porque cnc_set() escribía cnc_config.json sin encoding='utf-8' y cp1252 no puede codificar el "″" de los nombres de fresa
 metadata: 
   node_type: memory
   type: project
   originSessionId: 21ab0256-37c6-4ef2-a2de-deb0c30ca8da
-  modified: 2026-07-29T19:01:56.889Z
+  modified: 2026-07-29T20:00:00.000Z
 ---
 
-# 🔴 SIN RESOLVER: el grosor del material vuelve a 15 mm (Windows)
+# ✅ RESUELTO: el grosor del material volvía a 15 mm (Windows)
 
-**Estado al 29-jul-2026, final del día.** Se abre sesión de Claude Code **en la propia Windows**
-para medir ahí, porque desde el Mac ya se falló dos veces. Ver [[design-studio]].
+**Resuelto 29-jul-2026**, en sesión de Claude Code corriendo **en la propia Windows** (siguiendo la
+regla de este archivo: medir en la máquina que falla). Ver [[design-studio]] y [[estado]].
 
-## El síntoma (reportado por Jose)
+## Causa raíz
 
-En la PC de Windows, la pestaña **Configuración** del CNC muestra el **grosor del material en
-15 mm**. Al cambiarlo y volver, **regresa a 15**. **No aparece ningún aviso ni error en pantalla.**
+`studio_backend.py` escribía `cnc_config.json` con `_cnc_path().write_text(json.dumps(cur, ...))`
+**sin `encoding='utf-8'`**. Sin ese parámetro, `Path.write_text` usa el codepage por defecto del
+sistema — en esta Windows, **cp1252**. Los nombres de fresa de fábrica incluyen
+`'Fresa 3.175 mm (1/8″) · 1 filo'`, con `″` (U+2033, comilla doble tipográfica). **cp1252 no puede
+codificar ese carácter.**
 
-**15.0 es el valor de FÁBRICA** (`studio_backend.py`, `CNC_DEFAULTS['material']['thickness']`).
-Que se vea 15 significa que `cnc_get()` **no encontró la config guardada** y cayó a los defaults.
-⚠️ Ojo: `studio_ui.html` tiene además `<input id="matThick" value="15">` **escrito a mano en el
-HTML** — el 15 puede venir de ahí si `paintCnc()` no llega a correr. Son dos fuentes distintas del
-mismo número; hay que distinguirlas.
+`cnc_set()` reescribe el dict COMPLETO (incluida la lista de fresas) en cada guardado, así que
+**cualquier cambio en la pestaña CNC** disparaba la escritura. `Path.write_text` abre el archivo en
+modo `'w'` (trunca de inmediato) y *luego* intenta codificar — al fallar la codificación, el archivo
+quedaba **vacío (0 bytes)**, que es exactamente lo que se midió en ambas rutas de config (nueva y
+vieja). `cnc_set` capturaba la excepción y devolvía `{'ok': False, 'error': ...}` (por eso Jose no
+vio un aviso claro: probablemente un toast que no relacionó con el campo).
 
-## Ya está DESCARTADO (probado, no supuesto)
+Después, `cnc_get()` intentaba leer ese archivo vacío; `json.loads('')` truena, pero está envuelto
+en un `except Exception: pass` silencioso → cae a los defaults → **grosor siempre 15, sin aviso**.
 
-Las tres capas pasan sus pruebas **en el Mac**:
+**Por qué nunca falló en el Mac**: ahí el default de Python es UTF-8, no cp1252. Este bug es
+100% específico de Windows — coincide con que las 3 capas habían pasado 4/4 en el Mac.
 
-| Capa | Prueba | Resultado |
+## El arreglo
+
+Se agregó `encoding='utf-8'` explícito a las 6 lecturas/escrituras de `cnc_config.json` y del
+autoguardado en `studio_backend.py` (líneas ~29, 34, 190, 201, 325, 653). **Commit:** ver git log
+(`studio_backend.py`, 29-jul-2026, mensaje sobre encoding UTF-8 en cnc_config).
+
+⚠️ **Regla para el futuro**: toda lectura/escritura de JSON en este proyecto debe llevar
+`encoding='utf-8'` explícito (`read_text`/`write_text`/`open`). Sin eso, el default es el codepage
+del SO — cp1252 en Windows, UTF-8 en Mac/Linux — y cualquier string con un carácter fuera de
+cp1252 (tildes raras, comillas tipográficas, símbolos) revienta la escritura **en Windows
+únicamente**, dejando el archivo truncado a 0 bytes. `autosave_load()` ya usaba `encoding='utf-8'`
+al leer pero `autosave_save()` no al escribir — ese descuido delató el patrón.
+
+## Cómo se probó (antes/después, en esta máquina)
+
+Se escribió un script mínimo que importa `studio_backend` directo (sin la GUI) y llama
+`cnc_set({'material': {'thickness': 7}})`:
+
+| | Código original | Con el arreglo |
 |---|---|---|
-| Migración de config | 4 escenarios con `sys.frozen` y HOME de mentira, en subprocesos | 4/4 |
-| Backend (`cnc_set`/`cnc_get`) | Escribe a disco y relee | Persiste bien |
-| Interfaz (el campo) | Arnés de DOM falso: pinta lo guardado, manda el cambio, lo conserva | 4/4 |
+| `cnc_set` | `ok: False` — `'charmap' codec can't encode character '″'...` | `ok: True` |
+| `cnc_config.json` | 0 bytes | contenido completo |
+| `cnc_get()` tras "reabrir" | 15.0 (default, silencioso) | 7.0 (persiste) |
 
-- **Jose SÍ instaló a mano** el zip de `v2026.07.29.5` (no con el botón, que está roto).
-- **No es que la interfaz no mande el cambio**: el arnés confirma que `blur` → `cnc_set` con el
-  valor correcto, y que el campo conserva lo que devuelve el backend.
+Se reprodujo con `git stash` (código viejo) y se re-probó tras `git stash pop` (código arreglado) —
+mismo mensaje de error predicho antes de correrlo, confirmando la causa con precisión.
 
-## Dos intentos FALLIDOS (no repetirlos)
+Luego se **reconstruyó e instaló** la app (`DesignStudio.exe`) en esta Windows para validar
+end-to-end, y se **reparó a mano** el `cnc_config.json` real de esta máquina (estaba en 0 bytes
+desde antes) llamando al backend arreglado contra esa ruta real.
 
-1. **`v2026.07.29.4`** — arreglé que `_migrar_config` era una **trampa de un solo tiro**: se
-   disparaba `if not d.exists()` y la línea siguiente hacía `d.mkdir()`, así que si la carpeta
-   nueva quedaba vacía la migración no se reintentaba jamás. **Era un defecto real y está
-   arreglado**, pero **no resolvió esto**.
-2. Antes de eso se sospechó del cambio de fabricante en sí. Tampoco.
+## Bonus: bug nuevo encontrado y arreglado en el camino
 
-## 👉 LO QUE HAY QUE MEDIR EN LA WINDOWS (siguiente paso)
+Al escribir `version.txt` con PowerShell (`Out-File -Encoding utf8`) se coló un **BOM UTF-8**
+(`EF BB BF`) al inicio del archivo — `Out-File -Encoding utf8` en PowerShell 5.1 SIEMPRE agrega BOM.
+`--diagnostico` no lo limpia al leer la versión y revienta con el mismo tipo de error
+(`UnicodeEncodeError` en `cp1252`, esta vez con `﻿`). Si vuelves a escribir `version.txt` a
+mano en Windows, usa algo que NO agregue BOM (`printf` en bash, o `[System.IO.File]::WriteAllText`
+en PowerShell) — nunca `Out-File -Encoding utf8`. **`version.txt` en el repo es `"dev"`**; la
+versión real solo se escribe en el pipeline de CI al publicar un release, nunca se commitea.
 
-Rutas de esa máquina:
-- **Programa**: `%LOCALAPPDATA%\BuiltByJose\DesignStudio` (si actualizó con el botón en vez de
-  reinstalar, puede seguir en `...\Antike\DesignStudio`)
-- **Config**: `%APPDATA%\BuiltByJose\DesignStudio` — aquí van `cnc_config.json`,
-  `plotter_config.json`, `fonts_cache.json`, `arranque.log`, `actualizar.log`
-- **Config vieja**: `%APPDATA%\Antike\PlotterController` (de ahí copia la migración)
+## Lección que rige esta sesión
 
-**Protocolo, en este orden:**
-
-1. Ver qué versión está instalada de verdad (`version.txt` en la carpeta del programa).
-2. Listar la carpeta de config **con `LastWriteTime`** y leer el grosor de `cnc_config.json`.
-3. Abrir la app, poner el grosor en **7** (número que no se haya usado), clic fuera, **cerrar**.
-4. Volver a listar.
-
-**Cómo se lee el resultado:**
-
-| Qué pasó | Dónde está el fallo |
-|---|---|
-| `LastWriteTime` se movió **y** dice 7 | Sí escribe → el fallo es al **LEER** |
-| `LastWriteTime` **no** se movió | No escribe → el fallo es al **GUARDAR**, en silencio |
-| La carpeta nueva no existe | La app no usa la ruta esperada |
-| `version.txt` ≠ `2026.07.29.5` | No es la versión que se cree; todo lo demás sobra |
-
-**Ventaja de estar en la Windows**: se puede correr `DesignStudio.exe --diagnostico`, leer
-`arranque.log`, y sobre todo **correr la app desde el código** (`python design_studio.py`) para ver
-los errores en vivo — que compilada no se ven porque **se distribuye sin consola**.
-
-## La lección que rige aquí
-
-**Cinco teorías cayeron el 28-jul razonando desde el Mac; la instrumentación lo resolvió al primer
-intento.** Con este bug ya van **dos** intentos fallidos por el mismo camino. **Medir en la máquina
-que falla, no deducir desde la que funciona.** Y un fallo que solo ocurre en una máquina no está en
-el código: está en el encuentro entre el código y ESA máquina.
+**Medir en la máquina que falla, no deducir desde la que funciona** — la causa era 100% específica
+de Windows (codepage cp1252 vs. default UTF-8 en Mac) y nunca iba a aparecer en las pruebas del Mac
+sin importar cuántas veces se repitieran.
