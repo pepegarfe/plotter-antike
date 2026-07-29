@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-29T17:28:22.217Z
+  modified: 2026-07-29T17:34:53.627Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -711,8 +711,10 @@ La sexta salió a la primera **en cuanto la app contó qué le pasaba**:
 instrumenta**. Cada teoría costó un release y una reinstalación; el registro lo resolvió en un
 intento. Y: **un fallo intermitente = dos cosas compitiendo**, casi nunca algo roto.
 
-⏳ **Falta que la PC de Windows confirme** varios arranques seguidos terminando en
-`=== CERRADA NORMALMENTE ===`. No probados uno por uno los 12 diálogos de archivo renombrados.
+✅ **CONFIRMADO EN LA MÁQUINA (29-jul)**: 5 arranques seguidos sin trabarse. Con la tasa anterior
+(fallaba 2 de cada 3) eso sería 1 entre 243 por azar — el cuelgue está muerto.
+⏳ Único fleco: **no se probaron uno por uno los 12 diálogos de archivo renombrados**
+(Abrir / Guardar / Exportar). Si alguno truena al abrir su cuadro, es un `_window` mal puesto.
 
 ### Pendientes (act. 25-jul-2026 — tras la maratón de diseño del 24-jul)
 1. **Rebaba en MDF 3mm**: sigue viva tras el primer corte real (salió en AMBOS lados pese al
