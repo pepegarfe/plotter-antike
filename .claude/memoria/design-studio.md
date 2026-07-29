@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 661c489b-f53b-4842-91af-46e807877393
-  modified: 2026-07-29T17:34:53.627Z
+  modified: 2026-07-29T18:03:07.073Z
 ---
 
 # Design Studio — la interfaz nueva (rebuild)
@@ -710,6 +710,47 @@ La sexta salió a la primera **en cuanto la app contó qué le pasaba**:
 **Lección**: en cuanto un fallo solo ocurra en una máquina que no puedes tocar, **deja de deducir e
 instrumenta**. Cada teoría costó un release y una reinstalación; el registro lo resolvió en un
 intento. Y: **un fallo intermitente = dos cosas compitiendo**, casi nunca algo roto.
+
+## 29-jul-2026: fabricante `BuiltByJose` + el paso CNC ya no se salta solo — ✅ `v2026.07.29.3`
+
+**Renombre de carpetas** (convención `Fabricante\Aplicación`, como `Google\Chrome`). El fabricante
+era `Antike` y la config vivía en `PlotterController`, heredado de la app vieja de tkinter y ya
+engañoso: los ajustes de Design Studio bajo el nombre del programa anterior.
+
+| Antes | Ahora |
+|---|---|
+| `%LOCALAPPDATA%\Antike\DesignStudio` | `%LOCALAPPDATA%\BuiltByJose\DesignStudio` |
+| `%APPDATA%\Antike\PlotterController` | `%APPDATA%\BuiltByJose\DesignStudio` |
+| `~/Library/Application Support/Antike/PlotterController` | `…/BuiltByJose/DesignStudio` |
+| `com.antike.designstudio` | `com.builtbyjose.designstudio` |
+
+- **`_migrar_config()` en `plotter_control.py`**: al arrancar, si la carpeta nueva no existe y la
+  vieja sí, **COPIA** todo (fresas, materiales y presets del CNC, config del plotter, caché de
+  fuentes, autoguardado). ⚠️ **Copia, NO mueve, a propósito** — ahí viven las fresas: si algo sale
+  mal la vieja queda intacta. No pisa una carpeta nueva ya existente. ⚠️ **No borres
+  `_FABRICANTE_VIEJO`/`_APP_VIEJA`**: los usa la migración.
+- El **instalador borra la instalación vieja** tras copiar la nueva, con tres guardas (ruta
+  exactamente la esperada · distinta de la recién instalada · contiene el `.exe` de esta app).
+- ⚠️ **`--diagnostico` DEDUCE la ruta del `.exe`**, no la lleva a fuego: quien actualice con el
+  botón de la app **se queda en la carpeta vieja** (`updater.py` reemplaza la carpeta actual, sea
+  cual sea); solo reinstalar con el zip estrena la nueva. **La config migra igual**, porque eso lo
+  hace la app al arrancar, no el instalador.
+- ⚠️ **NO se tocó `format: 'antike-tools'`** de las fresas exportadas: es un **identificador de
+  formato**, no un nombre — cambiarlo rompería los archivos ya exportados. Ni la app vieja de
+  tkinter (`instalar.ps1`/`desinstalar.ps1`), que ya no se distribuye.
+
+**Paso CNC**: elegir la máquina CNC en la barra de arriba **ya no salta** el panel lateral al paso
+CNC (`applyMachine` ahora hace `setSideMode('design')` siempre). Primero se acomoda el diseño; al
+paso CNC se pasa **a mano** con el toggle Diseño|CNC. Quedan cuatro sitios que tocan el paso
+lateral y **ninguno lleva a 'cnc' automáticamente**: solo el clic del usuario.
+Verificado 3/3 con el arnés de DOM falso. ⚠️ **El arnés NO crea los botones hijos de las barras
+segmentadas** (`querySelectorAll('button')` → 0), así que el clic físico no se puede simular: hay
+que llamar a la función y verificar la cadena leyendo el código. `__DS.cnc.setSideMode` (anidado,
+no en la raíz de `__DS`).
+
+⏳ Falta probarlo en la máquina.
+
+---
 
 ✅ **CONFIRMADO EN LA MÁQUINA (29-jul)**: 5 arranques seguidos sin trabarse. Con la tasa anterior
 (fallaba 2 de cada 3) eso sería 1 entre 243 por azar — el cuelgue está muerto.
