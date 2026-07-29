@@ -86,6 +86,20 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
 - **`_set_led` no debe tocar `self.sb_led` directo** — usar `_set_sb_led()`, que tiene guard
   `hasattr` (a `_set_led` se le llama antes de que exista el LED de la barra de estado).
 
+### Design Studio (`design_studio.py`, pywebview) — lo que costó tres días
+
+- ⚠️ **NUNCA cuelgues del objeto `js_api` un atributo PÚBLICO que sea un objeto**: pywebview
+  **recorre** ese objeto para exponer sus métodos y **se mete dentro**. Con la ventana colgada ahí
+  toca `window.width`, cuyo getter pide el tamaño **a la ventana nativa que aún nace en otro hilo**
+  → **abrazo mortal: "No responde" para siempre** (~2 de 3 arranques, solo Windows; es una carrera
+  y en Mac se gana). Por eso **`api._window`** — pywebview salta los nombres con `_`. **Ese guion
+  bajo no es estilo, es el arreglo.**
+- **No quitar `arranque.log` ni el vigilante `faulthandler`** de `main()`. La app se distribuye
+  **sin consola**: sin ese registro, un cuelgue al arrancar **no deja ningún rastro** y solo queda
+  adivinar. En un arranque sano escribe seis líneas y se desarma solo.
+- **Regla general:** un fallo **intermitente** = **dos cosas compitiendo** (lo roto falla siempre o
+  nunca); si solo pasa en una máquina que no puedes tocar, **instrumenta en vez de deducir**.
+
 ---
 
 ## Aspecto visual — sistema de diseño (tokens)
@@ -152,6 +166,13 @@ en el repo como motor y como respaldo, pero **ya no se compila ni se publica**.
   librería no quedó empaquetada.
 - **Mac sin firmar** (Jose no tiene cuenta de Apple): la primera vez hay que abrirla con
   **clic derecho → Abrir**, o `xattr -cr` si dice "está dañada". Va explicado en las notas del release.
+- ⚠️ **Windows: `instalar_studio.ps1` DEBE hacer `Unblock-File` recursivo** tras copiar. Windows
+  marca (`Zone.Identifier`) todo lo que sale de un `.zip` del navegador y **.NET se NIEGA a cargar
+  un ensamblado marcado**: sin pythonnet, pywebview no dibuja ventana y **la app no arranca**.
+  Síntoma: *"Failed to resolve Python.Runtime.Loader.Initialize"* **con la ruta del DLL** — está
+  ahí, solo bloqueado. La auto-actualización no se ve afectada (`urllib`+`zipfile` no marcan). El
+  `.bat` lanza el `.ps1` con `-ExecutionPolicy Bypass`, que ignora la marca. **El `.ps1` se
+  mantiene 100% ASCII**: PowerShell 5.1 lee UTF-8 sin BOM como ANSI y destroza los acentos.
 
 ---
 
