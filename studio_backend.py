@@ -26,12 +26,12 @@ def set_workarea(w, h):
         data = {}
         if p.exists():
             try:
-                data = json.loads(p.read_text())
+                data = json.loads(p.read_text(encoding='utf-8'))
             except Exception:
                 data = {}
         data['work_w'] = w
         data['work_h'] = h
-        p.write_text(json.dumps(data))
+        p.write_text(json.dumps(data), encoding='utf-8')
         return {'ok': True, 'work': [w, h]}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
@@ -187,7 +187,7 @@ def cnc_get():
     try:
         p = _cnc_path()
         if p.exists():
-            saved = json.loads(p.read_text())
+            saved = json.loads(p.read_text(encoding='utf-8'))
             for k in ('machine', 'theme', 'units', 'fillview', 'sheets', 'quote', 'work',
                       'material', 'materials', 'tool_sel', 'tools'):
                 if k in saved:
@@ -201,7 +201,7 @@ def cnc_get():
                 p.write_text(json.dumps({k: data[k] for k in
                                          ('machine', 'theme', 'units', 'fillview', 'sheets', 'work',
                                           'material', 'materials', 'tool_sel', 'tools')},
-                                        ensure_ascii=False, indent=1))
+                                        ensure_ascii=False, indent=1), encoding='utf-8')
             if not any(m['id'] == data['material'].get('type') for m in data['materials']):
                 data['material']['type'] = data['materials'][0]['id']
     except Exception:
@@ -322,7 +322,7 @@ def cnc_set(patch):
             cur['tool_sel'] = str(patch['tool_sel'])
         if not any(t['id'] == cur['tool_sel'] for t in cur['tools']):
             cur['tool_sel'] = cur['tools'][0]['id']
-        _cnc_path().write_text(json.dumps(cur, ensure_ascii=False, indent=1))
+        _cnc_path().write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding='utf-8')
         cur['ok'] = True
         return cur
     except Exception as e:
@@ -650,7 +650,7 @@ def _autosave_path():
 
 def autosave_save(data):
     try:
-        _autosave_path().write_text(json.dumps(data or {}, ensure_ascii=False))
+        _autosave_path().write_text(json.dumps(data or {}, ensure_ascii=False), encoding='utf-8')
         return {'ok': True}
     except Exception as e:
         return {'ok': False, 'error': str(e)}
