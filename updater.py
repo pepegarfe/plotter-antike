@@ -255,15 +255,46 @@ rm -rf "{payload_dir}"
     subprocess.Popen(['/bin/bash', str(sh)], start_new_session=True)
 
 
+def _log_actualizacion():
+    """Dónde cuenta el ayudante externo qué hizo. Junto a la config, para que se encuentre
+    igual que `arranque.log`. Sin esto una actualización fallida no deja NINGÚN rastro: el
+    ayudante corre cuando la app ya murió y con la ventana oculta."""
+    try:
+        import plotter_control as core
+        return core._config_path().with_name('actualizar.log')
+    except Exception:
+        return Path(tempfile.gettempdir()) / 'designstudio_actualizar.log'
+
+
 def _apply_win(payload, dest, helper_dir, payload_dir):
-    """Ayudante PowerShell: espera, espeja la carpeta nueva sobre la vieja y relanza."""
+    """Ayudante PowerShell: espera, espeja la carpeta nueva sobre la vieja y relanza.
+
+    ⚠️ **`robocopy` SIN `/R` reintenta 1,000,000 de veces esperando 30 s cada una** — ese es
+    su valor por omisión, unos 950 años. Basta UN archivo bloqueado (y esta app deja procesos
+    de WebView2 vivos tras cerrarse) para que el ayudante se quede ahí: nunca copia, nunca
+    relanza, y el usuario se queda con la versión vieja y sin ningún mensaje. De ahí `/R:2`.
+    ⚠️ El .ps1 se escribe 100% ASCII: PowerShell 5.1 lee un UTF-8 sin BOM como ANSI."""
+    log = _log_actualizacion()
     ps = helper_dir / 'aplicar.ps1'
     ps.write_text(f'''$ErrorActionPreference = 'SilentlyContinue'
-# Ayudante de actualización de {APP}.
+# Ayudante de actualizacion de {APP}.
+$log = "{log}"
+function L($m) {{ "$(Get-Date -Format 'HH:mm:ss')  $m" | Out-File -FilePath $log -Append -Encoding utf8 }}
+L "--- ayudante arrancado; espera a que cierre el PID {os.getpid()}"
 try {{ Wait-Process -Id {os.getpid()} -Timeout 120 }} catch {{ }}
 Start-Sleep -Milliseconds 900
-robocopy "{payload}" "{dest}" /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+# Restos de la app que dejarian archivos bloqueados y atascarian la copia.
+$restos = Get-Process -Name '{APP}' -ErrorAction SilentlyContinue
+if ($restos) {{ L "quedaban $($restos.Count) procesos de la app; se cierran"
+                $restos | Stop-Process -Force; Start-Sleep -Milliseconds 600 }}
+L "copiando la version nueva sobre {dest}"
+robocopy "{payload}" "{dest}" /MIR /R:2 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
+$rc = $LASTEXITCODE
+if ($rc -ge 8) {{ L "ERROR: robocopy fallo con codigo $rc -- sigue puesta la version vieja" }}
+else {{ L "copia terminada (codigo $rc)" }}
+# Se relanza SIEMPRE, aunque la copia falle: mejor la app vieja que ninguna app.
 Start-Process -FilePath "{dest}\\{APP}.exe"
+L "relanzada"
 Remove-Item -Recurse -Force "{payload_dir}"
 ''', encoding='utf-8')
     subprocess.Popen(
