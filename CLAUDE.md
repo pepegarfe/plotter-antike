@@ -75,6 +75,15 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   pasada final `_simplify_mm` (Douglas-Peucker a 0.01 mm, en mm reales, a la salida de los TRES
   parsers). ⚠️ **No volver a muestrear curvas con N fijo de segmentos** — eso cuadriculaba los
   imports al escalarlos.
+- ⚠️ **CNC: la salida de TODO `buffer()`/`offset_curve()` pasa por `_simplify()`**
+  (`cnc_gcode.py`, Douglas-Peucker a `_SIMPLIFY_MM` = 0.01 mm). **No lo quites: no es cosmética.**
+  Shapely redondea CADA vértice con un arco, así que en un contorno curvo (giros de ~1°) siembra
+  un segmento de ~0.05 mm pegado a cada segmento bueno — el 30 % de la trayectoria. A 4000 mm/min
+  ese movimiento dura medio milisegundo, el RichAuto **no puede ejecutarlo y frena**: la máquina
+  tartamudea cientos de veces por contorno, el bocado de cada filo se vuelve errático y **la madera
+  sale con rebaba** (caso real, ago-2026). Señal: si dos archivos cortan la MISMA geometría y uno
+  vibra, no compares las trayectorias — **compara el largo de los movimientos**; un patrón
+  largo-corto-largo-corto es geometría de computadora que nadie limpió.
 - **Tres modos de selección/transformación** según estado: **individual** (`_sel_idx >= 0`, escala y
   rotación ABSOLUTAS), **grupo manual** (`_sel_set` no vacío, RELATIVAS) y **todos** (ambos vacíos,
   RELATIVAS). Toda transformación debe respetar los tres.

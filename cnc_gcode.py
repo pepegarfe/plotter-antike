@@ -38,6 +38,26 @@ _CLOSE_TOL = 0.05    # mm: fin ≈ inicio → trazado cerrado
 _SAFE_MM = 5.0       # altura de seguridad sobre la cara superior del material
 _PECK_CLEAR = 2.0    # mm sobre el material entre picotazos del taladro
 _TAB_SLOPE = 2.0     # rampa de los puentes: 2 mm de avance por 1 mm de subida
+_SIMPLIFY_MM = 0.01  # mm: tolerancia al limpiar la salida del offset (ver _simplify)
+
+
+def _simplify(geom):
+    """Quita los vértices de relleno que shapely siembra al redondear cada esquina.
+
+    ⚠️ NO es cosmética, es lo que hace que el corte salga limpio. `buffer()` redondea
+    CADA vértice con un arco; con los giros suaves de un contorno curvo (~1°) ese arco
+    deja un segmento de ~0.05 mm pegado a cada segmento bueno. El control RichAuto no
+    puede ejecutar un movimiento tan corto al avance pedido (a 4000 mm/min dura medio
+    milisegundo), así que FRENA en cada uno: la máquina tartamudea cientos de veces por
+    contorno, el bocado de cada filo se vuelve errático y la madera sale con rebaba.
+    Douglas-Peucker a _SIMPLIFY_MM los borra todos; la pieza se desvía una centésima de
+    milímetro, muy por debajo de lo que la máquina puede posicionar.
+    """
+    try:
+        s = geom.simplify(_SIMPLIFY_MM)
+        return geom if s.is_empty else s
+    except Exception:
+        return geom
 
 
 def _is_closed(pts):
@@ -99,7 +119,7 @@ def _units_from(geom, sign=1.0):
     for p in getattr(geom, 'geoms', [geom]):
         if p.is_empty or not isinstance(p, Polygon):
             continue
-        p = orient(p, sign)
+        p = orient(_simplify(p), sign)
         rings = [[list(c) for c in h.coords] for h in p.interiors]
         rings.append([list(c) for c in p.exterior.coords])
         units.append(rings)
@@ -212,7 +232,7 @@ def _offset_side(paths, side, tool_dia, allowance=0.0, last_pass=0.0):
             except Exception:
                 continue
             for g in getattr(oc, 'geoms', [oc]):
-                c = [list(q) for q in g.coords]
+                c = [list(q) for q in _simplify(g).coords]
                 if len(c) < 2:
                     continue
                 if _d2(c[0], pts[0]) > _d2(c[-1], pts[0]):
@@ -260,7 +280,7 @@ def _rings_flat(geom, sign=1.0):
     for p in getattr(geom, 'geoms', [geom]):
         if p.is_empty or not isinstance(p, Polygon):
             continue
-        p = orient(p, sign)
+        p = orient(_simplify(p), sign)
         out.append([list(c) for c in p.exterior.coords])
         for hole in p.interiors:
             out.append([list(c) for c in hole.coords])
