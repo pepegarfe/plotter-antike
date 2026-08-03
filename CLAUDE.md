@@ -75,6 +75,10 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   pasada final `_simplify_mm` (Douglas-Peucker a 0.01 mm, en mm reales, a la salida de los TRES
   parsers). ⚠️ **No volver a muestrear curvas con N fijo de segmentos** — eso cuadriculaba los
   imports al escalarlos.
+- ⚠️ **CNC: `_passes()` reparte la profundidad POR IGUAL**, y `pass_depth` es el **máximo**
+  de una pasada, no su altura fija. **No volver a "pasadas llenas + lo que sobre"**: 6 mm con
+  pasada de 5 daba `[5, 6]` — una segunda pasada de **1 mm** que a todo el ancho de la fresa
+  **frota en vez de morder** (quema, desafila, deja rebaba) y cuesta la vuelta entera igual.
 - ⚠️ **CNC: la salida de TODO `buffer()`/`offset_curve()` pasa por `_simplify()`**
   (`cnc_gcode.py`, Douglas-Peucker a `_SIMPLIFY_MM` = 0.01 mm). **No lo quites: no es cosmética.**
   Shapely redondea CADA vértice con un arco, así que en un contorno curvo (giros de ~1°) siembra

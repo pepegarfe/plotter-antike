@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 87a314c6-5428-4c70-a10b-0b8e43cd5e7b
-  modified: 2026-08-03T20:12:59.569Z
+  modified: 2026-08-03T22:40:02.407Z
 ---
 
 # La rebaba del CNC eran micro-segmentos, no la velocidad
@@ -66,6 +66,38 @@ También pendiente de decidir tras el A/B: si F4000 sigue siendo demasiado (con 
 el modelo estima que la máquina promedia ~1800–2350 mm/min, aunque ese modelo ignora el
 look-ahead y es pesimista), y probar la **fresa de compresión** (`t6-comp`, ya configurada), que es
 lo que el triplay pide para que no se levante la chapa de arriba.
+
+## Comparación de RUTA entre los dos .tap (3-ago-2026, a petición de Jose)
+
+Medido el recorrido completo de los dos archivos. **El perfil coincide al centímetro**
+(2.14 m a −6.10 y 2.14 m a −12.20 en AMBOS). Toda la diferencia está en el cajeado:
+
+| | Aspire | Design Studio |
+|---|---|---|
+| Cortando de verdad | 10.41 m | **16.41 m** (×1.58) |
+| En aire (G00) | 1.92 m | 5.02 m (×2.6) |
+| Subidas a seguridad | 16 | 51 (×3.2) |
+| Entrando en rampa | 0.25 m | 1.48 m (×6) |
+| Tiempo total | 11.82 min | 5.56 min |
+
+**Los 6 m de más son una pasada de cajeado entera**: Aspire lo hace en UNA pasada de 6 mm;
+Design Studio en dos (5 mm + **1 mm**) por culpa de `_passes()`. ✅ **ARREGLADO** (reparto
+equitativo → 3+3). Ojo: **no ahorra distancia** (mismo recorrido), quita el raspado.
+
+Lo demás, en contexto: el aire cuesta solo 0.63 de los 5.56 min (11 %), y las rampas largas de
+DS (34.6 mm vs 6 mm) son **mejores** para la fresa que el casi-clavado de Aspire. La altura de
+retirada de DS (siempre 5 mm) también es mejor que la de Aspire (sube a 20 mm varias veces).
+
+⚠️ **Autocorrección al medir:** la primera cifra de "desorden del aire" (55 % de margen) estaba
+**inflada** — reordenaba libremente entre los 6 trabajos del archivo, cosa imposible sin
+fusionarlos. Trabajo por trabajo el margen real es 29 %, y aun ese es un **techo**, porque el
+cajeado debe ir del centro a la pared en cada zona. **Al medir una optimización, comprueba que el
+"ideal" con el que comparas sea alcanzable.**
+
+⏳ **PENDIENTE (decidido aparte, no hecho):** encadenar anillos contiguos del cajeado en vez de
+retirarse entre cada uno. Aspire hace el cajeado en **12 trayectorias** y DS en **49**; Aspire
+encadena algunos anillos (2 saltos < 5 mm), DS **ninguno** (su salto más corto es de 32 mm).
+Ahí está el ahorro de aire real.
 
 ## Lecciones (señales)
 
