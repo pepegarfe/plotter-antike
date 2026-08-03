@@ -75,6 +75,15 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   pasada final `_simplify_mm` (Douglas-Peucker a 0.01 mm, en mm reales, a la salida de los TRES
   parsers). ⚠️ **No volver a muestrear curvas con N fijo de segmentos** — eso cuadriculaba los
   imports al escalarlos.
+- ⚠️ **CNC: el cajeado ENCADENA anillos contiguos** (`_chain_rings`): en vez de retirarse a
+  altura de seguridad entre uno y otro, pasa al siguiente con un movimiento corto a
+  profundidad de corte. **La condición de unión es de SEGURIDAD, no de optimización**: solo
+  se une si el tramo recto se queda dentro de `poly.buffer(-radio)` (por donde el CENTRO de
+  la fresa puede andar). Si un cajeado se parte en ISLAS, unirlas en línea recta **arruina la
+  pieza**. Se usa `covers` y no `contains` (el anillo exterior va justo sobre ese borde).
+  Una cadena es un trayecto **ABIERTO**: entra con `_open_pass` (no `_ring_pass`, que da la
+  vuelta con `s % perim`) y **entre pasadas de profundidad DEBE subir y volver al inicio por
+  el aire** — sin eso cortaría en línea recta del extremo lejano al principio.
 - ⚠️ **CNC: `_passes()` reparte la profundidad POR IGUAL**, y `pass_depth` es el **máximo**
   de una pasada, no su altura fija. **No volver a "pasadas llenas + lo que sobre"**: 6 mm con
   pasada de 5 daba `[5, 6]` — una segunda pasada de **1 mm** que a todo el ancho de la fresa

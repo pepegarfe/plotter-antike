@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 87a314c6-5428-4c70-a10b-0b8e43cd5e7b
-  modified: 2026-08-03T22:40:02.407Z
+  modified: 2026-08-03T23:04:04.013Z
 ---
 
 # La rebaba del CNC eran micro-segmentos, no la velocidad
@@ -94,10 +94,24 @@ fusionarlos. Trabajo por trabajo el margen real es 29 %, y aun ese es un **techo
 cajeado debe ir del centro a la pared en cada zona. **Al medir una optimización, comprueba que el
 "ideal" con el que comparas sea alcanzable.**
 
-⏳ **PENDIENTE (decidido aparte, no hecho):** encadenar anillos contiguos del cajeado en vez de
-retirarse entre cada uno. Aspire hace el cajeado en **12 trayectorias** y DS en **49**; Aspire
-encadena algunos anillos (2 saltos < 5 mm), DS **ninguno** (su salto más corto es de 32 mm).
-Ahí está el ahorro de aire real.
+✅ **ENCADENADO DE ANILLOS — HECHO** (3-ago-2026). `_chain_rings()` une anillos contiguos del
+cajeado con un movimiento corto a profundidad de corte en vez de retirarse. Sobre el diseño real:
+**67 → 5 trayectorias**, **68 → 9 retiros**, aire 6.90 → 5.06 m, y el recorrido de corte incluso
+BAJA (78.0 → 76.4 m) porque desaparecen 60 rampas de entrada.
+
+**La condición de unión es de SEGURIDAD:** solo se une si el tramo recto cabe dentro de
+`poly.buffer(-radio)`. Con un cajeado partido en ISLAS, unirlas en recta arruina la pieza.
+
+Detalles que costaron encontrar (todos en `CLAUDE.md`):
+- `covers`, no `contains`: el anillo exterior va JUSTO sobre el borde de la zona y `contains`
+  da falso para un punto del borde.
+- Una cadena es un trayecto **ABIERTO** → necesitó `_open_pass` aparte, porque `_ring_pass`
+  envuelve con `s % perim` y en un trayecto abierto saltaría del final al principio cortando.
+- **Entre pasadas de profundidad hay que subir y volver al inicio por el aire.** Sin eso, la
+  fresa cortaría en línea recta del extremo lejano al principio de la cadena.
+- Primera versión: exigía que los anillos fueran CONSECUTIVOS y con islas no encadenaba nunca
+  (36 → 36), porque los anillos vienen intercalados entre islas. Ahora busca más allá del
+  siguiente, prefiriendo el más temprano (así dentro de cada isla sigue yendo de dentro afuera).
 
 ## Lecciones (señales)
 
