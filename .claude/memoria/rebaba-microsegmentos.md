@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 87a314c6-5428-4c70-a10b-0b8e43cd5e7b
-  modified: 2026-08-03T23:04:04.013Z
+  modified: 2026-08-04T21:48:04.623Z
 ---
 
 # La rebaba del CNC eran micro-segmentos, no la velocidad
@@ -112,6 +112,64 @@ Detalles que costaron encontrar (todos en `CLAUDE.md`):
 - Primera versión: exigía que los anillos fueran CONSECUTIVOS y con islas no encadenaba nunca
   (36 → 36), porque los anillos vienen intercalados entre islas. Ahora busca más allá del
   siguiente, prefiriendo el más temprano (así dentro de cada isla sigue yendo de dentro afuera).
+
+## El cajeado nuevo, medido contra el de Aspire (4-ago-2026)
+
+Comparados sobre **la misma zona**: se reconstruyó el área del recorrido real (los tramos
+engordados el radio de la fresa **son** el material retirado), dando 185 cm² contra los 182 cm²
+de Aspire — 1.3 % de diferencia, así que la comparación vale. El paso lateral efectivo también
+coincide (2.97 mm contra 2.91), o sea que barren con la misma densidad.
+
+**A un mismo nivel de profundidad:**
+
+| | Trayectorias | Corte | Aire |
+|---|---|---|---|
+| Aspire | 12 | 6.36 m | 1.06 m |
+| DS código viejo | 44 | 6.14 m | 4.58 m |
+| **DS código NUEVO** | **9** | 6.23 m | **0.88 m** |
+
+**El cajeado nuevo ya GANA a Aspire**: menos trayectorias y menos aire recorriendo lo mismo.
+El margen de aire que quedaba se agotó — las 9 cadenas están separadas por saltos largos de
+verdad.
+
+⏳ **Lo único que falta es un AJUSTE DE JOSE, no código:** Aspire hace el cajeado en UNA pasada
+de 6 mm; DS lo parte en dos porque su preset tiene la **pasada máxima en 5 mm**. Poniéndola en
+6 mm sería una sola pasada: **1.7 min contra los 6.4 de Aspire**. Se dejó a su criterio a
+propósito — 6 mm de profundidad con fresa de 6 mm es **un diámetro completo de un tirón**, y
+Aspire lo hacía a 1016 mm/min mientras él iría a 4000. Sugerido: probar primero con las dos
+pasadas de 3 mm (3.3 min, ya la mitad que Aspire) y subir solo si la máquina va sobrada.
+
+## "Última pasada separada": cómo funciona y su trampa (4-ago-2026)
+
+Casilla en el panel de Perfil, con "Deja _ mm" e "Invertir dir.". El desbaste corta dejando una
+**cáscara** (0.3–0.5 mm típico) y un **anillo aparte** la quita a medida exacta **en UNA pasada a
+profundidad completa**. Ataca una causa de rebaba **distinta** a la de los micro-segmentos: con
+poca mordida la fresa **no se flexiona**, y el borde no sale ondulado. En el perfil de 12.2 mm
+cuesta **+50 % de recorrido** (6.26 → 9.39 m).
+
+⚠️ **La trampa:** ese anillo va a fondo de una vez, y **sin entrada en rampa entra con un `G01 Z`
+vertical** — medido, **17.20 mm de bajada de un tirón**, 12.2 de ellos dentro del material. Una
+fresa de 2 filos no está hecha para taladrar: quema, puede agarrar y se maltrata. Con rampa la
+bajada vertical más honda queda en **5.00 mm** (el aire hasta la superficie).
+
+✅ **Arreglado** (COMMIT c7c79c0, release `v2026.08.04`): marcar la casilla **enciende solas** la
+entrada en rampa e "Invertir dir.". Es un valor por DEFECTO, no una imposición — solo se tocan al
+ENCENDER, y si Jose las apaga a mano se respetan.
+
+⚠️ **Reserva dicha a Jose:** de las dos, la rampa es de seguridad y no tiene discusión, pero
+**"Invertir dir." es experimental** — en la mayoría de los CAM la pasada de acabado va en el MISMO
+sentido (concordante); invertirla es un truco para fibra levantada en triplay. Si al cortar sale
+mejor sin invertir, es una línea.
+
+**Orden recomendado a Jose para la rebaba** (importa, son causas distintas): 1) cortar el A/B con
+la geometría ya limpia; 2) si aún queda, activar la última pasada; 3) fresa de compresión. La
+última pasada **no sustituye** al arreglo de geometría: si el recorrido tartamudea, el anillo de
+acabado tartamudea igual.
+
+## Releases publicados
+
+`v2026.08.03` (micro-segmentos) · `v2026.08.03.2` (zoom 3D al cursor + pasadas parejas +
+encadenado del cajeado) · `v2026.08.04` (la última pasada enciende sola la rampa).
 
 ## Lecciones (señales)
 
