@@ -4178,7 +4178,9 @@
       for(var t=Math.max(t0,0); t<=t1; t+=dt){
         var gx=Math.floor((o.x+d.x*t-r.minx)/r.cell), gy=Math.floor((o.y+d.y*t-r.miny)/r.cell);
         if(gx<0||gy<0||gx>=r.nx||gy>=r.ny) continue;
-        if(o.z+d.z*t<=r.hm[gy*r.nx+gx]) return {kind:'cell', i:gy*r.nx+gx};
+        if(o.z+d.z*t<=r.hm[gy*r.nx+gx])
+          return {kind:'cell', i:gy*r.nx+gx,
+                  pt:new THREE.Vector3(o.x+d.x*t,o.y+d.y*t,o.z+d.z*t)};
       }
     }
     // ¿pegó en la PLACA? (cara superior de la hoja, fuera de la rejilla)
@@ -4188,10 +4190,47 @@
         var px=o.x+d.x*tt, py=o.y+d.y*tt;
         var dentroHoja=px>=0&&py>=0&&px<=r.sheetW&&py<=r.sheetH;
         var dentroRejilla=px>=r.minx&&py>=r.miny&&px<=r.minx+r.w&&py<=r.miny+r.h;
-        if(dentroHoja&&!dentroRejilla) return {kind:'sheet'};
+        if(dentroHoja&&!dentroRejilla)
+          return {kind:'sheet', pt:new THREE.Vector3(px,py,r.thick)};
       }
     }
     return null;
+  }
+  function simAnchor(ev){
+    // El PUNTO al que apunta el cursor: es el que debe quedarse quieto al hacer zoom.
+    // 1º lo que haya bajo el cursor (material o placa); si el cursor está sobre el vacío,
+    // el plano que pasa por el centro de órbita y mira a la cámara — así el zoom sigue
+    // yendo hacia donde apuntas y no se va al infinito.
+    var hit=simPick(ev);
+    if(hit&&hit.pt) return hit.pt;
+    var b=S3.renderer.domElement.getBoundingClientRect();
+    var rc=new THREE.Raycaster();
+    rc.setFromCamera({x:((ev.clientX-b.left)/b.width)*2-1, y:-((ev.clientY-b.top)/b.height)*2+1}, S3.camera);
+    var n=new THREE.Vector3(); S3.camera.getWorldDirection(n);
+    var pl=new THREE.Plane().setFromNormalAndCoplanarPoint(n, S3.controls.target);
+    var p=new THREE.Vector3();
+    return rc.ray.intersectPlane(pl,p) ? p : S3.controls.target.clone();
+  }
+  function simZoomAt(ev){
+    // Zoom HACIA EL CURSOR: se acercan la cámara Y el centro de órbita al punto de
+    // debajo del cursor, los dos por el mismo factor. Así ese punto no se mueve en
+    // pantalla y las siguientes rotaciones giran alrededor de la zona que ampliaste.
+    // (OrbitControls de three r128 no trae `zoomToCursor`; por eso se hace a mano y
+    // su zoom propio va desactivado — si lo reactivas, se aplicaría dos veces.)
+    var r=S3.res; if(!r) return;
+    var f=ev.deltaY<0 ? 1/1.1 : 1.1;          // <1 acerca (mismo paso que el lienzo 2D)
+    var p=simAnchor(ev), cam=S3.camera, tgt=S3.controls.target;
+    var span=Math.hypot(r.sheetW||r.w, r.sheetH||r.h)+r.thick;
+    var np=p.clone().add(cam.position.clone().sub(p).multiplyScalar(f));
+    var nt=p.clone().add(tgt.clone().sub(p).multiplyScalar(f));
+    var d=np.distanceTo(nt);
+    if(d<Math.max(r.cell*2,0.5)||d>span*6) return;   // topes: ni dentro del material ni perdido
+    cam.position.copy(np); tgt.copy(nt);
+    // el plano cercano tiene que seguir al acercamiento o la pieza se recorta al ampliar;
+    // el lejano no puede encogerse por debajo de la hoja o desaparecería el resto.
+    cam.near=Math.max(d/500,0.05); cam.far=Math.max(d*30,span*4);
+    cam.updateProjectionMatrix();
+    S3.controls.update();
   }
   function simAfterRemoval(){
     var r=S3.res, g=S3.surf.geometry, pos=g.attributes.position.array;
@@ -4361,6 +4400,15 @@
     S3.camera.up.set(0,0,1);                                 // en la CNC la Z es la altura
     S3.controls=new THREE.OrbitControls(S3.camera,S3.renderer.domElement);
     S3.controls.enableDamping=true; S3.controls.dampingFactor=0.12;
+    // ⚠️ El zoom propio de OrbitControls va DESACTIVADO a propósito: solo sabe acercarse
+    // al centro de órbita, así que en la hoja entera te dejaba ampliar el centro y nunca
+    // la esquina que querías ver. Lo hace simZoomAt(), hacia el cursor. No lo reactives.
+    S3.controls.enableZoom=false;
+    // ...y como el botón central de OrbitControls hacía justo ese zoom, se queda en PAN:
+    // así no se pierde un control, y es lo mismo que hace el botón central en el 2D.
+    S3.controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE, MIDDLE:THREE.MOUSE.PAN, RIGHT:THREE.MOUSE.PAN};
+    S3.renderer.domElement.addEventListener('wheel',function(ev){
+      ev.preventDefault(); simZoomAt(ev); },{passive:false});
     var hemi=new THREE.HemisphereLight(0xffffff,0x8a8f99,0.8); hemi.position.set(0,0,1); S3.scene.add(hemi);
     var d1=new THREE.DirectionalLight(0xffffff,0.6); d1.position.set(-0.6,-1,1.4); S3.scene.add(d1);
     var d2=new THREE.DirectionalLight(0xffffff,0.25); d2.position.set(1,0.6,0.8); S3.scene.add(d2);
