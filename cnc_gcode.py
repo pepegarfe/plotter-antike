@@ -247,7 +247,72 @@ def _offset_side(paths, side, tool_dia, allowance=0.0, last_pass=0.0):
     return _order_units([[r] for r in rings])
 
 
-def make_pocket(paths, tool_dia, stepover_mm, direction='climb', allowance=0.0):
+def _chain_rings(rings, libre, step):
+    """Encadena anillos CONTIGUOS del cajeado en una sola polilínea: en vez de retirarse a
+    altura de seguridad y volver a hundirse entre uno y otro, la fresa pasa al siguiente
+    con un movimiento corto A PROFUNDIDAD DE CORTE — el "paso lateral" de toda la vida.
+
+    ⚠️ **SEGURIDAD, no optimización:** solo se encadena si el tramo recto se queda DENTRO de
+    `libre` = la zona por la que el CENTRO de la fresa puede andar sin comerse la pared del
+    cajeado (la región menos el radio). Cuando un cajeado se parte en ISLAS, unir dos en
+    línea recta cortaría material que debe quedarse y **arruina la pieza**. Si el salto no
+    pasa la prueba —o es largo— se deja el retiro de siempre.
+
+    Se usa `covers` y no `contains` a propósito: el anillo más exterior va JUSTO sobre el
+    borde de `libre`, y `contains` da falso para un punto que está en el borde.
+    """
+    if not HAS_SHAPELY or libre is None or getattr(libre, 'is_empty', True) or len(rings) < 2:
+        return rings
+    try:
+        zona = libre.buffer(1e-3)        # 1 µm de holgura: tolera el redondeo de coma flotante
+    except Exception:
+        return rings
+    salto_max = max(float(step) * 1.6, 1.0)
+
+    def desde(rg, a):
+        """El anillo rotado para arrancar en su vértice más cercano a `a`, y esa distancia."""
+        pts = [list(p) for p in rg]
+        if not _is_closed(pts):
+            return pts, math.hypot(pts[0][0]-a[0], pts[0][1]-a[1])
+        core = pts[:-1]
+        i = min(range(len(core)), key=lambda k: _d2(core[k], a))
+        core = core[i:] + core[:i]
+        return core + [list(core[0])], math.hypot(core[0][0]-a[0], core[0][1]-a[1])
+
+    # Se recorre en el orden original (centro → pared), pero al buscar con quién seguir se
+    # mira MÁS ALLÁ del siguiente: cuando el cajeado se parte en islas los anillos vienen
+    # intercalados entre ellas, y exigir que sean consecutivos no encadenaría nunca.
+    # Se prefiere siempre el más temprano de la lista, así dentro de cada isla se sigue
+    # yendo de dentro hacia fuera.
+    pend = list(rings)
+    out = []
+    cadena = list(pend.pop(0))
+    while True:
+        a = cadena[-1]
+        elegido = None
+        for k, rg in enumerate(pend):
+            pts, d = desde(rg, a)
+            if d > salto_max:
+                continue
+            try:
+                if zona.covers(LineString([(a[0], a[1]), (pts[0][0], pts[0][1])])):
+                    elegido = (k, pts)
+                    break
+            except Exception:
+                pass
+        if elegido is None:
+            out.append(cadena)
+            if not pend:
+                break
+            cadena = list(pend.pop(0))
+        else:
+            k, pts = elegido
+            pend.pop(k)
+            cadena.extend(pts)
+    return out
+
+
+def make_pocket(paths, tool_dia, stepover_mm, direction='climb', allowance=0.0, link=True):
     """CAJEADO: anillos concéntricos; cada zona completa (centro → pared), zonas por NN.
     allowance positiva deja material en la pared (pasada de acabado aparte)."""
     region, skipped = _closed_region(paths)
@@ -260,18 +325,20 @@ def make_pocket(paths, tool_dia, stepover_mm, direction='climb', allowance=0.0):
     sign = -1.0 if direction != 'conv' else 1.0     # cortar por dentro: climb = anillo horario
     units = []
     for poly in getattr(region, 'geoms', [region]):
-        levels, k = [], 0
+        levels, k, libre = [], 0, None
         while True:
             off = poly.buffer(-(r + k * step), quad_segs=16)
             if off.is_empty:
                 break
+            if k == 0:
+                libre = off              # por donde puede andar el CENTRO de la fresa
             levels.append(_rings_flat(off, sign))
             k += 1
         rings = []
         for lev in reversed(levels):
             rings.extend(lev)
         if rings:
-            units.append(rings)
+            units.append(_chain_rings(rings, libre, step) if link else rings)
     return _order_units(units), skipped
 
 
@@ -396,6 +463,32 @@ def _ring_pass(pts, cum, perim, s0, z_from, z_cut, entry_len, zones, z_tab, tab_
     return out, (s0 + entry_len) % perim if (overlap and entry_len > 0) else s0 % perim
 
 
+def _open_pass(pts, cum, z_from, z_cut, entry_len):
+    """Vértices [x,y,z] de UNA pasada sobre una polilínea ABIERTA (una cadena de anillos de
+    cajeado): baja en rampa a lo largo de los primeros `entry_len` mm y sigue plana hasta
+    el final.
+
+    Existe aparte de `_ring_pass` porque aquélla da LA VUELTA (usa `s % perim`): en un
+    trayecto abierto envolver saltaría del final al principio cortando en línea recta por
+    donde no debe. Aquí el recorrido es de 0 a `perim` y se acabó.
+    """
+    total = cum[-1]
+    L = max(0.0, min(float(entry_len or 0.0), total))
+    st = set(cum)
+    st.add(0.0); st.add(total)
+    if L > 0:
+        st.add(L)
+    out = []
+    for s in sorted(st):
+        z = z_cut if (L <= 0 or s >= L) else z_from + (z_cut - z_from) * (s / L)
+        p = _point_at(pts, cum, s)
+        if out and abs(p[0]-out[-1][0]) < 1e-6 and abs(p[1]-out[-1][1]) < 1e-6 \
+               and abs(z-out[-1][2]) < 1e-6:
+            continue
+        out.append([p[0], p[1], z])
+    return out
+
+
 # ---------- rampa de entrada (estilo Aspire: Suave / Zigzag / Espiral, por ángulo o distancia) ----------
 
 def _ramp_cfg(ramp):
@@ -460,8 +553,22 @@ def _zigzag_pass(pts, cum, perim, s0, z_from, z_cut, cfg, zones, z_tab, tab_ramp
 # ---------- G-code ----------
 
 def _passes(depth, pass_depth):
+    """Profundidades ACUMULADAS de cada pasada, repartidas por IGUAL (como Aspire).
+
+    `pass_depth` es el MÁXIMO que puede bajar una pasada, no la altura fija de cada una:
+    se calcula cuántas hacen falta y se reparte el total entre ellas.
+
+    ⚠️ **No volver a "pasadas llenas y lo que sobre"** (`pass_depth*(i+1)`): 6 mm con
+    pasada de 5 daba `[5, 6]`, o sea una segunda pasada que quita **1 mm** — y con 5.9
+    habría quitado 0.1 mm. Una pasada tan fina a todo el ancho de la fresa **frota en vez
+    de morder**: quema, desafila y deja rebaba, y encima cuesta la vuelta entera. Repartido
+    da `[3, 6]`: el mismo número de pasadas y el mismo recorrido, con bocado parejo.
+
+    La última se fija a `depth` EXACTO: `depth*n/n` en coma flotante no siempre vuelve a
+    dar `depth` (12.2*3/3 = 12.199999999999998) y la pieza quedaría sin cortar del todo.
+    """
     n = max(1, math.ceil(depth / max(0.1, pass_depth)))
-    return [min(depth, pass_depth * (i + 1)) for i in range(n)]
+    return [(depth * (i + 1) / n if i < n - 1 else depth) for i in range(n)]
 
 
 def _f(v):
@@ -532,7 +639,11 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
             dz = z_prev - z_cut
             pass_zones = zones if (zones and z_cut < z_tab - 1e-9) else None
             rtype = rc['type'] if (rc and dz > 1e-9) else None
-            if rtype == 'zigzag':
+            if (not closed) and rcfg and dz > 1e-9:
+                # cadena de anillos de cajeado: rampa a lo largo del propio trayecto, sin
+                # dar la vuelta (ver _open_pass)
+                verts = _open_pass(pts, cum, z_prev, z_cut, _entry_len(rcfg, dz, perim))
+            elif rtype == 'zigzag':
                 # vaivén descendente y luego la vuelta completa a fondo (repasa el tramo)
                 verts, s_zz = _zigzag_pass(pts, cum, perim, s_cur, z_prev, z_cut,
                                            rc, pass_zones, z_tab, tab_ramp)
@@ -557,6 +668,14 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
                 for x, y, z in verts[1:]:
                     lines.append('G01 X%s Y%s Z%s F%s' % (_f(x), _f(y), _f(z), _f(feed)))
                 z_now = verts[-1][2]
+                if not closed and d != ring_depths[-1]:
+                    # ⚠️ un trayecto ABIERTO termina en el extremo lejano, pero la pasada
+                    # siguiente vuelve a arrancar en pts[0]: hay que subir y regresar por el
+                    # aire. Sin esto la fresa cortaría en línea recta de vuelta, por encima
+                    # de todo lo que haya en medio.
+                    lines.append('G00 Z%s' % _f(safe))
+                    lines.append('G00 X%s Y%s' % (_f(pts[0][0]), _f(pts[0][1])))
+                    z_now = None
             else:
                 lines.append('G01 Z%s F%s' % (_f(z_cut), _f(plunge)))
                 for p in pts[1:]:
