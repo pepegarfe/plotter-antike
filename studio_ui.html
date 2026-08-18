@@ -108,6 +108,8 @@
   .fprow{padding:6px 9px;border-radius:6px;cursor:pointer;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
   .fprow:hover{background:var(--hover);}
   .fprow.on{background:var(--accent-soft);color:var(--accent);}
+  .fprow.fpsub{padding-left:24px;font-size:14px;opacity:.85;}
+  .fprow .fpn{float:right;margin-left:8px;font:11px/1.5 -apple-system,system-ui,sans-serif;color:var(--muted);opacity:.75;}
 
   .inspect{grid-area:inspect;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column;}
   .tabs{display:flex;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2;}
@@ -2105,7 +2107,7 @@
   function fontsLoad(cb){
     if(fontsCache){ cb(fontsCache); return; }
     var done=function(r){ if(!r||!r.ok){ toast((r&&r.error)||'No pude leer las fuentes del sistema'); return; }
-      fontsCache=r.fonts||[]; cb(fontsCache); };
+      fontsCache=r.fonts||[]; fpFams=[]; cb(fontsCache); };
     if(api()) api().fonts().then(done).catch(function(e){ toast('Error: '+e); });
     else fetch('/api/fonts').then(function(r){ return r.json(); }).then(done).catch(function(e){ toast('Error: '+e); });
   }
@@ -2140,44 +2142,108 @@
     }
     applyFontPreview();
   }
-  var fpVisible=[];   // índices que pasan el filtro actual (para navegar con flechas)
-  function fillFontList(filtro){
-    var L=el('fpList'); L.innerHTML=''; fpVisible=[];
-    var q=(filtro||'').toLowerCase(), onRow=null;
+  // La lista se AGRUPA POR FAMILIA (una fila por familia, sus pesos adentro) y solo
+  // dibuja las filas que hacen falta, pidiendo más al bajar. ⚠️ No volver a pintar una fila
+  // por cada archivo de fuente: cada fila se dibuja CON SU PROPIA tipografía, así que la
+  // lista completa obliga al navegador a cargar miles de fuentes cada vez que se abre
+  // el menú (con el catálogo de Google Fonts instalado eso son varios segundos).
+  var fpFams=[];        // [{name, styles:[índices en fontsCache], def:índice de la 'normal'}]
+  var fpFamOf={};       // índice de fuente → índice de su familia
+  var fpRows=[];        // filas del filtro actual: {fam, font, sub}
+  var fpDrawn=0;        // cuántas de fpRows ya están en el DOM
+  var fpOpen=-1;        // familia desplegada
+  var FP_CHUNK=60;      // filas por tanda
+
+  function buildFams(){
+    var pos={}; fpFams=[]; fpFamOf={};
     (fontsCache||[]).forEach(function(f,i){
-      if(q && f.name.toLowerCase().indexOf(q)<0) return;
-      fpVisible.push(i);
-      var d=document.createElement('div');
-      d.className='fprow'+(i===fontSel?' on':'');
-      if(i===fontSel) onRow=d;
-      d.textContent=f.name;
-      var c=cssFontOf(f);
-      d.style.fontFamily='"'+c.fam+'"'; d.style.fontWeight=c.w; d.style.fontStyle=c.it;
-      d.addEventListener('click',function(ev){ ev.stopPropagation();
-        fontSel=i; applyFontPreview(); el('fpDD').style.display='none'; });
-      L.appendChild(d);
+      var fam=f.family||f.name;
+      if(!(fam in pos)){ pos[fam]=fpFams.length; fpFams.push({name:fam, styles:[], def:i}); }
+      var e=fpFams[pos[fam]];
+      e.styles.push(i); fpFamOf[i]=pos[fam];
+      var sub=(f.sub||'').toLowerCase();
+      if(!sub||sub==='regular'||sub==='normal') e.def=i;   // la normal manda la vista previa
     });
-    if(onRow && onRow.scrollIntoView) onRow.scrollIntoView({block:'nearest'});
+    fpFams.forEach(function(e){
+      e.styles.sort(function(a,b){
+        if(a===e.def) return -1;
+        if(b===e.def) return 1;
+        return (fontsCache[a].sub||'').localeCompare(fontsCache[b].sub||'');
+      });
+    });
+  }
+  function fpCalcRows(filtro){
+    var q=(filtro||'').toLowerCase();
+    fpRows=[];
+    fpFams.forEach(function(e,n){
+      var famOk=!q || e.name.toLowerCase().indexOf(q)>=0;
+      var hits=e.styles.filter(function(i){ return !q || fontsCache[i].name.toLowerCase().indexOf(q)>=0; });
+      if(!famOk && !hits.length) return;
+      fpRows.push({fam:n, font:e.def, sub:false});
+      // se despliega si el usuario la abrió, o si buscó un peso concreto ('bold')
+      var abierta=(n===fpOpen)||(q && !famOk);
+      if(abierta && e.styles.length>1)
+        (famOk?e.styles:hits).forEach(function(i){ fpRows.push({fam:n, font:i, sub:true}); });
+    });
+  }
+  function fpPosDe(idx){
+    for(var i=0;i<fpRows.length;i++) if(fpRows[i].font===idx && !fpRows[i].sub) return i;
+    for(var j=0;j<fpRows.length;j++) if(fpRows[j].font===idx) return j;
+    return -1;
+  }
+  function fpMakeRow(r){
+    var f=fontsCache[r.font], e=fpFams[r.fam];
+    var d=document.createElement('div');
+    d.className='fprow'+(r.sub?' fpsub':'')+(r.font===fontSel?' on':'');
+    d.textContent=r.sub?(f.sub||'Regular'):e.name;
+    if(!r.sub && e.styles.length>1){
+      var b=document.createElement('span'); b.className='fpn'; b.textContent=e.styles.length;
+      d.appendChild(b);
+    }
+    var c=cssFontOf(f);
+    d.style.fontFamily='"'+c.fam+'"'; d.style.fontWeight=c.w; d.style.fontStyle=c.it;
+    d.addEventListener('click',function(ev){ ev.stopPropagation();
+      if(!r.sub && e.styles.length>1 && fpOpen!==r.fam){     // familia con varios pesos: abrirla
+        fpOpen=r.fam; fontSel=r.font; applyFontPreview(); fillFontList(el('fpSearch').value); return; }
+      fontSel=r.font; applyFontPreview(); el('fpDD').style.display='none'; });
+    return d;
+  }
+  function fpDrawRows(hasta){
+    var L=el('fpList');
+    while(fpDrawn<fpRows.length && fpDrawn<hasta){ L.appendChild(fpMakeRow(fpRows[fpDrawn])); fpDrawn++; }
+  }
+  function fillFontList(filtro){
+    if(!fpFams.length) buildFams();
+    var L=el('fpList'); L.innerHTML=''; fpDrawn=0;
+    fpCalcRows(filtro);
+    fpDrawRows(Math.max(FP_CHUNK, fpPosDe(fontSel)+8));
+    var on=L.querySelector('.fprow.on');
+    if(on && on.scrollIntoView) on.scrollIntoView({block:'nearest'});
   }
   // ↑/↓ recorren las fuentes con vista previa EN VIVO (dentro del filtro si hay búsqueda)
   function fontStep(dir){
     var fonts=fontsCache||[]; if(!fonts.length) return;
     var abierto=el('fpDD').style.display!=='none';
-    if(abierto && fpVisible.length){
-      var pos=fpVisible.indexOf(fontSel)+dir;
-      if(pos<0) pos=fpVisible.length-1;
-      if(pos>=fpVisible.length) pos=0;
-      fontSel=fpVisible[pos];
+    if(abierto && fpRows.length){
+      var pos=fpPosDe(fontSel)+dir;
+      if(pos<0) pos=fpRows.length-1;
+      if(pos>=fpRows.length) pos=0;
+      fontSel=fpRows[pos].font;
     } else {
       fontSel=((fontSel<0?0:fontSel)+dir+fonts.length)%fonts.length;
     }
     applyFontPreview();
     if(abierto) fillFontList(el('fpSearch').value);
   }
+  el('fpList').addEventListener('scroll',function(){    // al llegar al fondo, otra tanda
+    if(this.scrollTop+this.clientHeight > this.scrollHeight-120) fpDrawRows(fpDrawn+FP_CHUNK); });
   el('fpBtn').addEventListener('click',function(e){ e.stopPropagation();
     var dd=el('fpDD');
     if(dd.style.display!=='none'){ dd.style.display='none'; return; }
-    dd.style.display='block'; el('fpSearch').value=''; fillFontList('');
+    dd.style.display='block'; el('fpSearch').value='';
+    if(!fpFams.length) buildFams();
+    fpOpen=(fontSel>=0 && fpFamOf[fontSel]!==undefined)?fpFamOf[fontSel]:-1;
+    fillFontList('');
     setTimeout(function(){ el('fpSearch').focus(); },30); });
   el('fpBtn').addEventListener('keydown',function(e){
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); fontStep(e.key==='ArrowDown'?1:-1); } });
@@ -4813,6 +4879,11 @@
     allUnits:allUnits, setFillView:setFillView, get fillView(){return fillView;}, get outlineMode(){return outlineMode;}, draw:draw,
     ex:{open:exOpen, payload:exPayload, go:exGo, paint:exPaint, setFmt:exSetFmt, set fmt(f){exFmt=f;}, get fmt(){return exFmt;}},
     hpglPayload:hpglPayload,
+    fonts:{ get cache(){return fontsCache;}, set cache(v){fontsCache=v; fpFams=[];},
+            get sel(){return fontSel;}, set sel(v){fontSel=v;},
+            get open(){return fpOpen;}, set open(v){fpOpen=v;},
+            get rows(){return fpRows;}, get fams(){return fpFams;}, get drawn(){return fpDrawn;},
+            build:buildFams, fill:fillFontList, step:fontStep, more:fpDrawRows, byName:setFontByName },
     cnc:{ get tpaths(){return tpaths;}, get tpSel(){return tpSel;}, set tpSel(v){tpSel=v;},
           get prev(){return cncPrev;}, set prev(v){cncPrev=v;}, hitToolpath:hitToolpath,
           selectFromCanvas:selectTpFromCanvas, paintTps:paintTps,
