@@ -143,6 +143,19 @@ hardcodear colores ni fuentes en los widgets** — todo sale de aquí:
 - ⚠️ **Los `tk.Toplevel` necesitan `bg=UI.PANEL`** o en modo oscuro de macOS salen con fondo negro.
 - **No quitar** el bloque de tema/paleta al inicio de `PlotterApp.__init__` ni `_setup_theme()`.
 
+### Fuentes (Design Studio)
+
+- **La app NO tiene carpeta propia de tipografías**: lee las instaladas en el sistema
+  (`_font_dirs()` en `text_vector.py`). Agregar una fuente = instalarla en el SO. El caché
+  (`fonts_cache.json`) se invalida solo con una firma de esas carpetas (`_dirs_sig`), pero **esa
+  firma solo mira el PRIMER NIVEL**: fuentes metidas dentro de una subcarpeta que ya existía
+  pueden no detectarse — instalarlas sueltas, o borrar el caché.
+- ⚠️ **El selector de fuentes dibuja POR TANDAS y agrupado por familia** (`fillFontList`/
+  `fpDrawRows` en `studio_ui.html`). **No volver a pintar una fila por archivo de fuente**: cada
+  fila se dibuja con su propia tipografía, así que la lista completa obliga al motor web a cargar
+  cientos de fuentes cada vez que se abre el menú. Con el catálogo grande instalado (ago-2026:
+  969 fuentes / 343 familias) eso se sentiría al abrir el desplegable.
+
 ## Dependencias opcionales
 
 La app **arranca sin ninguna dependencia** y solo deshabilita la función que falte:
