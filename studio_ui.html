@@ -3319,14 +3319,22 @@
     cancel:     function(){ return api()? api().cancel() : postJSON('/api/cancel',{}); },
     testcut:    function(){ return api()? api().test_cut() : postJSON('/api/testcut',{}); }
   };
-  var connected=false, penDown=false;
-  function setConnUI(c,port){ connected=c; el('connPill').classList.toggle('ok',c);
-    el('connText').textContent = c ? ('Conectado · '+(port||'')) : 'Desconectado';
+  var connected=false, penDown=false, connPort=null;
+  function setConnUI(c,port){ connected=c;
+    if(port!==undefined) connPort=port||null;
+    if(!c) connPort=null;
+    el('connPill').classList.toggle('ok',c);
+    // en la píldora de la barra va el nombre CORTO: no cabe la descripción entera
+    el('connText').textContent = c ? ('Conectado · '+portShort(connPort)) : 'Desconectado';
     el('btnConnect').textContent = c ? 'Desconectar' : 'Conectar';
-    el('connStat').textContent = c ? ('Conectado a '+portName(port)) : 'Desconectado'; el('connStat').classList.toggle('ok',c); }
+    el('connStat').textContent = c ? ('Conectado a '+portName(connPort)) : 'Desconectado';
+    el('connStat').classList.toggle('ok',c); }
   var lastPort=null;   // el puerto de la última conexión exitosa (lo recuerda el backend)
-  var portLabels={};   // ruta real → nombre legible, para los mensajes de estado
+  var portLabels={};   // ruta real → nombre legible (se llena al listar los puertos)
   function portName(p){ return portLabels[p]||p||''; }
+  function portShort(p){ var l=portLabels[p];
+    if(!l) return (p||'').replace('/dev/cu.','').replace('/dev/tty.','');   // aún sin etiquetas
+    return l.split(' — ')[0]; }
   // La lista muestra NOMBRES LEGIBLES ('Cable USB — FT232R USB UART'), no /dev/cu.usbserial-AO004NFH,
   // y separa los cables USB de los aparatos internos del sistema, que nunca son un plotter.
   // El valor de cada opción sigue siendo la ruta real: eso es lo que se le manda al backend.
@@ -3345,6 +3353,7 @@
     if(cur && rutas.indexOf(cur)>=0){ sel.value=cur; return; }
     var usb=items.filter(function(i){ return i.kind==='usb'; });
     if(usb.length===1) sel.value=usb[0].port;      // sin memoria y un solo cable: ese es
+  }).then(function(){ if(connected) setConnUI(true);   // repintar ya con los nombres legibles
   }).catch(function(){}); }
   function openPlotter(){ el('plotterModal').style.display='flex';
     // el estado ANTES de llenar la lista: así el puerto de la última vez sale ya elegido
