@@ -11,6 +11,7 @@ dist/
 plotter_config.json
 cnc_config.json
 
+plotter_prefs.json
 fonts_cache.json
 autosave.dstudio
 arranque.log
