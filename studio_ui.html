@@ -3323,11 +3323,37 @@
   function setConnUI(c,port){ connected=c; el('connPill').classList.toggle('ok',c);
     el('connText').textContent = c ? ('Conectado · '+(port||'')) : 'Desconectado';
     el('btnConnect').textContent = c ? 'Desconectar' : 'Conectar';
-    el('connStat').textContent = c ? ('Conectado a '+(port||'')) : 'Desconectado'; el('connStat').classList.toggle('ok',c); }
-  function refreshPorts(){ P.ports().then(function(r){ var sel=el('portSel'), cur=sel.value; var ps=(r&&r.ports)||[]; sel.innerHTML='';
-    if(!ps.length){ sel.innerHTML='<option value="">— sin puertos —</option>'; }
-    else { ps.forEach(function(p){ var o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); }); if(cur&&ps.indexOf(cur)>=0) sel.value=cur; } }).catch(function(){}); }
-  function openPlotter(){ el('plotterModal').style.display='flex'; refreshPorts(); P.status().then(function(s){ if(s&&s.ok){ setConnUI(!!s.connected,s.port); if(!s.has_serial) toast('pyserial no disponible en este Python'); } }).catch(function(){}); }
+    el('connStat').textContent = c ? ('Conectado a '+portName(port)) : 'Desconectado'; el('connStat').classList.toggle('ok',c); }
+  var lastPort=null;   // el puerto de la última conexión exitosa (lo recuerda el backend)
+  var portLabels={};   // ruta real → nombre legible, para los mensajes de estado
+  function portName(p){ return portLabels[p]||p||''; }
+  // La lista muestra NOMBRES LEGIBLES ('Cable USB — FT232R USB UART'), no /dev/cu.usbserial-AO004NFH,
+  // y separa los cables USB de los aparatos internos del sistema, que nunca son un plotter.
+  // El valor de cada opción sigue siendo la ruta real: eso es lo que se le manda al backend.
+  function refreshPorts(pref){ return P.ports().then(function(r){ var sel=el('portSel'), cur=sel.value||pref||lastPort;
+    var items=(r&&r.items)||((r&&r.ports)||[]).map(function(p){ return {port:p, label:p, kind:'otro'}; });
+    sel.innerHTML='';
+    if(!items.length){ sel.innerHTML='<option value="">— sin puertos —</option>'; return; }
+    [['usb','Cables USB'],['otro','Otros (no suelen ser el plotter)']].forEach(function(g){
+      var lote=items.filter(function(i){ return i.kind===g[0]; });
+      if(!lote.length) return;
+      var og=document.createElement('optgroup'); og.label=g[1];
+      lote.forEach(function(i){ var o=document.createElement('option'); o.value=i.port; o.textContent=i.label; og.appendChild(o); });
+      sel.appendChild(og); });
+    items.forEach(function(i){ portLabels[i.port]=i.label; });
+    var rutas=items.map(function(i){ return i.port; });
+    if(cur && rutas.indexOf(cur)>=0){ sel.value=cur; return; }
+    var usb=items.filter(function(i){ return i.kind==='usb'; });
+    if(usb.length===1) sel.value=usb[0].port;      // sin memoria y un solo cable: ese es
+  }).catch(function(){}); }
+  function openPlotter(){ el('plotterModal').style.display='flex';
+    // el estado ANTES de llenar la lista: así el puerto de la última vez sale ya elegido
+    P.status().then(function(s){ if(s&&s.ok){ setConnUI(!!s.connected,s.port);
+        lastPort=s.last_port||null;
+        if(s.last_baud) el('baudSel').value=String(s.last_baud);
+        if(!s.has_serial) toast('pyserial no disponible en este Python'); }
+      refreshPorts(s&&(s.port||s.last_port)); })
+     .catch(function(){ refreshPorts(); }); }
   el('connPill').addEventListener('click',openPlotter);
   el('plotterClose').addEventListener('click',function(){ el('plotterModal').style.display='none'; });
   el('plotterModal').addEventListener('click',function(e){ if(e.target===el('plotterModal')) el('plotterModal').style.display='none'; });
@@ -3337,7 +3363,7 @@
     var port=el('portSel').value; if(!port){ toast('Elige un puerto primero'); return; }
     el('btnConnect').textContent='Conectando…';
     P.connect(port, parseInt(el('baudSel').value,10)||9600).then(function(s){
-      if(s && s.ok!==false && s.connected){ setConnUI(true,s.port); toast('Conectado a '+s.port); }
+      if(s && s.ok!==false && s.connected){ setConnUI(true,s.port); lastPort=s.port; toast('Conectado a '+portName(s.port)); }
       else { setConnUI(false); toast((s&&s.error)||'No se pudo conectar'); } }).catch(function(e){ setConnUI(false); toast('Error: '+e); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('.jogpad [data-dir]'),function(b){ b.addEventListener('click',function(){ P.jog(b.getAttribute('data-dir'), parseFloat(el('jogStep').value)||1).then(function(r){ if(r&&!r.ok) toast(r.error||'Plotter no conectado'); }); }); });

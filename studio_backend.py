@@ -11,6 +11,7 @@ en vez de tronar.
 """
 import time
 import json
+import re
 import threading
 
 import plotter_control as core
@@ -61,6 +62,35 @@ def flip_paths_y(paths):
 
 def _cnc_path():
     return core._config_path().with_name('cnc_config.json')
+
+
+# --- último puerto usado (para no volver a elegirlo cada vez que se abre la app) ---
+# ⚠️ Archivo PROPIO por el mismo motivo que cnc_config.json: la app tkinter reescribe
+# plotter_config.json con SOLO sus llaves y borraría esto en silencio.
+# ⚠️ encoding='utf-8' explícito en las dos direcciones (regla del proyecto).
+
+def _prefs_path():
+    return core._config_path().with_name('plotter_prefs.json')
+
+
+def plotter_prefs():
+    """{'port', 'baud'} de la última conexión exitosa. Sin archivo: puerto vacío."""
+    try:
+        p = _prefs_path()
+        if p.exists():
+            d = json.loads(p.read_text(encoding='utf-8'))
+            return {'port': d.get('port') or None, 'baud': int(d.get('baud') or 9600)}
+    except Exception:
+        pass
+    return {'port': None, 'baud': 9600}
+
+
+def _prefs_save(port, baud):
+    try:
+        _prefs_path().write_text(json.dumps({'port': port, 'baud': int(baud)}),
+                                 encoding='utf-8')
+    except Exception:
+        pass      # sin permisos de escritura no es motivo para impedir el corte
 
 
 # ESQUEMA v2 (estilo Aspire): la fresa es GEOMETRÍA (nombre, Ø, notas) y sus DATOS DE CORTE
@@ -465,6 +495,45 @@ def build_hpgl(data):
     return conv.get_hpgl()
 
 
+def _port_items():
+    """Puertos con nombre legible y separando el grano de la paja.
+
+    La señal es el VID/PID: un cable USB de verdad lo trae (el FTDI del plotter da
+    'FT232R USB UART' de fabricante FTDI); los aparatos internos del sistema
+    (Bluetooth, audífonos emparejados, consola de depuración) vienen VACÍOS y NUNCA
+    son un plotter. Por eso se marcan como 'otro' y se mandan al fondo de la lista:
+    el nombre crudo /dev/cu.usbserial-AO004NFH no le dice nada a nadie.
+    """
+    if not core.HAS_SERIAL:
+        return []
+    import serial.tools.list_ports as lp
+    usb, otros = [], []
+    for p in lp.comports():
+        dev = p.device
+        corto = dev.replace('/dev/cu.', '').replace('/dev/tty.', '')
+        desc = (p.description or '').strip()
+        if desc.lower() in ('n/a', 'none', ''):
+            desc = ''
+        # en Windows la descripción ya trae el COM ('USB Serial Port (COM3)'): sobra
+        desc = re.sub(r'\s*\(COM\d+\)$', '', desc)
+        if p.vid is not None:                       # cable USB real
+            det = desc or (p.manufacturer or '').strip() or 'adaptador USB'
+            # en Windows el propio nombre (COM3) ya es corto y es el que la gente busca
+            base = dev if dev.upper().startswith('COM') else 'Cable USB'
+            usb.append({'port': dev, 'label': f'{base} — {det}', 'kind': 'usb'})
+        else:
+            if 'bluetooth' in corto.lower():
+                lab = 'Bluetooth (entrante)'
+            elif 'debug' in corto.lower():
+                lab = 'Consola interna del equipo'
+            elif dev.upper().startswith('COM'):
+                lab = f'{dev} — puerto serie del equipo'
+            else:
+                lab = corto
+            otros.append({'port': dev, 'label': lab, 'kind': 'otro'})
+    return usb + otros                              # los cables USB primero
+
+
 class PlotterService:
     def __init__(self):
         self.ctrl = core.PlotterController()
@@ -478,13 +547,18 @@ class PlotterService:
     # --- estado / puertos ---
     def ports(self):
         try:
-            return {'ok': True, 'ports': self.ctrl.get_ports(), 'has_serial': core.HAS_SERIAL}
+            items = _port_items()
+            # 'ports' (solo nombres) se mantiene por compatibilidad con la UI vieja
+            return {'ok': True, 'ports': [i['port'] for i in items], 'items': items,
+                    'has_serial': core.HAS_SERIAL}
         except Exception as e:
-            return {'ok': False, 'error': str(e), 'ports': []}
+            return {'ok': False, 'error': str(e), 'ports': [], 'items': []}
 
     def status(self):
+        pref = plotter_prefs()
         return {'ok': True, 'connected': bool(self.ctrl.connected),
-                'port': self.port, 'baud': self.baud, 'has_serial': core.HAS_SERIAL}
+                'port': self.port, 'baud': self.baud, 'has_serial': core.HAS_SERIAL,
+                'last_port': pref['port'], 'last_baud': pref['baud']}
 
     # --- conexión ---
     def connect(self, port, baud=9600):
@@ -493,6 +567,7 @@ class PlotterService:
         try:
             self.ctrl.connect(port, int(baud))
             self.port, self.baud = port, int(baud)
+            _prefs_save(self.port, self.baud)     # la próxima vez sale ya elegido
             try:
                 self.ctrl.send('IN;')
             except Exception:
