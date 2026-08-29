@@ -1,6 +1,6 @@
 ---
 name: rebaba-microsegmentos
-description: Por qué el .tap de Design Studio dejaba rebaba y el de Aspire no — micro-segmentos del offset de shapely (RESUELTO 3-ago-2026)
+description: Por qué el .tap de Design Studio deja rebaba y el de Aspire no — RONDA 1 micro-segmentos del offset (3-ago-2026) y RONDA 2 avance irreal, pasada al doble y rampa al avance de corte (29-ago-2026)
 metadata: 
   node_type: memory
   type: project
@@ -186,4 +186,81 @@ encadenado del cajeado) · `v2026.08.04` (la última pasada enciende sola la ram
   pedía. Una línea que OMITE un eje depende del valor modal anterior: si quitas el punto de antes,
   hereda una posición equivocada.
 
-Relacionado: [[cnc-richauto]] (la integración y los presets), [[design-studio]].
+---
+
+# RONDA 2 — 29-ago-2026: seguía habiendo rebaba, y ya no era la geometría
+
+Jose cortó el **cocodrilo** (`Vetta Mirror/Espejos para niños/Animales/Cocodrilo/`) con los dos
+programas: **una décima parte de rebaba** con Aspire, y "movimientos menos bruscos". Comparé
+`cocodrilo.tap` (Vectric) contra `cocodrilo dstudio.tap`.
+
+**Lo primero fue descartar la ronda 1: el arreglo de ago-2026 aguanta.** Segmentos más cortos
+que 0.2 mm: **Aspire 14.0 %, nosotros 1.2 %** — nuestra geometría ya es *más limpia* que la suya.
+La rebaba venía de tres cosas nuevas.
+
+## 1. Le pedíamos un avance que la máquina no puede dar (la grave)
+
+Aspire pide **F1270**, nosotros **F4000**. Para llegar a 4000 mm/min la máquina necesita
+**3.7–11 mm solo de aceleración** (según su `a`, 200–1000 mm/s²), y el segmento típico de este
+diseño mide **0.69 mm**: nunca llega. Simulé el perfil trapezoidal con look-ahead sobre el rango
+entero de aceleración —**la conclusión no depende de saber la `a` real**:
+
+| | Aspire | Design Studio |
+|---|---|---|
+| avance pedido | 1270 | 4000 |
+| avance **real** logrado | ~667 | ~765 |
+| **% del recorrido a velocidad ESTABLE** | **42.7 %** | **5.9 %** |
+
+El 94 % del recorrido acelerando o frenando *es* "movimientos bruscos": el bocado de cada filo
+oscila corte a corte. Y el F4000 **no compra nada** — misma geometría, solo cambiando el avance
+pedido: F1270 → 13.02 min, F4000 → 12.20 min. **48 segundos**, a cambio de 6.5× menos estabilidad.
+
+## 2. Bajábamos al doble y medio por pasada
+
+Aspire: **5 pasadas de 2.44 mm**. Nosotros: **2 de 6.10 mm** = **1.02 × el diámetro** de la fresa
+(todo el filo enterrado a la vez), **7× la fuerza de corte pedida**. La fresa se flexiona y rebota:
+causa de rebaba **distinta** de la vibración. ⚠️ **Esto salió de un consejo mío de ago-2026**
+(subir la pasada máxima para ganar tiempo en el cajeado); Jose la subió y la cuenta llegó en
+rebaba. **Ganar minutos subiendo la pasada tiene un precio que no se ve en la simulación.**
+
+## 3. Entrábamos al material 7× más rápido (bug nuestro)
+
+`_contour_body` emitía la rampa de entrada con `feed` en vez de `plunge`. Velocidad **vertical**
+de entrada: **mediana 686 mm/min y picos de 2499**, contra los **90/381** de Aspire.
+
+## Lo que se arregló en el código (29-ago-2026)
+
+- **`_emit_cut()`**: todo movimiento que baja entrando al material va al avance de **picada**,
+  decidido **por segmento**. Verificado en los 3 tipos de rampa: 0 entradas al avance de corte,
+  vertical de 174 mm/min (antes 686).
+- **`_modal()`**: salida modal como el post de Vectric (`G01`/`F` solo cuando cambian, ejes que no
+  cambian omitidos) y **borrado de los 36 movimientos de largo cero**. De **32.3 a 17.6 caracteres
+  por bloque** (Aspire: 17.1). Probado **ida y vuelta sobre el .tap real del cocodrilo**: mismos
+  8816 movimientos, **desviación 0.000000000 mm**, 0 avances distintos.
+- **`parseTap()` de la vista 3D**: descartaba las líneas sin `G` inicial → con la salida modal
+  **veía 68 movimientos de 8812**, vista 3D casi vacía y **sin ningún error**. Arreglado y probado
+  en node con el `parseTap` real sobre los dos formatos.
+- **`auditar_gcode.py`**: parser modal + dos invariantes nuevos (nada de largo cero; todo lo que
+  baja al material va a `plunge`). **133 verificaciones OK.**
+
+## Lo que NO se tocó, y por qué
+
+Los **presets de fresa** (avance 4000, pasada 5 mm) son la causa dominante y **son datos vivos de
+Jose**: no se cambian desde el escritorio sin cortar. Recomendado para 6 mm / 2 filos en triplay:
+**avance 1500, picada 400, pasada máx. 3.0** — cuesta ~5 min más por hoja. ⏳ **PENDIENTE: que
+Jose corte el A/B.** Nadie ha probado todavía en la madera que esto sea lo que era.
+
+## Lección de la ronda 2
+
+**Compara el avance PEDIDO contra la distancia que hay para acelerar** (`v²/2a`). Si el segmento
+típico es más corto que esa distancia, el número del archivo no lo va a ver nadie y la máquina va
+a ir a tirones. Es la ronda 1 vista por el otro lado: entonces sobraban segmentos para la
+velocidad, ahora sobra velocidad para los segmentos — **el mismo choque entre lo que el archivo
+pide y lo que el control alcanza a ejecutar**.
+
+Y una de método: **al cambiar el FORMATO de un archivo, busca a todos los que lo leen.** El
+`.tap` tenía un segundo lector (la vista 3D) que se habría roto en silencio.
+
+Relacionado: [[cnc-richauto]] (la integración y los presets), [[design-studio]],
+[[render-3d-fidelidad]] (la vista 3D es fiel al recorte y ciega al terminado — no habría enseñado
+nada de esto).

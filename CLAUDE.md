@@ -97,6 +97,33 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   sale con rebaba** (caso real, ago-2026). Señal: si dos archivos cortan la MISMA geometría y uno
   vibra, no compares las trayectorias — **compara el largo de los movimientos**; un patrón
   largo-corto-largo-corto es geometría de computadora que nadie limpió.
+- ⚠️ **CNC: TODO movimiento que baja entrando al material va al avance de PICADA**, no al
+  de corte — lo emite `_emit_cut()`, que decide **por segmento** (baja → `plunge`, llano →
+  `feed`). Una rampa de entrada avanza y baja a la vez, así que para el control es un corte
+  más; pero la fresa estrena material con su **punta**, que es donde peor corta. Emitirla al
+  avance de corte la hundía a **686 mm/min verticales de mediana, con picos de 2499**, contra
+  los 90/381 de Aspire en la misma pieza (ago-2026).
+- ⚠️ **CNC: la salida del `.tap` es MODAL** (`_modal()`, la última pasada de `build_jobs`):
+  el `G01` y la `F` solo se escriben cuando cambian, los ejes que no cambian se omiten y los
+  movimientos de **largo cero se borran** (frenan al control sin cortar nada). **No la quites:
+  no es cosmética** — el DSP lee y ejecuta bloque a bloque, así que cada carácter compite con
+  el movimiento, el mismo mecanismo de `_simplify`. Bajó de **32.3 a 17.6 caracteres por
+  bloque** (Aspire: 17.1). Dos cautelas a respetar: **los G00 conservan SIEMPRE su palabra G**
+  (son cuatro docenas, no ahorran nada y no vale dejar un rápido al estado modal), y **tras
+  cada G00 se reescribe la F** aunque no haya cambiado.
+- ⚠️ **Todo lector del `.tap` debe arrastrar el modo vigente.** `parseTap()` (vista 3D, en
+  `studio_ui.html`) descartaba las líneas que no empiezan con `G` y al hacer modal la salida
+  **se quedó viendo 68 movimientos de 8812** — vista 3D casi vacía, **sin ningún error**. Si
+  agregas otro lector de G-code, la prueba es correr el MISMO archivo en los dos formatos y
+  exigir la misma lista de movimientos.
+- ⚠️ **CNC: el avance del archivo tiene que ser alcanzable, o es fantasía.** Para llegar a
+  4000 mm/min la máquina necesita **3.7–11 mm solo de aceleración**, y el segmento típico de
+  un diseño curvo mide **0.7 mm**: pedir F4000 dejaba a la máquina **el 94 % del recorrido
+  acelerando o frenando** (contra el 57 % de Aspire a F1270) para ahorrar **48 segundos** —
+  bocado errático y rebaba. Señal: **compara el avance pedido contra la distancia que hay
+  para acelerar** (`v²/2a`); si el segmento típico es más corto, el número del archivo no lo
+  va a ver nadie. Esto vive en los **presets de fresa**, no en el código: el código no valida
+  esa relación (candidato a aviso en la UI).
 - **Tres modos de selección/transformación** según estado: **individual** (`_sel_idx >= 0`, escala y
   rotación ABSOLUTAS), **grupo manual** (`_sel_set` no vacío, RELATIVAS) y **todos** (ambos vacíos,
   RELATIVAS). Toda transformación debe respetar los tres.
