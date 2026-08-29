@@ -28,7 +28,39 @@ TOOL = {'id': 't6-2f', 'name': 'Fresa 6mm 2F', 'dia': 6.0, 'pass_depth': 5.0,
 MAT_TOP = {'thickness': 15.0, 'z_zero': 'top', 'clearance': 5.0, 'home_end': True}
 MAT_BED = {'thickness': 15.0, 'z_zero': 'bed', 'clearance': 5.0, 'home_end': True}
 
-LN_RE = re.compile(r'^(?:\( [^()]* \)|G90 G21 G17|M03 S\d+|M05|M30|G04 P\d+(?:\.\d{1,3})?|G0[01](?: X(-?\d+(?:\.\d{1,3})?))?(?: Y(-?\d+(?:\.\d{1,3})?))?(?: Z(-?\d+(?:\.\d{1,3})?))?(?: F(\d+(?:\.\d{1,3})?))?)$')
+LN_OTRA = re.compile(r'^(?:\( [^()]* \)|G90 G21 G17|M03 S\d+|M05|M30|G04 P\d+(?:\.\d{1,3})?)$')
+PALABRA_RE = re.compile(r'^([GXYZF])(-?\d+(?:\.\d{1,3})?)$')
+
+
+def mov(ln):
+    """Descompone una línea de movimiento en (g, {eje: valor}, f); None si no lo es.
+
+    La salida es MODAL desde ago-2026 (ver `_modal` en cnc_gcode): un corte puede venir
+    sin su `G01` y sin su `F`, y sin los ejes que no cambian — igual que el archivo de
+    Aspire. Lo que NO se acepta es una palabra repetida o fuera del orden G-X-Y-Z-F.
+    """
+    g = f = None
+    ejes = {}
+    orden = []
+    for t in ln.split(' '):
+        m = PALABRA_RE.match(t)
+        if not m:
+            return None
+        letra, val = m.group(1), m.group(2)
+        if letra in orden:
+            return None
+        orden.append(letra)
+        if letra == 'G':
+            if t not in ('G00', 'G01'):
+                return None
+            g = int(val)
+        elif letra == 'F':
+            f = float(val)
+        else:
+            ejes[letra] = float(val)
+    if orden != [c for c in 'GXYZF' if c in orden]:
+        return None
+    return None if (g is None and f is None and not ejes) else (g, ejes, f)
 
 
 def parse(tap, mat, tool, depth, caso, start=0.0):
@@ -54,48 +86,62 @@ def parse(tap, mat, tool, depth, caso, start=0.0):
           else ('( Z0 en la cara superior' in tap))
     check(f'{caso}: espera de husillo tras M03 (G04 + respiro aéreo)',
           body[3].startswith('G04 P') and body[4].startswith('G01 Z')
-          and body[5] == 'G00 Z%g' % safe or body[5].startswith('G01 Z'),
+          and body[5] in ('G00 Z%g' % safe, 'Z%g' % safe),
           str(body[3:6]))
     fin = body[-3:] if mat.get('home_end', True) else body[-2:]
     check(f'{caso}: cierre M05/[home]/M30',
           fin[-1] == 'M30' and fin[0] == 'M05' and
           (not mat.get('home_end', True) or fin[1] == 'G00 X0 Y0'), str(fin))
 
-    # línea por línea: gramática estricta + física
+    # línea por línea: gramática estricta + física, siguiendo el estado MODAL
     x = y = None
     z = None
+    modo = None                      # G00/G01 vigente
+    f_mod = None                     # avance vigente
     moves = []
     zmin = 1e9
     malas = []
-    for i, ln in enumerate(lines):
-        m = LN_RE.match(ln)
-        if not m:
+    for ln in lines:
+        if LN_OTRA.match(ln):
+            continue
+        m = mov(ln)
+        if m is None:
             malas.append(ln)
             continue
-        if not ln.startswith('G0') or ln.startswith('G04'):
+        g, ejes, f = m
+        if g is not None:
+            modo = g
+        if modo is None:
+            malas.append('movimiento antes de cualquier G: ' + ln)
             continue
-        rapid = ln.startswith('G00')
-        nx = float(m.group(1)) if m.group(1) else x
-        ny = float(m.group(2)) if m.group(2) else y
-        nz = float(m.group(3)) if m.group(3) else z
-        f = float(m.group(4)) if m.group(4) else None
+        if f is not None:
+            f_mod = f
+        rapid = (modo == 0)
+        nx = ejes.get('X', x)
+        ny = ejes.get('Y', y)
+        nz = ejes.get('Z', z)
+        # un movimiento que no va a ningún lado hace frenar al control sin cortar nada
+        if (nx, ny, nz) == (x, y, z):
+            malas.append('movimiento de largo cero: ' + ln)
         aereo = (nz is not None and nz >= safe - 1e-9 and
                  (z is None or z >= safe - 1e-9))
         if not rapid:
-            # todo G01 lleva F; bajo la Z segura debe ser la F de corte o la de bajada
-            if f is None:
-                malas.append('G01 sin F: ' + ln)
-            elif not aereo and f not in (float(tool['feed']), float(tool['plunge'])):
+            if f_mod is None:
+                malas.append('G01 sin F vigente: ' + ln)
+            elif not aereo and f_mod not in (float(tool['feed']), float(tool['plunge'])):
                 malas.append('F desconocida: ' + ln)
-            # bajada vertical que ENTRA al material → F de plunge
-            if m.group(3) and not m.group(1) and not m.group(2) \
-               and not aereo and f != float(tool['plunge']):
-                malas.append('bajada vertical sin F de plunge: ' + ln)
+            # TODO lo que baja entrando al material va al avance de picada, sea una
+            # bajada vertical o una rampa que avanza mientras baja (ver _emit_cut)
+            if nz is not None and z is not None and nz < z - 1e-9 and not aereo \
+               and f_mod != float(tool['plunge']):
+                malas.append('bajada sin F de plunge: ' + ln)
         else:
             if f is not None:
                 malas.append('G00 con F: ' + ln)
+            if g is None:
+                malas.append('rápido sin su palabra G: ' + ln)
             # un G00 con XY solo puede viajar A SALVO (>= cara del material)
-            if (m.group(1) or m.group(2)) and z is not None and z < z_top - 1e-9:
+            if ('X' in ejes or 'Y' in ejes) and z is not None and z < z_top - 1e-9:
                 malas.append(f'G00 XY con la fresa ENTERRADA (z={z}): ' + ln)
         if nz is not None:
             zmin = min(zmin, nz)

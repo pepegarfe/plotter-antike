@@ -26,6 +26,7 @@ Dialecto: solo G00/G01 (sin arcos), G90 G21 G17, avances mm/min, comentarios ASC
 Cero de Z: 'top' = cara superior del material, 'bed' = cama (la cara queda en Z=grosor).
 """
 import math
+import re
 
 try:
     from shapely.geometry import Polygon, LineString
@@ -602,6 +603,83 @@ def _z_levels(material):
     return z_top, z_top + clear
 
 
+def _emit_cut(lines, verts, feed, plunge):
+    """Emite un tramo de corte XYZ. Todo movimiento que BAJA va al avance de PICADA.
+
+    ⚠️ Una rampa de entrada avanza y baja a la vez, así que para el control es un
+    movimiento de corte más — pero la fresa está estrenando material con su PUNTA, que
+    es justo donde peor corta. Emitirla al avance de corte la hunde varias veces más
+    rápido de lo que aguanta y deja rebaba en cada entrada: medido contra el archivo de
+    Aspire de la misma pieza (ago-2026), nuestra velocidad vertical de entrada era de
+    686 mm/min de mediana contra los 90 de Aspire, con picos de 2499 contra 381.
+    Todo CAM serio usa aquí el avance de picada. Se decide POR SEGMENTO para que el
+    tramo llano de la misma pasada no se frene de más.
+    """
+    zp = verts[0][2]
+    for x, y, z in verts[1:]:
+        lines.append('G01 X%s Y%s Z%s F%s'
+                     % (_f(x), _f(y), _f(z), _f(plunge if z < zp - 1e-9 else feed)))
+        zp = z
+
+
+_MOVE_RE = re.compile(r'^G0([01])((?: [XYZ]-?\d+(?:\.\d+)?)+)(?: F(\d+(?:\.\d+)?))?$')
+_AXIS_RE = re.compile(r'([XYZ])(-?\d+(?:\.\d+)?)')
+
+
+def _modal(lines):
+    """Compacta la salida como hace el post de Vectric para este control: quita los
+    movimientos que no van a ningún lado y omite las palabras que no cambian.
+
+    ⚠️ No es cosmética. El DSP lee y EJECUTA bloque a bloque: cada carácter de más es
+    trabajo que le compite al movimiento, el mismo mecanismo por el que los
+    micro-segmentos lo hacían tartamudear (ver `_simplify`). Nuestros bloques medían
+    32.3 caracteres contra los 17.1 del archivo de Aspire que la MISMA máquina corta
+    limpio, porque repetíamos `G01` y la `F` en cada línea.
+
+    Dos cautelas deliberadas:
+    - **Solo se compacta el G01.** Los rápidos conservan siempre su palabra `G`: son
+      cuatro docenas en todo el archivo, no ahorran nada, y no vale la pena dejar un
+      movimiento en el aire a merced del estado modal.
+    - **Tras cada G00 se vuelve a escribir la F** aunque no haya cambiado. El rápido no
+      la usa, pero así ningún corte depende de una `F` escrita antes de un salto.
+
+    Que el A11E entiende una línea sin `G` está probado por el propio archivo de Aspire
+    que Jose corta a diario: 9,917 de sus 11,889 líneas son un `X#Y#` pelado.
+    """
+    out = []
+    prev_g = None                     # última palabra G de movimiento EMITIDA
+    x = y = z = None
+    f = None
+    for ln in lines:
+        m = _MOVE_RE.match(ln)
+        if m is None:                 # comentarios, G90/G21/G17, M03, G04, M05, M30
+            out.append(ln)
+            continue
+        w = dict(_AXIS_RE.findall(m.group(2)))
+        nx = float(w['X']) if 'X' in w else x
+        ny = float(w['Y']) if 'Y' in w else y
+        nz = float(w['Z']) if 'Z' in w else z
+        if m.group(1) == '0':
+            out.append(ln)
+            prev_g, f = 0, None       # tras un rápido se reescribe la F
+            x, y, z = nx, ny, nz
+            continue
+        if (nx, ny, nz) == (x, y, z):
+            continue                  # movimiento de largo cero: frena a cero sin cortar
+        parts = ['G01'] if prev_g != 1 else []
+        for ax, new, old in (('X', nx, x), ('Y', ny, y), ('Z', nz, z)):
+            if ax in w and new != old:
+                parts.append(ax + w[ax])
+        nf = float(m.group(3)) if m.group(3) else None
+        if nf is not None and nf != f:
+            parts.append('F' + m.group(3))
+            f = nf
+        out.append(' '.join(parts))
+        prev_g = 1
+        x, y, z = nx, ny, nz
+    return out
+
+
 def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=0.0):
     """Emite perfil/cajeado. `start` = prof. inicial (el corte va de start a start+depth).
     Devuelve segundos estimados."""
@@ -665,8 +743,7 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
             if verts is not None:
                 if z_now is None or abs(verts[0][2] - z_now) > 1e-9:   # no repetir una Z en la que ya está
                     lines.append('G01 Z%s F%s' % (_f(verts[0][2]), _f(plunge)))
-                for x, y, z in verts[1:]:
-                    lines.append('G01 X%s Y%s Z%s F%s' % (_f(x), _f(y), _f(z), _f(feed)))
+                _emit_cut(lines, verts, feed, plunge)
                 z_now = verts[-1][2]
                 if not closed and d != ring_depths[-1]:
                     # ⚠️ un trayecto ABIERTO termina en el extremo lejano, pero la pasada
@@ -693,8 +770,7 @@ def _contour_body(lines, toolpaths, tool, depth, tabs, ramp, z_top, safe, start=
             fzones = zones if (zones and z_fin < z_tab - 1e-9) else None
             verts, s_cur = _ring_pass(pts, cum, perim, s_cur, z_fin, z_fin,
                                       0.0, fzones, z_tab, tab_ramp)
-            for x, y, z in verts[1:]:
-                lines.append('G01 X%s Y%s Z%s F%s' % (_f(x), _f(y), _f(z), _f(feed)))
+            _emit_cut(lines, verts, feed, plunge)
             secs += (perim / feed) * 60.0
         lines.append('G00 Z%s' % _f(safe))
     return secs
@@ -784,7 +860,7 @@ def build_jobs(jobs, material, name=''):
     if material.get('home_end', True):        # "posición final": volver al origen (configurable)
         lines.append('G00 X0 Y0')
     lines.append('M30')
-    return '\n'.join(lines) + '\n', secs
+    return '\n'.join(_modal(lines)) + '\n', secs
 
 
 # --- envolturas de un solo trabajo (compatibilidad con pruebas y backend viejo) ---

@@ -3901,15 +3901,22 @@
     // G-code → movimientos [x0,y0,z0,x1,y1,z1,rapid]. Solo hay G00/G01 (límite del
     // RichAuto). X/Y arrancan desconocidas (el primer G00 X Y viaja a Z segura):
     // hasta no tener las tres coordenadas no se emiten movimientos.
-    var mv=[], cx=null, cy=null, cz=null;
+    // ⚠️ La salida es MODAL desde ago-2026 (ver _modal en cnc_gcode.py): un corte puede
+    // venir como un 'X12.3 Y45.6' pelado, sin su G01. Descartar las líneas que no
+    // empiezan con G deja la vista 3D casi VACÍA sin dar ningún error — que es justo
+    // como este parser se rompió al hacer modal la salida. El modo vigente se arrastra.
+    var mv=[], cx=null, cy=null, cz=null, rapid=null;
     tap.split('\n').forEach(function(ln){
-      var g=/^G0?([01])\b/.exec(ln); if(!g) return;
+      var g=/^G0?([01])\b/.exec(ln);
+      if(g) rapid=(g[1]==='0');
+      else if(!/^[XYZ]-?[0-9.]/.test(ln)) return;   // comentario, M03, G04, G90…
+      if(rapid===null) return;                      // aún no hay modo de movimiento
       var nx=cx, ny=cy, nz=cz, m;
       m=/X(-?[0-9.]+)/.exec(ln); if(m) nx=parseFloat(m[1]);
       m=/Y(-?[0-9.]+)/.exec(ln); if(m) ny=parseFloat(m[1]);
       m=/Z(-?[0-9.]+)/.exec(ln); if(m) nz=parseFloat(m[1]);
       if(cx!==null&&cy!==null&&cz!==null&&(nx!==cx||ny!==cy||nz!==cz))
-        mv.push([cx,cy,cz,nx,ny,nz,g[1]==='0'?1:0]);
+        mv.push([cx,cy,cz,nx,ny,nz,rapid?1:0]);
       cx=nx; cy=ny; cz=nz;
     });
     return mv;
