@@ -124,6 +124,14 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   para acelerar** (`v²/2a`); si el segmento típico es más corto, el número del archivo no lo
   va a ver nadie. Esto vive en los **presets de fresa**, no en el código: el código no valida
   esa relación (candidato a aviso en la UI).
+- ⚠️ **CNC: la profundidad por pasada se fija en DOS sitios, y gana el del formulario.** La
+  biblioteca de fresas trae `pass_depth` (el máximo), pero el campo **"Pasadas"** de la
+  operación pasa por `effPassDepth()` (`studio_ui.html`), que devuelve **`profundidad / N`**
+  en cuanto escribes un N distinto del automático — y **ese N sobrevive a que cambies la
+  biblioteca**. Caso real (ago-2026): la biblioteca en 5.0 mm daría 3 pasadas de 4.07 en un
+  corte de 12.2, pero el archivo salió con **2 de 6.10** porque el formulario tenía un 2
+  escrito a mano. **Antes de culpar al preset, mira cuál de los dos manda**; la cuenta del
+  archivo lo delata (12.2/2 = 6.1 exacto es imposible con `pass_depth` 5.0).
 - **Tres modos de selección/transformación** según estado: **individual** (`_sel_idx >= 0`, escala y
   rotación ABSOLUTAS), **grupo manual** (`_sel_set` no vacío, RELATIVAS) y **todos** (ambos vacíos,
   RELATIVAS). Toda transformación debe respetar los tres.

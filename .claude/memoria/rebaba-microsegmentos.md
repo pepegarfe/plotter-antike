@@ -219,9 +219,18 @@ pedido: F1270 → 13.02 min, F4000 → 12.20 min. **48 segundos**, a cambio de 6
 
 Aspire: **5 pasadas de 2.44 mm**. Nosotros: **2 de 6.10 mm** = **1.02 × el diámetro** de la fresa
 (todo el filo enterrado a la vez), **7× la fuerza de corte pedida**. La fresa se flexiona y rebota:
-causa de rebaba **distinta** de la vibración. ⚠️ **Esto salió de un consejo mío de ago-2026**
-(subir la pasada máxima para ganar tiempo en el cajeado); Jose la subió y la cuenta llegó en
-rebaba. **Ganar minutos subiendo la pasada tiene un precio que no se ve en la simulación.**
+causa de rebaba **distinta** de la vibración.
+
+⚠️ **CORREGIDO el 29-ago (yo lo había atribuido mal).** Primero dije que Jose había subido la
+pasada de la biblioteca siguiendo un consejo mío de agosto. **Falso**: su biblioteca sigue en
+`pass_depth = 5.0` para MDF (verificado en `cnc_config.json`), que daría `ceil(12.2/5) = 3`
+pasadas de 4.07 mm. Los 6.10 mm salen del campo **"Pasadas" del formulario de la operación,
+puesto en 2** — `effPassDepth()` en `studio_ui.html` devuelve `profundidad/N` cuando escribes
+un N distinto del automático, y **ese campo le GANA a la biblioteca**. Consecuencia práctica:
+cambiar la pasada de la biblioteca **no arregla nada** mientras el trabajo tenga el N forzado.
+**Lección: antes de culpar a una configuración, comprueba cuál de los dos sitios que la fijan
+está mandando** — aquí la evidencia estaba en el archivo (12.2/2 = 6.1 exacto, imposible con
+pass_depth 5.0).
 
 ## 3. Entrábamos al material 7× más rápido (bug nuestro)
 
@@ -245,10 +254,11 @@ de entrada: **mediana 686 mm/min y picos de 2499**, contra los **90/381** de Asp
 
 ## Lo que NO se tocó, y por qué
 
-Los **presets de fresa** (avance 4000, pasada 5 mm) son la causa dominante y **son datos vivos de
-Jose**: no se cambian desde el escritorio sin cortar. Recomendado para 6 mm / 2 filos en triplay:
-**avance 1500, picada 400, pasada máx. 3.0** — cuesta ~5 min más por hoja. ⏳ **PENDIENTE: que
-Jose corte el A/B.** Nadie ha probado todavía en la madera que esto sea lo que era.
+Los **presets** son la causa dominante y **son datos vivos de Jose**: no se cambian desde el
+escritorio sin cortar. Recomendado para 6 mm / 2 filos en triplay: **avance 1500, bajada 400**
+(biblioteca de fresas, por material) y **"Pasadas" = 5** en cada trayectoria de 12.2 mm — que es
+el campo que de verdad manda. ⏳ **PENDIENTE: que Jose corte el A/B.** Nadie ha probado todavía
+en la madera que esto sea lo que era.
 
 ## Lección de la ronda 2
 
