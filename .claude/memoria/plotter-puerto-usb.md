@@ -45,4 +45,61 @@ o sea que la lista cruda invitaba a elegir mal.
   folder de config; archivo propio porque la app tkinter reescribe `plotter_config.json`
   con solo sus llaves). Una conexión fallida **no** se guarda.
 
+---
+
+# SEGUNDO EPISODIO — 2-sep-2026: esta vez SÍ era el programa, y no era detección
+
+Jose: *"¿por qué el programa no está detectando el plotter? ya está conectado"*. El orden de
+diagnóstico de agosto pasó los tres pasos **sin encontrar nada**:
+
+| comprobación | resultado |
+|---|---|
+| ¿lo ve el sistema? | **sí** — `/dev/cu.usbserial-AO004NFH`, creado ese día 09:12 |
+| ¿lo ve pyserial, en el intérprete que corre la app? | **sí** — Python 3.14.6, pyserial 3.5 |
+| ¿lo arma bien `_port_items()`? | **sí** — primero de la lista, `Cable USB — FT232R USB UART` |
+
+**No era detección: era PRESELECCIÓN.** `plotter_prefs.json` recordaba
+`/dev/cu.Buds3ProdeJose` — **sus audífonos** — y en `refreshPorts` la memoria se evaluaba
+ANTES que la autoselección del único cable:
+
+```js
+var cur = sel.value || pref || lastPort;                     // pref = los audifonos
+if(cur && rutas.indexOf(cur)>=0){ sel.value=cur; return; }   // <- se salia AQUI
+if(usb.length===1) sel.value=usb[0].port;                    // <- nunca llegaba
+```
+
+Como los audífonos **siguen existiendo** en la lista, ganaban siempre. El plotter estaba en
+el desplegable, bajo "Cables USB", pero el que aparecía elegido era otro.
+
+**Cómo llegaron ahí:** `_prefs_save()` guarda al conectar, y **abrir un puerto Bluetooth
+SIEMPRE "funciona"** aunque no haya nada del otro lado — así que una conexión equivocada se
+graba como si fuera buena. La guarda "una conexión fallida no se guarda" no sirve aquí:
+*no falló*.
+
+## El arreglo (`refreshPorts` en `studio_ui.html`)
+
+Prioridad explícita, con el recordado **al final**:
+
+1. el puerto **realmente conectado** (`connPort`) — no se lo quita nadie;
+2. lo que el usuario eligió a mano en el panel (sobrevive a pulsar ↻);
+3. **el único cable USB** — si solo hay uno, ese es el plotter;
+4. el puerto recordado.
+
+Probado en node con el `refreshPorts` real y un DOM falso, **8 casos, antes y después**: solo
+cambian los dos que estaban mal (el de Jose, y "ya conectado", que también se dejaba pisar por
+la memoria); los otros seis dan idéntico. La explicación vive **en un comentario dentro de la
+propia función**, que es donde alguien la va a romper.
+
+⚠️ **NO se tocó `plotter_control.py`** (la app tkinter): su `_refresh_ports` elige `ports[0]`
+a ciegas, que en esta Mac sería la consola de depuración. No se distribuye desde jul-2026 y el
+trabajo de puertos de agosto tampoco la tocó — queda anotado, no arreglado.
+
+## Lección
+
+El orden *sistema → refresco → driver* es bueno pero **incompleto**: da por hecho que el
+síntoma es "no aparece". Cuando los tres pasos salen limpios, **deja de preguntar por qué no
+aparece el que buscas y mira qué apareció en su lugar** — la respuesta estaba en un archivo de
+una línea. Y como regla de diseño: **una preferencia recordada no debe ganarle a una señal
+física del presente** (aquí, un VID/PID de cable USB real).
+
 Ver [[design-studio]] y [[estado]].
