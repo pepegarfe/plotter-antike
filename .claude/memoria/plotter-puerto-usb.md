@@ -94,6 +94,24 @@ propia función**, que es donde alguien la va a romper.
 a ciegas, que en esta Mac sería la consola de depuración. No se distribuye desde jul-2026 y el
 trabajo de puertos de agosto tampoco la tocó — queda anotado, no arreglado.
 
+✅ **COMMITEADO el 7-sep-2026** (`335f798`), tras rehacer las 8 pruebas en node (8/8). Estuvo
+cinco días sin commitear: funcionaba porque la app lee el archivo del disco, pero un `git
+checkout` accidental lo habría borrado sin dejar rastro.
+
+## Tercer episodio (7-sep-2026): otra vez el cable, no el programa
+
+Jose vuelve con "sigue sin detectar el plotter". **Esta vez sí era el hardware.** Medido:
+`/dev/cu.*` solo tenía Bluetooth, los audífonos y `debug-console` — ningún `usbserial-*` — y
+`ioreg -p IOUSB` devolvía **los dos controladores XHCI y cero dispositivos colgando** (uno de
+ellos 99 % del tiempo apagado: nadie tocó ese bus). Sin enumeración del kernel no hay nada que
+la app pueda filtrar mal.
+
+**Por qué importa el orden:** los dos episodios anteriores enseñaron a desconfiar del programa,
+y era tentador ir directo al código recién tocado. Un `ls /dev/cu.*` de un segundo separa los
+dos mundos **antes** de abrir un editor: si el puerto no está ahí, ningún cambio en el código lo
+va a materializar. Se dejó un vigía muestreando cada 2 s (mismo truco del 18-ago) para fechar la
+reconexión con hora exacta en lugar de abrir la app a ciegas.
+
 ## Lección
 
 El orden *sistema → refresco → driver* es bueno pero **incompleto**: da por hecho que el
