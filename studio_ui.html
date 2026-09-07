@@ -3338,7 +3338,9 @@
   // La lista muestra NOMBRES LEGIBLES ('Cable USB — FT232R USB UART'), no /dev/cu.usbserial-AO004NFH,
   // y separa los cables USB de los aparatos internos del sistema, que nunca son un plotter.
   // El valor de cada opción sigue siendo la ruta real: eso es lo que se le manda al backend.
-  function refreshPorts(pref){ return P.ports().then(function(r){ var sel=el('portSel'), cur=sel.value||pref||lastPort;
+  function refreshPorts(pref){ return P.ports().then(function(r){ var sel=el('portSel');
+    var vivo=sel.value||'';                 // lo que estaba elegido ANTES de repintar
+    var mem=pref||lastPort||'';             // el puerto de la ultima conexion exitosa
     var items=(r&&r.items)||((r&&r.ports)||[]).map(function(p){ return {port:p, label:p, kind:'otro'}; });
     sel.innerHTML='';
     if(!items.length){ sel.innerHTML='<option value="">— sin puertos —</option>'; return; }
@@ -3350,9 +3352,17 @@
       sel.appendChild(og); });
     items.forEach(function(i){ portLabels[i.port]=i.label; });
     var rutas=items.map(function(i){ return i.port; });
-    if(cur && rutas.indexOf(cur)>=0){ sel.value=cur; return; }
     var usb=items.filter(function(i){ return i.kind==='usb'; });
-    if(usb.length===1) sel.value=usb[0].port;      // sin memoria y un solo cable: ese es
+    // Qué sale PRESELECCIONADO, en orden de prioridad.
+    // ⚠️ El puerto RECORDADO va al FINAL y nunca le gana a un cable USB. Se guarda al
+    // conectar, y abrir un puerto Bluetooth SIEMPRE "funciona" aunque no haya nada
+    // detrás: unos audífonos emparejados quedaban elegidos para siempre y el plotter
+    // parecía no detectarse, estando en la lista (caso real sep-2026, en la Mac de
+    // Jose: /dev/cu.Buds3ProdeJose le ganaba al FTDI que sí estaba conectado).
+    if(connected && connPort && rutas.indexOf(connPort)>=0){ sel.value=connPort; return; }
+    if(vivo && rutas.indexOf(vivo)>=0){ sel.value=vivo; return; }   // tu elección manda
+    if(usb.length===1){ sel.value=usb[0].port; return; }            // un solo cable: ese es
+    if(mem && rutas.indexOf(mem)>=0) sel.value=mem;
   }).then(function(){ if(connected) setConnUI(true);   // repintar ya con los nombres legibles
   }).catch(function(){}); }
   function openPlotter(){ el('plotterModal').style.display='flex';
