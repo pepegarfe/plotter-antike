@@ -280,6 +280,17 @@ parámetros de Aspire **nunca se ha cortado**: es el siguiente paso, no más có
 
 Script de medición reutilizable: se escribió en el scratchpad de la sesión (no en el repo).
 
+### 28-oct-2026: preset de la Mac igualado a Aspire (a petición de Jose)
+
+`~/plotter-antike/cnc_config.json` (el que lee el Design Studio de la Mac al correr desde el repo;
+está en `.gitignore`), fresa `t6-2f` · MDF: **pasada 5.0→2.5, avance 4000→1270, bajada 1000→381,
+RPM 18000→16000** (marcha S6, igual que el `S16000` de Aspire). Respaldo del original:
+`/private/tmp/.../scratchpad/cnc_config.respaldo-28oct.json` (temporal; el valor viejo queda
+aquí escrito). Verificado con `cnc_get()` + `build_gcode` sobre un círculo a 12.2 mm: sale
+F1270/F381, `M03 S6` y **5 niveles −2.44…−12.20**, los mismos de Aspire. **NO tocado:** la PC del
+taller (Windows, su propio `cnc_config.json`) ni los defaults de `studio_backend.py`. El campo
+"Pasadas" del formulario sigue mandando si trae un número escrito a mano: hay que borrarlo.
+
 ## Lección de la ronda 2
 
 **Compara el avance PEDIDO contra la distancia que hay para acelerar** (`v²/2a`). Si el segmento
