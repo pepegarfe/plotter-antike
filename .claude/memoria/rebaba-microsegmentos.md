@@ -260,6 +260,26 @@ escritorio sin cortar. Recomendado para 6 mm / 2 filos en triplay: **avance 1500
 el campo que de verdad manda. ⏳ **PENDIENTE: que Jose corte el A/B.** Nadie ha probado todavía
 en la madera que esto sea lo que era.
 
+## Revisión 28-oct-2026: el `dstudio2` NO probó la ronda 2
+
+Jose: "Aspire deja mejor las piezas y no hemos logrado igualar el nivel". Se midió
+`cocodrilo dstudio2.tap` (29-ago 16:03, generado DESPUÉS del commit 52917e6) contra el de Aspire:
+
+| | Aspire | DS (29-ago 13:01) | **DS2 (29-ago 16:03)** |
+|---|---|---|---|
+| avance de corte | F1270 | F4000 | **F4000** (sin cambiar) |
+| perfil principal 12.2 mm | **5 pasadas de 2.44** | 2 de 6.10 | **2 de 6.10** (sin cambiar) |
+| bajada al material, mediana | 90 | 686 | 172 ✅ (arreglo de código activo) |
+| segmentos < 0.2 mm | 14.2 % | 1.2 % | 1.2 % |
+
+Conclusión: los **arreglos de código sí entraron** (picada, modal), pero **las dos causas
+dominantes —el avance y las pasadas— siguen iguales**, así que ese archivo no puede igualar a
+Aspire ni sirve para juzgar los arreglos. Los presets del Mac (`cnc_config.json`, 17-oct) siguen
+en `t6-2f` MDF **feed 4000 / plunge 1000** (la PC del taller no se pudo revisar). El A/B con los
+parámetros de Aspire **nunca se ha cortado**: es el siguiente paso, no más código.
+
+Script de medición reutilizable: se escribió en el scratchpad de la sesión (no en el repo).
+
 ## Lección de la ronda 2
 
 **Compara el avance PEDIDO contra la distancia que hay para acelerar** (`v²/2a`). Si el segmento
