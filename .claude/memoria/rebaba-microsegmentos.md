@@ -291,6 +291,13 @@ F1270/F381, `M03 S6` y **5 niveles −2.44…−12.20**, los mismos de Aspire. *
 taller (Windows, su propio `cnc_config.json`) ni los defaults de `studio_backend.py`. El campo
 "Pasadas" del formulario sigue mandando si trae un número escrito a mano: hay que borrarlo.
 
+**Mismo día, opción "de fábrica" (commit b5d528b, SIN publicar todavía):** defaults de
+`studio_backend.py` a los mismos 4 números + `_PRESET_FIXES`/`preset_rev`, que corrige UNA vez las
+instalaciones que conservan F4000/1000/5/18000 y respeta las ajustadas a mano (5 escenarios
+probados; auditor 133 OK). El push + tag `v2026.10.28` lo bloqueó el permiso: queda esperando a
+Jose. ⚠️ Ese release también estrena todo lo de después de `v2026.08.04` (ronda 2 incluida): **la PC
+del taller nunca tuvo la ronda 2**.
+
 ## Lección de la ronda 2
 
 **Compara el avance PEDIDO contra la distancia que hay para acelerar** (`v²/2a`). Si el segmento
