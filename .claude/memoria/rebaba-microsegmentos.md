@@ -295,7 +295,7 @@ taller (Windows, su propio `cnc_config.json`) ni los defaults de `studio_backend
 `studio_backend.py` a los mismos 4 números + `_PRESET_FIXES`/`preset_rev`, que corrige UNA vez las
 instalaciones que conservan F4000/1000/5/18000 y respeta las ajustadas a mano (5 escenarios
 probados; auditor 133 OK). El push + tag `v2026.10.28` lo bloqueó el permiso: queda esperando a
-Jose. ⚠️ Ese release también estrena todo lo de después de `v2026.08.04` (ronda 2 incluida): **la PC
+Jose. → Jose lo publicó él mismo; **`v2026.10.28` salió ROTA** (PyMuPDF 2.0, ver CLAUDE.md, Distribución): Mac no se publicó, Windows sí y no arranca. Arreglo de CI en commit 1075a07; la rota quedó en borrador y **`v2026.10.28.1` se publicó bien** (Mac y Windows, PyMuPDF 1.28.2; diagnóstico de Mac "todo completo", el de Windows solo da código 0 — su texto no llega al log). ⚠️ Ese release también estrena todo lo de después de `v2026.08.04` (ronda 2 incluida): **la PC
 del taller nunca tuvo la ronda 2**.
 
 ## Lección de la ronda 2
