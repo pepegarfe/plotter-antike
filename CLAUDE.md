@@ -132,6 +132,10 @@ ese archivo. **No separar en varios archivos sin pedido explícito.**
   corte de 12.2, pero el archivo salió con **2 de 6.10** porque el formulario tenía un 2
   escrito a mano. **Antes de culpar al preset, mira cuál de los dos manda**; la cuenta del
   archivo lo delata (12.2/2 = 6.1 exacto es imposible con `pass_depth` 5.0).
+- ⚠️ **Cambiar `CNC_DEFAULTS` NO llega a las instalaciones que ya existen**: `cnc_get()` toma la
+  lista `tools` guardada ENTERA. Para corregir un dato de fábrica en el campo, agrega una entrada
+  a `_PRESET_FIXES` (`studio_backend.py`): se aplica una sola vez por `preset_rev` y solo si la
+  fresa conserva los números viejos de fábrica — lo que Jose ajustó a mano no se toca.
 - **Tres modos de selección/transformación** según estado: **individual** (`_sel_idx >= 0`, escala y
   rotación ABSOLUTAS), **grupo manual** (`_sel_set` no vacío, RELATIVAS) y **todos** (ambos vacíos,
   RELATIVAS). Toda transformación debe respetar los tres.

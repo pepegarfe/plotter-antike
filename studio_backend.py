@@ -128,6 +128,7 @@ CNC_DEFAULTS = {
         {'id': 'mad', 'name': 'Madera sólida'},
     ],
     'tool_sel': 't6-2f',
+    'preset_rev': 1,                                   # ver _PRESET_FIXES: correcciones ya aplicadas
     # Las 5 fresas más comunes de un router de taller, con datos de ARRANQUE por material,
     # basados en tablas de chip load publicadas (feed = RPM × filos × chip load) y práctica
     # de rotulación: MDF ~0.10–0.25 mm/diente; acrílico SIEMPRE mejor con 1 filo (O-flute) y
@@ -146,7 +147,11 @@ CNC_DEFAULTS = {
         {'id': 't6-2f', 'name': 'Fresa 6 mm · 2 filos (espiral)', 'dia': 6.0,
          'notes': 'El caballo de batalla en MDF, triplay y madera. En acrílico tiende a derretir: mejor la de 1 filo.',
          'cut': {
-            'mdf': {'pass_depth': 5.0, 'feed': 4000, 'plunge': 1000, 'rpm': 18000, 'stepover_pct': 40},
+            # MDF = los datos del `.tap` de Aspire que deja la pieza limpia (28-oct-2026), NO la
+            # tabla de chip load (da 0.04 mm/filo, debajo del rango "ideal"): lo que manda en
+            # contornos ondulados es que la máquina vaya PAREJA, no el bocado ideal. 12.2 mm ÷
+            # 2.5 = 5 pasadas de 2.44, las mismas de Aspire. Ver memoria rebaba-microsegmentos.
+            'mdf': {'pass_depth': 2.5, 'feed': 1270, 'plunge': 381,  'rpm': 16000, 'stepover_pct': 40},
             'acr': {'pass_depth': 2.5, 'feed': 1800, 'plunge': 450,  'rpm': 16000, 'stepover_pct': 35},
             'pvc': {'pass_depth': 6.0, 'feed': 3000, 'plunge': 900,  'rpm': 14000, 'stepover_pct': 45},
             'mad': {'pass_depth': 4.0, 'feed': 2800, 'plunge': 800,  'rpm': 18000, 'stepover_pct': 40},
@@ -211,6 +216,33 @@ def _migrate_tools_v1(old_tools, materials):
     return out
 
 
+# Correcciones de los datos de FÁBRICA que deben llegar a las instalaciones que ya existen (la
+# config guardada reemplaza a CNC_DEFAULTS entera, así que cambiar los defaults no basta). Cada
+# una se aplica UNA vez (`preset_rev`) y solo si la fresa sigue con los números VIEJOS de fábrica:
+# si Jose ya los ajustó a mano, son suyos y no se tocan.
+_PRESET_FIXES = [
+    # rev 1 (28-oct-2026): 6 mm 2 filos en MDF, de F4000 a los datos de Aspire
+    (1, 't6-2f', 'mdf',
+     {'pass_depth': 5.0, 'feed': 4000, 'plunge': 1000, 'rpm': 18000},
+     {'pass_depth': 2.5, 'feed': 1270, 'plunge': 381, 'rpm': 16000}),
+]
+
+
+def _apply_preset_fixes(data, rev):
+    """Aplica las correcciones de fábrica pendientes (> rev). Devuelve True si hay que guardar."""
+    if rev >= _PRESET_FIXES[-1][0]:
+        return False
+    for n, tid, mid, old, new in _PRESET_FIXES:
+        if n <= rev:
+            continue
+        for t in data['tools']:
+            cut = (t.get('cut') or {}).get(mid)
+            if t.get('id') == tid and cut and all(float(cut.get(k, -1)) == v for k, v in old.items()):
+                cut.update({k: float(v) for k, v in new.items()})
+    data['preset_rev'] = _PRESET_FIXES[-1][0]
+    return True
+
+
 def cnc_get():
     """Config del CNC completa (defaults + lo guardado encima), migrando esquemas viejos."""
     data = json.loads(json.dumps(CNC_DEFAULTS))   # copia profunda de los defaults
@@ -222,6 +254,7 @@ def cnc_get():
                       'material', 'materials', 'tool_sel', 'tools'):
                 if k in saved:
                     data[k] = saved[k]
+            fix = _apply_preset_fixes(data, int(saved.get('preset_rev', 0) or 0))
             data['material'] = {**CNC_DEFAULTS['material'], **(data.get('material') or {})}
             data['quote'] = {**CNC_DEFAULTS['quote'], **(data.get('quote') or {})}
             if data['tools'] and 'cut' not in data['tools'][0]:      # esquema v1 → migrar
@@ -234,6 +267,11 @@ def cnc_get():
                                         ensure_ascii=False, indent=1), encoding='utf-8')
             if not any(m['id'] == data['material'].get('type') for m in data['materials']):
                 data['material']['type'] = data['materials'][0]['id']
+            if fix:   # aparte: si no se puede escribir, la corrección igual vale en memoria
+                try:
+                    p.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding='utf-8')
+                except Exception:
+                    pass
     except Exception:
         pass
     data['ok'] = True
