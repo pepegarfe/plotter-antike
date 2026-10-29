@@ -238,6 +238,11 @@ en el repo como motor y como respaldo, pero **ya no se compila ni se publica**.
 - **`DesignStudio --diagnostico`** imprime qué piezas trae la app y cuáles faltan. La CI lo corre
   tras compilar: una app puede arrancar perfecta y tener el texto o el acomodo muertos porque una
   librería no quedó empaquetada.
+- ⚠️ **`pymupdf<2` fijo en la CI.** PyMuPDF 2.0 (oct-2026) arrastra `pymupdf-layout`, que se
+  activa al importar y busca un modelo `.yaml` que PyInstaller no empaqueta: **la app no arranca**
+  (`v2026.10.28` salió así). Antes de quitar el tope, compila y corre `--diagnostico` en local.
+  En Windows el diagnóstico va con `Start-Process -Wait`: llamado a secas, el código de error del
+  `.exe` de ventana se perdía y la app rota pasó como "éxito".
 - **Mac sin firmar** (Jose no tiene cuenta de Apple): la primera vez hay que abrirla con
   **clic derecho → Abrir**, o `xattr -cr` si dice "está dañada". Va explicado en las notas del release.
 - ⚠️ **Windows: `instalar_studio.ps1` DEBE hacer `Unblock-File` recursivo** tras copiar. Windows

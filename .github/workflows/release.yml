@@ -93,7 +93,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller pywebview pyserial ezdxf pymupdf shapely fonttools pillow bottle
+          pip install pyinstaller pywebview pyserial ezdxf "pymupdf<2" shapely fonttools pillow bottle
           pip install vtracer || echo "AVISO: sin vtracer, el calco a color no estara disponible"
 
       - name: Escribir version.txt
@@ -109,7 +109,12 @@ jobs:
         run: python -m PyInstaller DesignStudio.spec --noconfirm --clean
 
       - name: Comprobar que la app trae todo
-        run: dist\DesignStudio\DesignStudio.exe --diagnostico
+        # ⚠️ Con Start-Process -Wait: llamado a secas, el .exe de ventana no le pasaba su código de
+        # salida a PowerShell y una app que NO ARRANCABA salió como "éxito" (v2026.10.28).
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\DesignStudio\DesignStudio.exe -ArgumentList '--diagnostico' -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { Write-Error "La app fallo al arrancar (codigo $($p.ExitCode))"; exit 1 }
 
       - name: Empaquetar
         shell: pwsh
@@ -137,7 +142,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller pywebview pyserial ezdxf pymupdf shapely fonttools pillow bottle
+          pip install pyinstaller pywebview pyserial ezdxf "pymupdf<2" shapely fonttools pillow bottle
           pip install vtracer || echo "AVISO: sin vtracer, el calco a color no estara disponible"
           brew install potrace
 
