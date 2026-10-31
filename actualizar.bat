@@ -68,10 +68,10 @@ echo   - Instalado localmente en este equipo.
 echo   - Build automatico iniciado en GitHub para Windows y Mac.
 echo.
 echo   Ver progreso:
-echo   https://github.com/pepegarfe/plotter-antike/actions
+echo   https://github.com/pepegarfe/Design-Studio/actions
 echo.
 echo   Link de descarga (listo en ~5 min):
-echo   https://github.com/pepegarfe/plotter-antike/releases/latest
+echo   https://github.com/pepegarfe/Design-Studio/releases/latest
 echo  ===================================================
 echo.
 pause

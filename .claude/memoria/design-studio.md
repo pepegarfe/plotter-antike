@@ -23,7 +23,7 @@ El aspecto de la app tkinter tiene techo (no compite con Illustrator). Jose pidi
 look profesional. Se eligió **web + backend Python** (pywebview) porque la maqueta aprobada es HTML/CSS
 y así se convierte directo en la app; el motor Python se reusa por debajo.
 
-## Arquitectura y archivos (todos en `~/plotter-antike/`)
+## Arquitectura y archivos (todos en `~/Design-Studio/`)
 - **`design_studio.py`** — entrada de ESCRITORIO (ventana nativa pywebview). Clase `Api` = puente
   JS↔Python. Carga `studio_ui.html`.
 - **`studio_server.py`** — modo SERVIDOR web (bottle, puerto 8765): sirve `studio_ui.html` y expone la
@@ -777,7 +777,7 @@ no en la raíz de `__DS`).
 ## Lanzador de escritorio (Mac) — ícono "Design Studio.app"
 Igual que Plotter Antike, hay un **ícono en el Escritorio** que lanza la app con doble clic. Es una
 **mini-app de AppleScript** (`osacompile`) que por dentro solo corre:
-`/opt/homebrew/bin/python3 /Users/josegf/plotter-antike/design_studio.py`. **NO es la app compilada de
+`/opt/homebrew/bin/python3 /Users/josegf/Design-Studio/design_studio.py`. **NO es la app compilada de
 97 MB** (`dist/DesignStudio.app`); es el atajo ligero de desarrollo — si mueves/borras la carpeta del
 código, deja de funcionar. Ícono propio: cuadro magenta de la marca + cursor blanco de selección.
 - ⚠️ **Gotcha que costó rato:** en macOS moderno (26.x) reemplazar `Contents/Resources/applet.icns`
@@ -791,11 +791,11 @@ código, deja de funcionar. Ícono propio: cuadro magenta de la marca + cursor b
 ## Cómo correrla y compilarla (Mac, Python de Homebrew)
 ```bash
 # Escritorio (ventana nativa):
-/opt/homebrew/bin/python3 ~/plotter-antike/design_studio.py
+/opt/homebrew/bin/python3 ~/Design-Studio/design_studio.py
 # Modo web (para depurar en el navegador): abre http://localhost:8765
-/opt/homebrew/bin/python3 ~/plotter-antike/studio_server.py
+/opt/homebrew/bin/python3 ~/Design-Studio/studio_server.py
 # Compilar app de Mac:
-cd ~/plotter-antike && /opt/homebrew/bin/python3 -m PyInstaller --windowed --noconfirm \
+cd ~/Design-Studio && /opt/homebrew/bin/python3 -m PyInstaller --windowed --noconfirm \
   --name DesignStudio --add-data "studio_ui.html:." --add-data "version.txt:." \
   --collect-all webview design_studio.py    # → dist/DesignStudio.app
 ```

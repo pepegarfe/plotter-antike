@@ -282,7 +282,7 @@ Script de medición reutilizable: se escribió en el scratchpad de la sesión (n
 
 ### 28-oct-2026: preset de la Mac igualado a Aspire (a petición de Jose)
 
-`~/plotter-antike/cnc_config.json` (el que lee el Design Studio de la Mac al correr desde el repo;
+`~/Design-Studio/cnc_config.json` (el que lee el Design Studio de la Mac al correr desde el repo;
 está en `.gitignore`), fresa `t6-2f` · MDF: **pasada 5.0→2.5, avance 4000→1270, bajada 1000→381,
 RPM 18000→16000** (marcha S6, igual que el `S16000` de Aspire). Respaldo del original:
 `/private/tmp/.../scratchpad/cnc_config.respaldo-28oct.json` (temporal; el valor viejo queda

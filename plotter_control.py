@@ -96,7 +96,7 @@ def _get_version():
 
 
 VERSION = _get_version()
-GITHUB_REPO = "pepegarfe/plotter-antike"
+GITHUB_REPO = "pepegarfe/Design-Studio"
 
 
 def _vkey(s):

@@ -22,8 +22,13 @@ no se puede probar el envío real al plotter aquí (no hay hardware ni el puerto
 > intacta.
 
 ## Estado al 21-jul-2026 (recién dado de alta en el sistema de conocimiento)
-- Repo `pepegarfe/plotter-antike` (público), rama `master`, 25 commits, último hace ~8 semanas.
-- Clonado en `~/plotter-antike`. **No es un proyecto activo** ahora mismo; se rescató del olvido.
+- Repo `pepegarfe/Design-Studio` (público), rama `master`, 25 commits, último hace ~8 semanas.
+- Clonado en `~/Design-Studio`.
+- **31-oct-2026: renombrado** de `plotter-antike` a `Design-Studio` (repo y carpeta; antes
+  `pepegarfe/plotter-antike` y `~/plotter-antike`). Las apps ya instaladas traen el nombre viejo
+  en `updater.py` y **siguen actualizándose gracias a la redirección de GitHub** (probada con
+  `urllib`). ⚠️ **Nunca crear otro repo llamado `plotter-antike`**: mataría esa redirección y las
+  instalaciones viejas dejarían de ver actualizaciones sin ningún error. **No es un proyecto activo** ahora mismo; se rescató del olvido.
 - **No autodespliega** (es app de escritorio) → editar notas NO reinicia nada; sin candados de
   Watch Paths que cuidar, a diferencia de Omniseller.
 
@@ -69,7 +74,7 @@ Se hizo un rediseño visual grande, en olas verificadas una por una con capturas
 ## Cómo correrlo en la Mac de Jose (instalado el 21-jul-2026)
 ⚠️ **Usar el Python de Homebrew, NO el del sistema:**
 ```bash
-/opt/homebrew/bin/python3 /Users/josegf/plotter-antike/plotter_control.py   # Python 3.14, Tk 9.0
+/opt/homebrew/bin/python3 /Users/josegf/Design-Studio/plotter_control.py   # Python 3.14, Tk 9.0
 ```
 Hay un **ícono "Plotter Antike" en el Escritorio** (app de AppleScript) que lanza justo eso con
 doble clic. Dependencias instaladas para ese Python: `pyserial ezdxf pymupdf`

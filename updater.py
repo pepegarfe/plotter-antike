@@ -26,7 +26,7 @@ import threading
 import urllib.request
 from pathlib import Path
 
-REPO = 'pepegarfe/plotter-antike'
+REPO = 'pepegarfe/Design-Studio'
 APP = 'DesignStudio'
 API_URL = f'https://api.github.com/repos/{REPO}/releases/latest'
 PAGE_URL = f'https://github.com/{REPO}/releases/latest'
